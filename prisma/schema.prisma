@@ -1,0 +1,127 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  password    String   // For simple auth
+  department  String?  // 学部など
+  laboratory  String?  // 研究室 (旧 affiliation)
+  extension   String?  // 内線
+  role        String   @default("USER") // USER, ADMIN
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reservations Reservation[]
+  usageLogs    UsageLog[]
+  invoices     Invoice[]
+}
+
+model Equipment {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reservations Reservation[]
+}
+
+model Reservation {
+  id          String   @id @default(cuid())
+  equipmentId String
+  userId      String
+  startTime   DateTime
+  endTime     DateTime
+  phoneNumber String?  // Optional contact number (Added for better communication)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+model Reagent {
+  id        String   @id @default(cuid())
+  name      String
+  unitPrice Float
+  stock     Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usageLogs UsageLog[]
+}
+
+model UsageLog {
+  id        String   @id @default(cuid())
+  userId    String
+  reagentId String
+  quantity  Int
+  totalCost Float
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  reagent Reagent @relation(fields: [reagentId], references: [id])
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  
+  // 期間情報
+  fiscalYear    Int      // 年度
+  quarter       Int      // 四半期 (1, 2, 3)
+  startDate     DateTime
+  endDate       DateTime
+  
+  // 金額情報
+  totalAmount   Float
+  
+  // 請求書情報
+  issuedDate    DateTime @default(now())
+  status        String   @default("draft") // draft, issued, paid
+  
+  // 支出予算情報（任意）
+  budgetDepartment String?
+  budgetCategory   String?
+  budgetCode       String?
+  
+  // 関連データ
+  items         InvoiceItem[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  
+  date        DateTime
+  itemName    String   // 利用項目名
+  unitPrice   Float    // 単価
+  quantity    Int      // 個数
+  amount      Float    // 合計
+  
+  // 元データへの参照（任意）
+  reservationId String?
+  reagentLogId  String?
+  
+  createdAt   DateTime @default(now())
+}
+

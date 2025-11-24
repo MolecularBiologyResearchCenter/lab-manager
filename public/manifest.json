@@ -1,0 +1,24 @@
+{
+    "name": "北里大学 医学部 分子生物実験センター",
+    "short_name": "分子生物実験センター",
+    "description": "Lab Management System for Kitasato University School of Medicine",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#2563eb",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/images/kitasato-logo.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/images/kitasato-logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}
