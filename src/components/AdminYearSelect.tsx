@@ -46,7 +46,7 @@ export default function AdminYearSelect({ currentYear }: Props) {
             <SelectTrigger className="w-[160px] bg-white">
                 <SelectValue placeholder="年選択" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false}>
                 {years.map((y) => (
                     <SelectItem key={y} value={y.toString()}>
                         {y}年

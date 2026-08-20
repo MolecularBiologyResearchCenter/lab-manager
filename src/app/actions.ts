@@ -1,6 +1,7 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
+import { sendEmail } from '@/lib/mail'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -293,16 +294,30 @@ export async function logout() {
 }
 
 export async function register(formData: FormData) {
-    const name = formData.get('name') as string
+    const lastName = formData.get('lastName') as string
+    const firstName = formData.get('firstName') as string
+    const lastNameKana = formData.get('lastNameKana') as string
+    const firstNameKana = formData.get('firstNameKana') as string
+    const employeeId = formData.get('employeeId') as string
+    const mailingList = formData.get('mailingList') === 'true' // Convert string to boolean
     const email = formData.get('email') as string
     const password = formData.get('password') as string
     const department = formData.get('department') as string
     const laboratory = formData.get('laboratory') as string
     const extension = formData.get('extension') as string
 
-    if (!name || !email || !password || !department || !laboratory) {
+    if (!lastName || !firstName || !lastNameKana || !firstNameKana || !employeeId || !email || !password || !department || !laboratory) {
         throw new Error('必須項目を入力してください。')
     }
+
+    // Password validation: at least 8 characters, alphanumeric
+    const passwordRegex = /^(?=.*[0-9])(?=.*[a-z]).{8,}$/
+    if (!passwordRegex.test(password)) {
+        throw new Error('パスワードは英小文字と数字を含む8文字以上で入力してください。')
+    }
+
+    const name = `${lastName} ${firstName}`
+    const nameKana = `${lastNameKana} ${firstNameKana}`
 
     const existingUser = await prisma.user.findUnique({
         where: { email },
@@ -315,6 +330,9 @@ export async function register(formData: FormData) {
     const user = await prisma.user.create({
         data: {
             name,
+            nameKana,
+            employeeId,
+            mailingList,
             email,
             password,
             department,
@@ -327,4 +345,217 @@ export async function register(formData: FormData) {
     cookieStore.set('userId', user.id, { httpOnly: true, secure: process.env.NODE_ENV === 'production' })
 
     redirect('/')
+}
+
+export async function remindPassword(formData: FormData) {
+    const email = formData.get('email') as string
+    const employeeId = formData.get('employeeId') as string
+
+    if (!email || !employeeId) {
+        throw new Error('メールアドレスと職員番号を入力してください。')
+    }
+
+    const user = await prisma.user.findFirst({
+        where: {
+            email,
+            employeeId,
+        },
+    })
+
+    if (!user) {
+        throw new Error('メールアドレスまたは職員番号が一致しません。')
+    }
+
+    await sendEmail({
+        to: email,
+        subject: '【分子生物実験センター】パスワード通知',
+        text: `${user.name} 様\n\nいつもご利用ありがとうございます。\n\n現在のパスワードをお知らせします。\n\nパスワード: ${user.password}\n\nログインはこちら: ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login`,
+    })
+}
+
+export async function deleteUser(userId: string) {
+    // Get current user to verify admin permissions
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        throw new Error('ログインが必要です。')
+    }
+
+    if (currentUser.role !== 'ADMIN') {
+        throw new Error('管理者権限が必要です。')
+    }
+
+    // Prevent self-deletion
+    if (currentUser.id === userId) {
+        throw new Error('自分自身を削除することはできません。')
+    }
+
+    // Delete the user
+    await prisma.user.delete({
+        where: { id: userId },
+    })
+
+    revalidatePath('/admin/users')
+}
+
+export async function updateProfile(
+    userId: string,
+    data: {
+        department?: string
+        laboratory?: string
+        extension?: string
+        currentPassword?: string
+        newPassword?: string
+    }
+) {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        throw new Error('ログインが必要です。')
+    }
+
+    if (currentUser.id !== userId) {
+        throw new Error('他のユーザーのプロフィールは変更できません。')
+    }
+
+    // Prepare update data
+    const updateData: any = {}
+    if (data.department !== undefined) updateData.department = data.department
+    if (data.laboratory !== undefined) updateData.laboratory = data.laboratory
+    if (data.extension !== undefined) updateData.extension = data.extension
+
+    // Handle password change
+    if (data.newPassword) {
+        if (!data.currentPassword) {
+            throw new Error('現在のパスワードを入力してください。')
+        }
+
+        if (currentUser.password !== data.currentPassword) {
+            throw new Error('現在のパスワードが間違っています。')
+        }
+
+        // Password validation
+        const passwordRegex = /^(?=.*[0-9])(?=.*[a-z]).{8,}$/
+        if (!passwordRegex.test(data.newPassword)) {
+            throw new Error('パスワードは英小文字と数字を含む8文字以上で入力してください。')
+        }
+
+        updateData.password = data.newPassword
+    }
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+    })
+
+    revalidatePath('/mypage')
+}
+
+export async function sealInvoice(invoiceId: string) {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        throw new Error('ログインが必要です。')
+    }
+
+    if (currentUser.role !== 'CENTER_DIRECTOR') {
+        throw new Error('権限がありません。')
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+        where: { id: invoiceId },
+    })
+
+    if (!invoice) {
+        throw new Error('請求書が見つかりません。')
+    }
+
+    await prisma.invoice.update({
+        where: { id: invoiceId },
+        data: {
+            sealedBy: currentUser.id,
+            sealedAt: new Date(),
+        },
+    })
+
+    revalidatePath(`/invoices/${invoiceId}`)
+    revalidatePath('/invoices')
+}
+
+export async function updateUserRole(userId: string, role: string) {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        throw new Error('ログインが必要です。')
+    }
+
+    if (currentUser.role !== 'ADMIN') {
+        throw new Error('管理者権限が必要です。')
+    }
+
+    if (!['USER', 'ADMIN', 'CENTER_DIRECTOR'].includes(role)) {
+        throw new Error('無効な権限です。')
+    }
+
+    // Prevent self-demotion from ADMIN (optional, but good practice)
+    if (currentUser.id === userId && role !== 'ADMIN') {
+        throw new Error('自分自身の管理者権限を外すことはできません。')
+    }
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: { role },
+    })
+
+    revalidatePath('/admin/users')
+}
+
+export async function uploadSeal(formData: FormData) {
+    const currentUser = await getCurrentUser()
+
+    if (!currentUser) {
+        throw new Error('ログインが必要です。')
+    }
+
+    if (currentUser.role !== 'CENTER_DIRECTOR') {
+        throw new Error('権限がありません。')
+    }
+
+    const file = formData.get('file') as File
+    if (!file) {
+        throw new Error('ファイルが選択されていません。')
+    }
+
+    if (!file.type.startsWith('image/')) {
+        throw new Error('画像ファイルを選択してください。')
+    }
+
+    // Save to public/uploads/seals
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+
+    // Ensure directory exists
+    const fs = require('fs')
+    const path = require('path')
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'seals')
+
+    if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true })
+    }
+
+    // Create unique filename
+    const filename = `${currentUser.id}-${Date.now()}${path.extname(file.name)}`
+    const filepath = path.join(uploadDir, filename)
+
+    fs.writeFileSync(filepath, buffer)
+
+    // Update user profile
+    await prisma.user.update({
+        where: { id: currentUser.id },
+        data: {
+            sealImage: `/uploads/seals/${filename}`,
+        },
+    })
+
+    revalidatePath('/mypage')
 }

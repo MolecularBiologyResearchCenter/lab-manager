@@ -66,7 +66,7 @@
 
   /* Medical/Academic Professional Styling */
   .page-container {
-    min-height: 100vh;
+    min-height: auto;
     background: linear-gradient(to bottom, rgb(239 246 255), rgb(255 255 255));
   }
 
@@ -104,8 +104,31 @@
     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
 
-  .header-gradient {
-    background: linear-gradient(to right, rgb(37 99 235), rgb(29 78 216));
+  /* Responsive Header Title - Single Structure */
+  .responsive-header-title {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.2;
+  }
+
+  .title-part-1::after {
+    content: "";
+  }
+
+  @media (min-width: 768px) {
+    .responsive-header-title {
+      display: block;
+      white-space: nowrap;
+    }
+
+    .title-part-1 {
+      margin-right: 0.5em;
+    }
+
+    .title-part-1::after {
+      content: "";
+    }
   }
 
   .btn-primary {
@@ -133,6 +156,64 @@
 
   .btn-secondary:hover {
     background-color: rgb(239 246 255);
+  }
+
+  /* Minimal Mobile-Friendly Design System */
+  .minimal-container {
+    max-width: 30rem;
+    /* 480px */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .minimal-card {
+    background-color: white;
+    border: 2px solid rgb(31 41 55);
+    border-radius: 0.5rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+  }
+
+  .minimal-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    line-height: 1.2;
+  }
+
+  .minimal-subtitle {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .minimal-button {
+    padding: 1rem 1.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .minimal-spacing {
+    margin-bottom: 2rem;
+  }
+
+  .minimal-spacing-lg {
+    margin-bottom: 3rem;
+  }
+
+  .minimal-text {
+    font-size: 1.125rem;
+    line-height: 1.6;
+  }
+
+  .minimal-icon {
+    width: 3.5rem;
+    height: 3.5rem;
   }
 }
 

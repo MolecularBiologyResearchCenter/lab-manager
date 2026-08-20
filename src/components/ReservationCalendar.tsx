@@ -61,6 +61,7 @@ interface Reservation {
     userExtension?: string
     userId: string
     userName?: string
+    userLaboratory?: string
 }
 
 interface Props {
@@ -82,6 +83,19 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     const [showActiveOnly, setShowActiveOnly] = useState(false)
     const [visibleEquipmentIds, setVisibleEquipmentIds] = useState<string[]>([])
     const [phoneNumber, setPhoneNumber] = useState<string>('')
+
+    // Mobile detection
+    const [isMobile, setIsMobile] = useState(false)
+    const [selectedMonth, setSelectedMonth] = useState<Date>(new Date()) // For mobile month filter
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768)
+        }
+        checkMobile()
+        window.addEventListener('resize', checkMobile)
+        return () => window.removeEventListener('resize', checkMobile)
+    }, [])
 
     // Initialize visible equipment
     useEffect(() => {
@@ -148,14 +162,19 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             return
         }
 
+        // Validate that end time is after start time
+        if (endTime <= startTime) {
+            toast.error('終了時刻は開始時刻より後に設定してください。')
+            return
+        }
+
         try {
             if (editingReservation) {
-                // Permission check
-                const isAdminUser = currentUser.role === 'ADMIN'
+                // Permission check - only the owner can edit
                 const isOriginalOwner = currentUser.id === editingReservation.userId
 
-                if (!isOriginalOwner && !isAdminUser) {
-                    toast.error('予約の編集・削除は本人または管理者のみ可能です。')
+                if (!isOriginalOwner) {
+                    toast.error('予約の編集・削除は本人のみ可能です。')
                     return
                 }
 
@@ -234,11 +253,10 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     const handleDelete = async () => {
         if (!editingReservation) return
 
-        const isAdminUser = currentUser.role === 'ADMIN'
         const isOriginalOwner = currentUser.id === editingReservation.userId
 
-        if (!isOriginalOwner && !isAdminUser) {
-            toast.error('予約の削除は本人または管理者のみ可能です。')
+        if (!isOriginalOwner) {
+            toast.error('予約の削除は本人のみ可能です。')
             return
         }
 
@@ -258,16 +276,155 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     }
 
     const CustomEvent = ({ event }: { event: Reservation }) => {
+        // Extract equipment name from title
+        const equipmentName = event.title.split('(')[0].trim()
+
+        // Extract last name from full name
+        const fullName = event.userName || event.title.split('(')[1]?.split(')')[0] || ''
+        const lastName = fullName.split(' ')[0] // Get first part (last name in Japanese)
+
         return (
             <div className="text-xs leading-tight">
-                <div className="font-semibold">{event.title.split('(')[0]}</div>
+                <div className="font-semibold">{equipmentName}</div>
                 <div>
-                    {event.title.split('(')[1]?.split(')')[0]}
+                    {lastName}
+                    {event.userLaboratory && (
+                        <span className="opacity-90"> ({event.userLaboratory})</span>
+                    )}
                 </div>
-                {event.phoneNumber && (
-                    <div className="flex items-center gap-1 mt-0.5 text-[0.9em] opacity-90">
+                {event.userExtension && (
+                    <div className="flex items-center gap-1 text-[0.9em] opacity-90">
                         <span className="text-[0.8em]">📞</span>
-                        <span>{event.phoneNumber}</span>
+                        <span>{event.userExtension}</span>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // Mobile List View Component
+    const MobileReservationList = () => {
+        // Filter reservations by selected month
+        const monthFilteredReservations = filteredReservations.filter(reservation => {
+            const reservationMonth = reservation.start.getMonth()
+            const reservationYear = reservation.start.getFullYear()
+            const selectedMonthValue = selectedMonth.getMonth()
+            const selectedYear = selectedMonth.getFullYear()
+            return reservationMonth === selectedMonthValue && reservationYear === selectedYear
+        })
+
+        // Group reservations by date
+        const groupedReservations: { [key: string]: Reservation[] } = {}
+
+        monthFilteredReservations.forEach(reservation => {
+            const dateKey = format(reservation.start, 'yyyy-MM-dd')
+            if (!groupedReservations[dateKey]) {
+                groupedReservations[dateKey] = []
+            }
+            groupedReservations[dateKey].push(reservation)
+        })
+
+        // Sort dates
+        const sortedDates = Object.keys(groupedReservations).sort()
+
+        // Generate month options (current month ± 3 months)
+        const monthOptions = []
+        for (let i = -3; i <= 3; i++) {
+            const optionDate = new Date(selectedMonth)
+            optionDate.setMonth(optionDate.getMonth() + i)
+            monthOptions.push(optionDate)
+        }
+
+        return (
+            <div className="p-4" style={{ minHeight: '100vh', backgroundColor: '#f3f4f6' }}>
+                {/* Month Selector */}
+                <div className="bg-white rounded-lg shadow-md p-4" style={{ marginBottom: '2rem' }}>
+                    <label className="block text-base font-bold text-gray-700 mb-3" style={{ fontSize: '1.1rem' }}>表示月</label>
+                    <select
+                        value={format(selectedMonth, 'yyyy-MM')}
+                        onChange={(e) => {
+                            const [year, month] = e.target.value.split('-')
+                            setSelectedMonth(new Date(parseInt(year), parseInt(month) - 1, 1))
+                        }}
+                        className="w-full border border-gray-300 rounded-lg font-medium focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        style={{ padding: '1rem', fontSize: '1.25rem' }}
+                    >
+                        {monthOptions.map(optionDate => (
+                            <option key={format(optionDate, 'yyyy-MM')} value={format(optionDate, 'yyyy-MM')}>
+                                {format(optionDate, 'yyyy年M月', { locale: ja })}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Date Groups */}
+                {sortedDates.map((dateKey, index) => {
+                    const reservationsForDate = groupedReservations[dateKey]
+                    const dateObj = parse(dateKey, 'yyyy-MM-dd', new Date())
+
+                    return (
+                        <div key={dateKey} style={{ marginTop: index === 0 ? '0' : '2rem', backgroundColor: '#ffffff', borderRadius: '0.5rem', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', overflow: 'hidden' }}>
+                            {/* Date Header - Larger and more prominent */}
+                            <div className="sticky top-0 bg-blue-600 text-white px-4 py-3" style={{ fontSize: '1.25rem', fontWeight: '800' }}>
+                                {format(dateObj, 'M月d日（E）', { locale: ja })}
+                            </div>
+
+                            {/* Reservations for this date */}
+                            <div className="space-y-2 p-3">
+                                {reservationsForDate.map(reservation => {
+                                    const equipment = equipmentList.find(e => e.id === reservation.resourceId)
+                                    const backgroundColor = getEquipmentColor(reservation.resourceId)
+
+                                    return (
+                                        <div
+                                            key={reservation.id}
+                                            onClick={() => handleSelectEvent(reservation)}
+                                            className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 active:bg-gray-100"
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            {/* Equipment Name Badge */}
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div
+                                                    className="px-3 py-1 rounded-full text-sm font-bold"
+                                                    style={{ backgroundColor, color: '#333' }}
+                                                >
+                                                    {equipment?.name || '不明'}
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                    {format(reservation.start, 'HH:mm')} - {format(reservation.end, 'HH:mm')}
+                                                </div>
+                                            </div>
+
+                                            {/* User Info */}
+                                            <div className="text-sm space-y-0.5">
+                                                <div className="font-medium text-gray-700">
+                                                    {(() => {
+                                                        const fullName = reservation.userName || reservation.title.split('(')[1]?.split(')')[0] || ''
+                                                        const lastName = fullName.split(' ')[0]
+                                                        return lastName
+                                                    })()}
+                                                    {reservation.userLaboratory && (
+                                                        <span className="text-gray-600 font-normal"> ({reservation.userLaboratory})</span>
+                                                    )}
+                                                </div>
+                                                {reservation.userExtension && (
+                                                    <div className="flex items-center gap-1 text-gray-500 text-xs">
+                                                        <span>📞</span>
+                                                        <span>{reservation.userExtension}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )
+                })}
+
+                {sortedDates.length === 0 && (
+                    <div className="text-center text-gray-500 py-8">
+                        予約がありません
                     </div>
                 )}
             </div>
@@ -276,68 +433,73 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
     return (
         <div className="h-full flex flex-row gap-4">
-            {/* Sidebar for Equipment Filtering */}
-            <div className="w-64 flex-shrink-0 bg-white p-4 rounded-lg shadow overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-gray-700">表示機器</h3>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={toggleAllEquipment}
-                        className="text-xs text-blue-600 hover:text-blue-800"
-                    >
-                        {visibleEquipmentIds.length === equipmentList.length ? '全解除' : '全選択'}
-                    </Button>
-                </div>
-                <div className="space-y-2">
-                    {equipmentList.map(eq => (
-                        <div key={eq.id} className="flex items-center space-x-2">
-                            <input
-                                type="checkbox"
-                                id={`eq-${eq.id}`}
-                                checked={visibleEquipmentIds.includes(eq.id)}
-                                onChange={() => toggleEquipment(eq.id)}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <label
-                                htmlFor={`eq-${eq.id}`}
-                                className="text-sm text-gray-700 cursor-pointer flex-1 truncate"
-                                title={eq.name}
-                            >
-                                {eq.name}
-                            </label>
-                            <div
-                                className="w-3 h-3 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: getEquipmentColor(eq.id) }}
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Main Calendar Area */}
-            <div className="flex-1 flex flex-col h-full">
-                <div className="flex justify-between items-center mb-4 px-4">
-                    <div className="flex gap-2">
+            {/* Sidebar for Equipment Filtering - Desktop only */}
+            {!isMobile && (
+                <div className="w-64 flex-shrink-0 bg-white p-4 rounded-lg shadow overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-gray-700">表示機器</h3>
                         <Button
-                            variant={view === 'month' ? 'default' : 'outline'}
-                            onClick={() => setView('month')}
+                            variant="ghost"
+                            size="sm"
+                            onClick={toggleAllEquipment}
+                            className="text-xs text-blue-600 hover:text-blue-800"
                         >
-                            月
-                        </Button>
-                        <Button
-                            variant={view === 'week' ? 'default' : 'outline'}
-                            onClick={() => setView('week')}
-                        >
-                            週
-                        </Button>
-                        <Button
-                            variant={view === 'day' ? 'default' : 'outline'}
-                            onClick={() => setView('day')}
-                        >
-                            日
+                            {visibleEquipmentIds.length === equipmentList.length ? '全解除' : '全選択'}
                         </Button>
                     </div>
+                    <div className="space-y-2">
+                        {equipmentList.map(eq => (
+                            <div key={eq.id} className="flex items-center space-x-2">
+                                <input
+                                    type="checkbox"
+                                    id={`eq-${eq.id}`}
+                                    checked={visibleEquipmentIds.includes(eq.id)}
+                                    onChange={() => toggleEquipment(eq.id)}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <label
+                                    htmlFor={`eq-${eq.id}`}
+                                    className="text-sm text-gray-700 cursor-pointer flex-1 truncate"
+                                    title={eq.name}
+                                >
+                                    {eq.name}
+                                </label>
+                                <div
+                                    className="w-3 h-3 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: getEquipmentColor(eq.id) }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Main Calendar/List Area */}
+            <div className="flex-1 flex flex-col h-full">
+                <div className="flex justify-between items-center mb-4 px-4">
+                    {!isMobile && (
+                        <div className="flex gap-2">
+                            <Button
+                                variant={view === 'month' ? 'default' : 'outline'}
+                                onClick={() => setView('month')}
+                            >
+                                月
+                            </Button>
+                            <Button
+                                variant={view === 'week' ? 'default' : 'outline'}
+                                onClick={() => setView('week')}
+                            >
+                                週
+                            </Button>
+                            <Button
+                                variant={view === 'day' ? 'default' : 'outline'}
+                                onClick={() => setView('day')}
+                            >
+                                日
+                            </Button>
+                        </div>
+                    )}
+                    {isMobile && <div></div>} {/* Spacer for mobile */}
                     <div className="flex items-center gap-4">
                         <Button variant="outline" onClick={() => setDate(new Date())}>
                             今日
@@ -348,49 +510,54 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                     </div>
                 </div>
 
-                <div className="flex-1 px-4 pb-4">
-                    <Calendar
-                        localizer={localizer}
-                        events={filteredReservations}
-                        startAccessor="start"
-                        endAccessor="end"
-                        style={{ height: 'calc(100vh - 150px)', backgroundColor: 'white' }}
-                        view={view}
-                        onView={setView}
-                        date={date}
-                        onNavigate={setDate}
-                        selectable
-                        onSelectSlot={handleSelectSlot}
-                        onSelectEvent={handleSelectEvent}
-                        eventPropGetter={eventPropGetter}
-                        components={{
-                            event: CustomEvent
-                        }}
-                        messages={{
-                            next: "次へ",
-                            previous: "前へ",
-                            today: "今日",
-                            month: "月",
-                            week: "週",
-                            day: "日",
-                            date: "日付",
-                            time: "時間",
-                            event: "イベント",
-                            noEventsInRange: "この期間に予約はありません。",
-                        }}
-                        formats={{
-                            timeGutterFormat: (date: Date, culture?: string, localizer?: any) =>
-                                localizer.format(date, 'HH:mm', culture),
-                        }}
-                        tooltipAccessor={(event: Reservation) => {
-                            return `${event.title}${event.phoneNumber ? ` Tel: ${event.phoneNumber}` : ''}`
-                        }}
-                    />
-                </div>
+                {/* Conditional rendering: Mobile List or Desktop Calendar */}
+                {isMobile ? (
+                    <MobileReservationList />
+                ) : (
+                    <div className="flex-1 px-4 pb-4">
+                        <Calendar
+                            localizer={localizer}
+                            events={filteredReservations}
+                            startAccessor="start"
+                            endAccessor="end"
+                            style={{ height: 'calc(100vh - 150px)', backgroundColor: 'white' }}
+                            view={view}
+                            onView={setView}
+                            date={date}
+                            onNavigate={setDate}
+                            selectable
+                            onSelectSlot={handleSelectSlot}
+                            onSelectEvent={handleSelectEvent}
+                            eventPropGetter={eventPropGetter}
+                            components={{
+                                event: CustomEvent
+                            }}
+                            messages={{
+                                next: "次へ",
+                                previous: "前へ",
+                                today: "今日",
+                                month: "月",
+                                week: "週",
+                                day: "日",
+                                date: "日付",
+                                time: "時間",
+                                event: "イベント",
+                                noEventsInRange: "この期間に予約はありません。",
+                            }}
+                            formats={{
+                                timeGutterFormat: (date: Date, culture?: string, localizer?: any) =>
+                                    localizer.format(date, 'HH:mm', culture),
+                            }}
+                            tooltipAccessor={(event: Reservation) => {
+                                return `${event.title}${event.phoneNumber ? ` Tel: ${event.phoneNumber}` : ''}`
+                            }}
+                        />
+                    </div>
+                )}
             </div>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-md bg-white" style={{ maxWidth: '448px', backgroundColor: 'white' }}>
+                <DialogContent className="max-w-md bg-white" style={{ maxWidth: '280px', backgroundColor: '#eff6ff', border: '2px solid #2563eb', borderRadius: '12px' }}>
                     <DialogHeader>
                         <DialogTitle>{editingReservation ? '予約の編集' : '新規予約'}</DialogTitle>
                     </DialogHeader>
@@ -408,9 +575,9 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                 <SelectTrigger>
                                     <SelectValue placeholder="機器を選択" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} style={{ maxHeight: '400px', backgroundColor: 'white' }}>
                                     {equipmentList.map((eq) => (
-                                        <SelectItem key={eq.id} value={eq.id}>
+                                        <SelectItem key={eq.id} value={eq.id} style={{ padding: '0.625rem 0.75rem', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
                                             {eq.name}
                                         </SelectItem>
                                     ))}
@@ -418,32 +585,41 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                             </Select>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-4">
                             <div>
                                 <Label className="text-base">開始日時</Label>
-                                <CustomDateTimePicker
-                                    selected={startTime}
-                                    onChange={setStartTime}
+                                <input
+                                    type="datetime-local"
+                                    value={startTime ? new Date(startTime.getTime() - startTime.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                                    onChange={(e) => setStartTime(e.target.value ? new Date(e.target.value) : null)}
+                                    className="w-full p-2 border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    style={{ fontSize: '1rem', height: '2.5rem' }}
+                                    required
                                 />
                             </div>
                             <div>
                                 <Label className="text-base">終了日時</Label>
-                                <CustomDateTimePicker
-                                    selected={endTime}
-                                    onChange={setEndTime}
+                                <input
+                                    type="datetime-local"
+                                    value={endTime ? new Date(endTime.getTime() - endTime.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                                    onChange={(e) => setEndTime(e.target.value ? new Date(e.target.value) : null)}
+                                    className="w-full p-2 border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    style={{ fontSize: '1rem', height: '2.5rem' }}
+                                    required
                                 />
                             </div>
                         </div>
 
                         <div className="flex gap-2">
-                            <Button type="submit" className="flex-1 text-lg py-6">
+                            <Button type="submit" className="flex-1 text-xl font-bold" style={{ backgroundColor: '#2563eb', color: 'white', padding: '1.5rem' }}>
                                 {editingReservation ? '更新する' : '予約する'}
                             </Button>
                             {editingReservation && (
                                 <Button
                                     type="button"
                                     variant="destructive"
-                                    className="flex-1 text-lg py-6"
+                                    className="flex-1 text-xl font-bold"
+                                    style={{ padding: '1.5rem' }}
                                     onClick={handleDelete}
                                 >
                                     削除する

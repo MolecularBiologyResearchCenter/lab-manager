@@ -65,24 +65,24 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
     const currentReagent = reagents.find(r => r.id === selectedReagent)
 
     return (
-        <Card className="w-[400px] mx-auto mt-10" style={{ backgroundColor: 'white' }}>
-            <CardHeader>
-                <CardTitle>有料サービス記録</CardTitle>
-                <CardDescription>
+        <Card className="mx-auto mt-10" style={{ maxWidth: '280px', backgroundColor: '#eff6ff', border: '2px solid #2563eb', borderRadius: '12px' }}>
+            <CardHeader style={{ paddingBottom: '1.5rem' }}>
+                <CardTitle style={{ marginBottom: '1rem', fontSize: '1.75rem' }}>有料サービス記録</CardTitle>
+                <CardDescription style={{ fontSize: '1rem' }}>
                     利用者: {currentUser.name}
                 </CardDescription>
             </CardHeader>
             <form onSubmit={handleSubmit}>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label>サービス・試薬</Label>
+                <CardContent className="flex flex-col" style={{ gap: '2rem', paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
+                    <div className="space-y-4">
+                        <Label className="text-base" style={{ display: 'block', marginTop: '1rem' }}>サービス・試薬</Label>
                         <Select onValueChange={setSelectedReagent} value={selectedReagent} required>
-                            <SelectTrigger style={{ backgroundColor: 'white' }}>
+                            <SelectTrigger style={{ backgroundColor: 'white', height: '3.5rem', fontSize: '1.1rem' }}>
                                 <SelectValue placeholder="選択してください" />
                             </SelectTrigger>
-                            <SelectContent style={{ backgroundColor: 'white' }}>
+                            <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} style={{ backgroundColor: 'white', maxHeight: '400px' }}>
                                 {reagents.map((r) => (
-                                    <SelectItem key={r.id} value={r.id}>
+                                    <SelectItem key={r.id} value={r.id} className="text-base" style={{ padding: '0.625rem 0.75rem', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
                                         {r.name} (¥{r.unitPrice})
                                     </SelectItem>
                                 ))}
@@ -90,15 +90,15 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
                         </Select>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label>数量</Label>
+                    <div className="space-y-4">
+                        <Label className="text-base">数量</Label>
                         <Input
                             type="number"
                             min="1"
                             value={quantity}
                             onChange={(e) => setQuantity(parseInt(e.target.value))}
                             required
-                            style={{ backgroundColor: 'white' }}
+                            style={{ backgroundColor: 'white', fontSize: '1.1rem', height: '3.5rem', width: '100%' }}
                         />
                         {currentReagent && (
                             <p className="text-sm text-muted-foreground text-right">
@@ -108,7 +108,7 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button type="submit" className="w-full">記録する</Button>
+                    <Button type="submit" className="w-full font-bold" style={{ backgroundColor: '#2563eb', color: 'white', padding: '1.5rem', fontSize: '1.5rem', borderRadius: '12px' }}>記録する</Button>
                 </CardFooter>
             </form>
         </Card>

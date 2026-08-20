@@ -20,7 +20,7 @@ export default function LoginPage() {
     return (
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
             <Card className="w-[450px] shadow-xl border-blue-100 overflow-hidden">
-                <CardHeader className="header-gradient text-center py-8 space-y-4">
+                <CardHeader className="header-gradient text-center py-8 space-y-4" style={{ background: 'linear-gradient(to right, rgb(96 165 250), rgb(29 78 216))' }}>
                     <div className="flex justify-center">
                         <div className="bg-white rounded-full p-1 w-[80px] h-[80px] flex items-center justify-center">
                             <img
@@ -34,11 +34,16 @@ export default function LoginPage() {
                         分子生物実験センター
                     </div>
                     <div className="font-medium" style={{ color: 'white', fontSize: '1.125rem', opacity: 0.9 }}>
-                        利用者登録
+                        ログイン
                     </div>
                 </CardHeader>
                 <form action={handleSubmit}>
                     <CardContent className="space-y-12" style={{ paddingTop: '2.5rem', paddingBottom: '2.5rem' }}>
+                        <div className="text-center" style={{ marginBottom: '2.5rem' }}>
+                            <CardDescription className="text-center text-gray-600">
+                                メールアドレスとパスワードを入力してください
+                            </CardDescription>
+                        </div>
                         <div className="space-y-3">
                             <Label htmlFor="email" className="text-gray-700">メールアドレス</Label>
                             <Input
@@ -64,9 +69,14 @@ export default function LoginPage() {
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-5 pt-4 pb-6">
-                        <Button type="submit" className="w-full btn-primary h-11 text-base">
+                        <Button type="submit" className="w-full btn-primary h-11" style={{ fontSize: '1.5rem' }}>
                             ログイン
                         </Button>
+                        <div className="text-sm text-center text-gray-600">
+                            <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium hover:underline">
+                                パスワードを忘れた方はこちら
+                            </Link>
+                        </div>
                         <div className="text-sm text-center text-gray-600">
                             アカウントをお持ちでない方は{' '}
                             <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium hover:underline">

@@ -11,8 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import AdminYearSelect from '@/components/AdminYearSelect'
+import { FileText, DollarSign, FlaskConical, Wrench, Users } from 'lucide-react'
 
-export default async function AdminPage({ searchParams }: { searchParams: { month?: string; year?: string } }) {
+export default async function AdminPage(props: { searchParams: Promise<{ month?: string; year?: string }> }) {
+    const searchParams = await props.searchParams
+
     // Date Filtering Logic
     const now = new Date()
     const currentYear = now.getFullYear()
@@ -97,18 +100,18 @@ export default async function AdminPage({ searchParams }: { searchParams: { mont
 
     return (
         <div className="content-wrapper py-8 space-y-8">
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
+            <div className="flex justify-center items-center">
+                <h1 className="text-4xl font-bold">管理者ダッシュボード</h1>
             </div>
 
             <div className="space-y-4">
                 {/* Year Selector */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                     <AdminYearSelect currentYear={currentYear} />
                 </div>
 
                 {/* Month Selector */}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap justify-center gap-2">
                     {months.map((m) => {
                         // Active if it matches the targetDate
                         const isTarget = targetDate.getFullYear() === parseInt(m.value.split('-')[0]) &&
@@ -128,80 +131,117 @@ export default async function AdminPage({ searchParams }: { searchParams: { mont
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>請求書管理</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-gray-600 mb-4">
-                            4ヶ月ごとの請求書を一括生成・管理
-                        </p>
-                        <a href="/admin/invoices">
-                            <button className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                                請求書管理へ
-                            </button>
-                        </a>
-                    </CardContent>
-                </Card>
+            {/* Management Cards Grid - 2x2 Layout */}
+            <div className="grid grid-cols-2 auto-rows-fr" style={{ gap: '1rem', maxWidth: '800px', margin: '0 auto' }}>
+                {/* Invoice Management */}
+                <Link href="/admin/invoices" className="h-full block" style={{ textDecoration: 'none' }}>
+                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
+                        style={{
+                            backgroundColor: 'white',
+                            border: '3px solid #3b82f6',
+                            borderRadius: '24px',
+                            minHeight: '140px'
+                        }}>
+                        <div className="bg-blue-100 p-4 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                            <FileText style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                        </div>
+                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>請求書管理</span>
+                    </div>
+                </Link>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>利用料金管理</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-gray-600 mb-4">
-                            試薬利用履歴の編集・削除
-                        </p>
-                        <a href="/admin/usage-logs">
-                            <button className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                                利用料金管理へ
-                            </button>
-                        </a>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>月次請求サマリー</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>利用者</TableHead>
-                                    <TableHead className="text-right">合計金額</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {Object.entries(billingByUser).map(([user, cost]) => (
-                                    <TableRow key={user}>
-                                        <TableCell>{user}</TableCell>
-                                        <TableCell className="text-right">¥{cost.toLocaleString()}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                {/* Usage Logs Management */}
+                <Link href="/admin/usage-logs" className="h-full block" style={{ textDecoration: 'none' }}>
+                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
+                        style={{
+                            backgroundColor: 'white',
+                            border: '3px solid #3b82f6',
+                            borderRadius: '24px',
+                            minHeight: '140px'
+                        }}>
+                        <div className="bg-blue-100 p-4 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                            <DollarSign style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                        </div>
+                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>利用料金管理</span>
+                    </div>
+                </Link>
+
+                {/* Reagent Management */}
+                <Link href="/admin/reagents" className="h-full block" style={{ textDecoration: 'none' }}>
+                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
+                        style={{
+                            backgroundColor: 'white',
+                            border: '3px solid #3b82f6',
+                            borderRadius: '24px',
+                            minHeight: '140px'
+                        }}>
+                        <div className="bg-blue-100 p-4 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                            <FlaskConical style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                        </div>
+                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>有料サービス管理</span>
+                    </div>
+                </Link>
+
+                {/* Equipment Management */}
+                <Link href="/admin/equipment" className="h-full block" style={{ textDecoration: 'none' }}>
+                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
+                        style={{
+                            backgroundColor: 'white',
+                            border: '3px solid #3b82f6',
+                            borderRadius: '24px',
+                            minHeight: '140px'
+                        }}>
+                        <div className="bg-blue-100 p-4 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                            <Wrench style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                        </div>
+                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>機器管理</span>
+                    </div>
+                </Link>
+
+                {/* User Management - Full Width */}
+                <Link href="/admin/users" className="col-span-2 h-full block" style={{ textDecoration: 'none' }}>
+                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center gap-4"
+                        style={{
+                            backgroundColor: 'white',
+                            border: '3px solid #3b82f6',
+                            borderRadius: '24px',
+                            minHeight: '140px'
+                        }}>
+                        <div className="bg-blue-100 p-4 rounded-lg" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                            <Users style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                        </div>
+                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>利用者管理</span>
+                    </div>
+                </Link>
             </div>
 
-            <Card>
+            {/* Monthly Billing Summary */}
+            <Card style={{ backgroundColor: 'white', border: '2px solid #2563eb', borderRadius: '12px', maxWidth: '800px', margin: '1rem auto 0 auto' }}>
                 <CardHeader>
-                    <CardTitle>利用者管理</CardTitle>
+                    <CardTitle>月次請求サマリー</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-gray-600 mb-4">
-                        登録ユーザーの一覧確認
-                    </p>
-                    <a href="/admin/users">
-                        <button className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                            利用者一覧へ
-                        </button>
-                    </a>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>利用者</TableHead>
+                                <TableHead className="text-right">合計金額</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {Object.entries(billingByUser).map(([user, cost]) => (
+                                <TableRow key={user}>
+                                    <TableCell>{user}</TableCell>
+                                    <TableCell className="text-right">¥{cost.toLocaleString()}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
 
-            <Card style={{ backgroundColor: 'white' }}>
+
+            {/* Usage Logs Table */}
+            <Card style={{ backgroundColor: 'white', border: '2px solid #2563eb', borderRadius: '12px', maxWidth: '800px', margin: '1rem auto 0 auto' }}>
                 <CardHeader>
                     <CardTitle>有料サービスログ</CardTitle>
                 </CardHeader>
@@ -231,7 +271,8 @@ export default async function AdminPage({ searchParams }: { searchParams: { mont
                 </CardContent>
             </Card>
 
-            <Card style={{ backgroundColor: 'white' }}>
+            {/* Reservations Table */}
+            <Card style={{ backgroundColor: 'white', border: '2px solid #2563eb', borderRadius: '12px', maxWidth: '800px', margin: '1rem auto 0 auto' }}>
                 <CardHeader>
                     <CardTitle>予約履歴</CardTitle>
                 </CardHeader>

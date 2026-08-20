@@ -16,6 +16,7 @@ export default function HomePage() {
     const [showFutureReservations, setShowFutureReservations] = useState(false)
     const [showDetails, setShowDetails] = useState(false)
     const [usageLogs, setUsageLogs] = useState<any[]>([])
+    const [periodLabel, setPeriodLabel] = useState<string>('')
 
     const [error, setError] = useState<string | null>(null)
 
@@ -29,8 +30,14 @@ export default function HomePage() {
                 }
                 setUser(currentUser)
 
-                const { totalCost: fetchedTotalCost, upcomingReservations, usageLogs: fetchedUsageLogs } = await getDashboardData()
-                setTotalCost(fetchedTotalCost)
+                const { totalCost: fetchedTotalCost, upcomingReservations, usageLogs: fetchedUsageLogs, fiscalYear, quarterLabel } = await getDashboardData()
+                setPeriodLabel(`(${fiscalYear}年${quarterLabel})`)
+
+                // Filter usage logs for current user and calculate total cost
+                const userUsageLogs = fetchedUsageLogs.filter((log: any) => log.userId === currentUser.id)
+                const userTotalCost = userUsageLogs.reduce((sum: number, log: any) => sum + log.totalCost, 0)
+
+                setTotalCost(userTotalCost)
 
                 // Get user's upcoming reservations (all of them)
                 const userReservations = upcomingReservations.filter((r: any) => r.userId === currentUser.id)
@@ -83,58 +90,44 @@ export default function HomePage() {
 
     return (
         <div className="py-8">
-            <div style={{ maxWidth: '576px', margin: '0 auto', padding: '0 1rem' }}>
+            <div style={{ maxWidth: '480px', margin: '0 auto', padding: '0 1.5rem' }}>
                 {/* Billing Summary */}
-                <Card className="mb-6 border-2 border-gray-800" style={{ backgroundColor: 'white' }}>
-                    <CardContent className="p-6 text-center">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">今期の利用料金</h2>
+                <Card className="border-2 border-blue-500 rounded-xl overflow-hidden" style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '2px solid #2563eb', marginTop: '1rem', marginBottom: '1rem' }}>
+                    <CardContent className="p-8 text-center">
+                        <h2 className="text-3xl font-bold text-gray-800 mb-0 leading-none">今期の利用料金</h2>
+                        <p className="text-sm text-gray-500 mb-0 -mt-1 leading-none">{periodLabel}</p>
                         <div
-                            className="text-4xl font-bold text-gray-700 cursor-pointer hover:text-blue-600 transition-colors flex items-center justify-center gap-2"
+                            className="text-5xl font-bold text-gray-700 cursor-pointer hover:text-blue-600 transition-colors flex items-center justify-center gap-2 -mt-1"
                             onClick={() => setShowDetails(!showDetails)}
                         >
                             {totalCost.toLocaleString()}円
-                            {showDetails ? <ChevronUp className="h-6 w-6" /> : <ChevronDown className="h-6 w-6" />}
+                            {showDetails ? <ChevronUp className="h-8 w-8" /> : <ChevronDown className="h-8 w-8" />}
                         </div>
                         {showDetails && (
-                            <div className="mt-4 text-left text-sm border-t pt-4">
+                            <div className="mt-4 border-t pt-4">
                                 {usageLogs.length === 0 ? (
-                                    <p className="text-gray-600 text-center">利用履歴はありません</p>
+                                    <p className="text-gray-600 text-center py-2">利用履歴はありません</p>
                                 ) : (
                                     <>
-                                        <table className="w-full text-xs">
-                                            <thead className="bg-gray-100">
-                                                <tr>
-                                                    <th className="p-2 text-left">日付</th>
-                                                    <th className="p-2 text-left">利用項目</th>
-                                                    <th className="p-2 text-right">単価</th>
-                                                    <th className="p-2 text-right">個数</th>
-                                                    <th className="p-2 text-right">合計</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {usageLogs.map((log: any, index: number) => (
-                                                    <tr key={log.id} className="border-b" style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
-                                                        <td className="p-2">
-                                                            {new Date(log.date).toLocaleDateString('ja-JP', {
-                                                                year: 'numeric',
-                                                                month: '2-digit',
-                                                                day: '2-digit',
-                                                            })}
-                                                        </td>
-                                                        <td className="p-2">{log.reagent.name}</td>
-                                                        <td className="p-2 text-right">¥{log.reagent.unitPrice.toLocaleString()}</td>
-                                                        <td className="p-2 text-right">{log.quantity}</td>
-                                                        <td className="p-2 text-right">¥{log.totalCost.toLocaleString()}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                            <tfoot className="bg-gray-50 font-bold">
-                                                <tr>
-                                                    <td colSpan={4} className="p-2 text-right">利用料合計</td>
-                                                    <td className="p-2 text-right">¥{totalCost.toLocaleString()}</td>
-                                                </tr>
-                                            </tfoot>
-                                        </table>
+                                        <div className="space-y-0">
+                                            {usageLogs.map((log: any, index: number) => (
+                                                <div key={log.id} className="flex justify-between text-sm py-2 px-3" style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
+                                                    <span>
+                                                        {new Date(log.date).toLocaleDateString('ja-JP', {
+                                                            year: 'numeric',
+                                                            month: '2-digit',
+                                                            day: '2-digit',
+                                                        })}
+                                                    </span>
+                                                    <span>{log.reagent.name}</span>
+                                                    <span>¥{log.totalCost.toLocaleString()}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="mt-2 pt-2 border-t border-gray-200 flex justify-between font-bold text-sm px-3 py-2" style={{ backgroundColor: '#f9fafb' }}>
+                                            <span>利用料合計</span>
+                                            <span>¥{totalCost.toLocaleString()}</span>
+                                        </div>
                                     </>
                                 )}
                             </div>
@@ -143,9 +136,9 @@ export default function HomePage() {
                 </Card>
 
                 {/* Reservations Summary */}
-                <Card className="mb-6 border-2 border-gray-800" style={{ backgroundColor: 'white' }}>
-                    <CardContent className="p-6">
-                        <h2 className="text-xl font-bold text-gray-800 mb-4 text-center">今日の予約</h2>
+                <Card className="border-2 border-blue-500 rounded-xl overflow-hidden" style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '2px solid #2563eb', marginBottom: '1rem' }}>
+                    <CardContent className="p-8">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">今日の予約</h2>
                         {todayReservations.length === 0 ? (
                             <p className="text-gray-600 text-center py-2">本日の予約はありません</p>
                         ) : (
@@ -182,8 +175,8 @@ export default function HomePage() {
                                 className="flex items-center justify-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
                                 onClick={() => setShowFutureReservations(!showFutureReservations)}
                             >
-                                <h3 className="text-lg font-bold text-gray-700">明日以降の予約</h3>
-                                {showFutureReservations ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                                <h3 className="text-xl font-bold text-gray-700">明日以降の予約</h3>
+                                {showFutureReservations ? <ChevronUp className="h-6 w-6" /> : <ChevronDown className="h-6 w-6" />}
                             </div>
 
                             {showFutureReservations && (
@@ -223,61 +216,88 @@ export default function HomePage() {
                     </CardContent>
                 </Card>
 
-                {/* Navigation Grid */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Navigation Grid - 2x2 Layout */}
+                <div className="grid grid-cols-2 auto-rows-fr" style={{ gap: '1rem' }}>
                     {/* Home Button */}
-                    <a href="https://www.med.kitasato-u.ac.jp/lab/dnalab/home/" target="_blank" rel="noopener noreferrer">
-                        <div className="aspect-square border-4 border-gray-700 flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-                            style={{ backgroundColor: 'hsl(var(--pastel-blue))' }}>
-                            <Home className="h-12 w-12 mb-2 text-gray-700" />
-                            <span className="text-xl font-bold text-gray-800">センターHP</span>
+                    <a href="https://www.med.kitasato-u.ac.jp/lab/dnalab/home/" target="_blank" rel="noopener noreferrer" className="h-full block" style={{ textDecoration: 'none' }}>
+                        <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
+                            style={{
+                                backgroundColor: 'white',
+                                border: '3px solid #3b82f6',
+                                borderRadius: '24px',
+                                minHeight: '120px'
+                            }}>
+                            <div className="bg-blue-100 p-6 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                                <Home style={{ color: '#1e40af', width: '80px', height: '80px' }} />
+                            </div>
+                            <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>センターHP</span>
                         </div>
                     </a>
 
                     {/* Equipment Reservation Button */}
-                    <Link href="/reservations">
-                        <div className="aspect-square border-4 border-gray-700 flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-                            style={{ backgroundColor: 'hsl(var(--pastel-peach))' }}>
-                            <Calendar className="h-12 w-12 mb-2 text-gray-700" />
-                            <span className="text-xl font-bold text-gray-800">機器予約</span>
+                    <Link href="/reservations" className="h-full block" style={{ textDecoration: 'none' }}>
+                        <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
+                            style={{
+                                backgroundColor: 'white',
+                                border: '3px solid #3b82f6',
+                                borderRadius: '24px',
+                                minHeight: '120px'
+                            }}>
+                            <div className="bg-blue-100 p-6 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                                <Calendar style={{ color: '#1e40af', width: '80px', height: '80px' }} />
+                            </div>
+                            <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>機器予約</span>
                         </div>
                     </Link>
 
                     {/* Paid Service Button */}
-                    <Link href="/reagents">
-                        <div className="aspect-square border-4 border-gray-700 flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-                            style={{ backgroundColor: 'hsl(var(--pastel-pink))' }}>
-                            <FlaskConical className="h-12 w-12 mb-2 text-gray-700" />
-                            <span className="text-xl font-bold text-gray-800">有料</span>
-                            <span className="text-xl font-bold text-gray-800">サービス</span>
+                    <Link href="/reagents" className="h-full block" style={{ textDecoration: 'none' }}>
+                        <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
+                            style={{
+                                backgroundColor: 'white',
+                                border: '3px solid #3b82f6',
+                                borderRadius: '24px',
+                                minHeight: '120px'
+                            }}>
+                            <div className="bg-blue-100 p-6 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                                <FlaskConical style={{ color: '#1e40af', width: '80px', height: '80px' }} />
+                            </div>
+                            <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>有料サービス</span>
                         </div>
                     </Link>
 
                     {/* Invoice Button */}
-                    <Link href="/invoices">
-                        <div className="aspect-square border-4 border-gray-700 flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-                            style={{ backgroundColor: 'hsl(var(--pastel-green))' }}>
-                            <FileText className="h-12 w-12 mb-2 text-gray-700" />
-                            <span className="text-xl font-bold text-gray-800">請求書</span>
+                    <Link href="/invoices" className="h-full block" style={{ textDecoration: 'none' }}>
+                        <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
+                            style={{
+                                backgroundColor: 'white',
+                                border: '3px solid #3b82f6',
+                                borderRadius: '24px',
+                                minHeight: '120px'
+                            }}>
+                            <div className="bg-blue-100 p-6 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                                <FileText style={{ color: '#1e40af', width: '80px', height: '80px' }} />
+                            </div>
+                            <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>請求書</span>
                         </div>
                     </Link>
 
                     {/* Admin Button (only for admins) */}
                     {user.role === 'ADMIN' && (
-                        <Link href="/admin">
-                            <div className="aspect-square border-4 border-gray-700 flex flex-col items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-                                style={{ backgroundColor: 'hsl(var(--pastel-yellow))' }}>
-                                <Settings className="h-12 w-12 mb-2 text-gray-700" />
-                                <span className="text-xl font-bold text-gray-800">管理画面</span>
+                        <Link href="/admin" className="col-span-2 h-full block" style={{ textDecoration: 'none' }}>
+                            <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center gap-4"
+                                style={{
+                                    backgroundColor: 'white',
+                                    border: '3px solid #3b82f6',
+                                    borderRadius: '24px',
+                                    minHeight: '120px'
+                                }}>
+                                <div className="bg-blue-100 p-6 rounded-lg" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
+                                    <Settings style={{ color: '#1e40af', width: '80px', height: '80px' }} />
+                                </div>
+                                <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>管理画面</span>
                             </div>
                         </Link>
-                    )}
-
-                    {/* Empty slot for non-admins */}
-                    {user.role !== 'ADMIN' && (
-                        <div className="aspect-square border-4 border-gray-600"
-                            style={{ backgroundColor: 'hsl(var(--pastel-gray))' }}>
-                        </div>
                     )}
                 </div>
             </div>
