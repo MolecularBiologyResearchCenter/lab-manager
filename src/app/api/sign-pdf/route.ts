@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
 
         // Load certificate
         const p12Path = path.join(process.cwd(), 'certificate.p12')
+        if (!fs.existsSync(p12Path)) {
+            console.warn('Certificate file certificate.p12 not found on server')
+            return NextResponse.json({ error: 'Certificate file not found' }, { status: 500 })
+        }
         const p12Buffer = fs.readFileSync(p12Path)
 
         // Sign
