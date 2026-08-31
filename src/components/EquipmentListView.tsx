@@ -160,16 +160,16 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                                         {isAvailable ? (
                                             <div className="flex items-center text-[0.7rem] font-medium text-gray-600 whitespace-nowrap">
                                                 <div
-                                                    className="rounded-full mr-2"
-                                                    style={{ width: '16px', height: '16px', minWidth: '16px', backgroundColor: '#22c55e' }}
+                                                    className="rounded-full"
+                                                    style={{ width: '16px', height: '16px', minWidth: '16px', marginRight: '0.7rem', backgroundColor: '#22c55e' }}
                                                 ></div>
                                                 利用可能
                                             </div>
                                         ) : (
                                             <div className="flex items-center text-[0.7rem] font-medium text-gray-600 whitespace-nowrap">
                                                 <div
-                                                    className="rounded-full mr-2"
-                                                    style={{ width: '16px', height: '16px', minWidth: '16px', backgroundColor: '#ef4444' }}
+                                                    className="rounded-full"
+                                                    style={{ width: '16px', height: '16px', minWidth: '16px', marginRight: '0.7rem', backgroundColor: '#ef4444' }}
                                                 ></div>
                                                 使用中
                                             </div>
