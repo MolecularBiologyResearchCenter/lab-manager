@@ -101,28 +101,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
 
     return (
         <div>
-            <div className="flex flex-col items-center mb-8">
-                <h2 className="text-3xl font-bold text-blue-900">機器予約</h2>
-                <div className="h-1 w-16 bg-blue-600 mt-2"></div>
-            </div>
-
-            {/* Custom CSS for Grid Layout */}
-            <style jsx global>{`
-                .equipment-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 1rem;
-                }
-                @media (min-width: 768px) {
-                    .equipment-grid {
-                        grid-template-columns: repeat(4, 1fr);
-                        gap: 1.5rem;
-                    }
-                }
-            `}</style>
-
-            {/* Grid Layout using custom class */}
-            <div className="equipment-grid">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
                 {equipmentList.map((equipment) => {
                     // Use icon from database, or fallback to default
                     const imagePath = equipment.icon || '/icons-blue/3500xL.jpg'
@@ -132,33 +111,26 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                     return (
                         <div
                             key={equipment.id}
-                            className="p-3 shadow-sm flex flex-col justify-between"
-                            style={{
-                                backgroundColor: 'white',
-                                border: '2px solid #2563eb',
-                                borderRadius: '12px'
-                            }}
+                            className="app-surface flex min-w-0 flex-col justify-between p-3 transition-shadow hover:shadow-md md:p-4"
                         >
-                            <div className="flex items-center gap-3 mb-2">
+                            <div>
                                 {/* Left: Icon */}
-                                <div className="flex-shrink-0 relative" style={{ width: '60px', height: '60px' }}>
+                                <div className="mb-3 grid h-16 place-items-center rounded-xl bg-slate-50 md:h-20">
                                     <img
                                         src={imagePath}
                                         alt={equipment.name}
-                                        className="object-contain w-full h-full"
+                                        className="h-14 w-14 object-contain mix-blend-multiply md:h-16 md:w-16"
                                     />
                                 </div>
 
-                                {/* Right: Name & Status */}
-                                <div className="flex-1 min-w-0 flex flex-col justify-center items-center">
-                                    <h3 className="text-base font-bold text-gray-900 leading-tight truncate text-center w-full">
+                                <div className="min-w-0">
+                                    <h3 className="w-full truncate text-sm font-semibold leading-tight text-slate-800 md:text-base">
                                         {equipment.name}
                                     </h3>
 
-                                    {/* Status - Below Name */}
-                                    <div className="flex items-center justify-center mt-1 w-full">
+                                    <div className="mt-2 flex min-h-5 items-center">
                                         {isAvailable ? (
-                                            <div className="flex items-center text-[0.7rem] font-medium text-gray-600 whitespace-nowrap">
+                                            <div className="flex items-center whitespace-nowrap text-xs font-medium text-slate-600">
                                                 <div
                                                     className="rounded-full"
                                                     style={{ width: '16px', height: '16px', minWidth: '16px', marginRight: '0.7rem', backgroundColor: '#22c55e' }}
@@ -166,7 +138,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                                                 利用可能
                                             </div>
                                         ) : (
-                                            <div className="flex items-center text-[0.7rem] font-medium text-gray-600 whitespace-nowrap">
+                                            <div className="flex items-center whitespace-nowrap text-xs font-medium text-slate-600">
                                                 <div
                                                     className="rounded-full"
                                                     style={{ width: '16px', height: '16px', minWidth: '16px', marginRight: '0.7rem', backgroundColor: '#ef4444' }}
@@ -179,17 +151,10 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                             </div>
 
                             {/* Reserve Button - Bottom */}
-                            <div>
+                            <div className="mt-4">
                                 <Button
                                     onClick={() => handleOpenDialog(equipment.id)}
-                                    className="w-full text-white font-bold h-12 hover:shadow-lg hover:scale-105 transition-all duration-200"
-                                    style={{
-                                        backgroundColor: '#2563eb',
-                                        color: 'white',
-                                        borderRadius: '8px',
-                                        height: '3rem',
-                                        fontSize: '1.1rem'
-                                    }}
+                                    className="h-10 w-full rounded-xl bg-blue-700 text-sm font-semibold text-white hover:bg-blue-800"
                                 >
                                     予約
                                 </Button>
@@ -200,7 +165,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
             </div>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-md bg-white" style={{ maxWidth: '280px', backgroundColor: '#eff6ff', border: '2px solid #2563eb', borderRadius: '12px' }}>
+                <DialogContent className="max-w-sm rounded-2xl border border-slate-200 bg-white shadow-xl">
                     <DialogHeader>
                         <DialogTitle>新規予約</DialogTitle>
                     </DialogHeader>
@@ -254,7 +219,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                         </div>
 
                         <div className="flex gap-2">
-                            <Button type="submit" className="flex-1 font-bold" style={{ backgroundColor: '#2563eb', color: 'white', padding: '1.5rem', fontSize: '1.5rem' }}>
+                            <Button type="submit" className="h-11 flex-1 rounded-xl bg-blue-700 font-semibold text-white hover:bg-blue-800">
                                 予約する
                             </Button>
                         </div>

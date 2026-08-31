@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, use } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Printer, ArrowLeft, Download } from 'lucide-react'
+import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import jsPDF from 'jspdf'
@@ -223,8 +223,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
     if (loading) {
         return (
-            <div className="content-wrapper py-8">
-                <div className="text-center">読み込み中...</div>
+            <div className="content-wrapper app-page">
+                <div className="text-center text-sm text-slate-500">読み込み中...</div>
             </div>
         )
     }
@@ -234,13 +234,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
 
     return (
-        <div className="content-wrapper py-8">
+        <div className="content-wrapper app-page">
             {/* Navigation */}
-            <div className="mb-6 print:hidden flex gap-3 justify-between">
-                <div className="flex gap-3">
+            <div className="mb-5 flex flex-col justify-between gap-3 print:hidden sm:flex-row">
+                <div className="flex flex-wrap gap-2">
                     <Link href="/invoices">
-                        <Button variant="outline">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
+                        <Button variant="outline" className="rounded-xl border-slate-300 bg-white">
+                            <ArrowLeft className="h-4 w-4" />
                             請求書一覧に戻る
                         </Button>
                     </Link>
@@ -255,9 +255,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                                 <Button
                                     onClick={handleDownloadPDF}
                                     disabled={downloading}
-                                    style={{ backgroundColor: '#2563eb', color: 'white' }}
+                                    className="rounded-xl bg-blue-700 text-white hover:bg-blue-800"
                                 >
-                                    <Download className="mr-2 h-4 w-4" />
+                                    <Download className="h-4 w-4" />
                                     {downloading ? 'ダウンロード中...' : 'PDFダウンロード'}
                                 </Button>
                             )
@@ -266,7 +266,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                                 <Button
                                     disabled={true}
                                     variant="outline"
-                                    className="bg-gray-100 text-gray-500 border-gray-300 cursor-not-allowed"
+                                    className="cursor-not-allowed rounded-xl border-slate-300 bg-slate-100 text-slate-500"
                                 >
                                     <span className="flex items-center">
                                         センター長承認待ち
@@ -280,7 +280,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     <Button
                         onClick={handleSeal}
                         disabled={sealing}
-                        className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                        className="rounded-xl bg-red-600 font-semibold text-white hover:bg-red-700"
                     >
                         {sealing ? '処理中...' : '電子印を押す'}
                     </Button>
@@ -288,14 +288,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Print Instructions */}
-            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4 print:hidden">
                 <p className="text-sm text-blue-800">
                     <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、学部経理に提出してください。
                 </p>
             </div>
 
             {/* Invoice Document - Fixed A4 Width */}
-            <div className="overflow-auto flex justify-center bg-white p-8">
+            <div className="app-surface flex justify-center overflow-auto p-3 md:p-8 print:border-0 print:p-0 print:shadow-none">
                 <Card
                     className="mx-auto bg-white shadow-none"
                     ref={invoiceRef}

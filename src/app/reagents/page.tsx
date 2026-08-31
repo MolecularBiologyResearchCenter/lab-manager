@@ -11,10 +11,12 @@ export default async function ReagentsPage() {
     }
 
     return (
-        <div className="content-wrapper py-8">
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">有料サービス記録</h1>
-                <p className="text-gray-600 mt-1">有料サービスの使用量を記録</p>
+        <div className="content-wrapper app-page">
+            <div className="app-page-header">
+                <div>
+                    <h1 className="app-page-title">有料サービス記録</h1>
+                    <p className="app-page-description">使用したサービスと数量を入力</p>
+                </div>
             </div>
             <ReagentLogger reagents={reagents} currentUser={currentUser} />
         </div>

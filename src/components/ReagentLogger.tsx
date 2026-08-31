@@ -3,14 +3,6 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card'
-import {
     Select,
     SelectContent,
     SelectItem,
@@ -65,24 +57,22 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
     const currentReagent = reagents.find(r => r.id === selectedReagent)
 
     return (
-        <Card className="mx-auto mt-10" style={{ maxWidth: '280px', backgroundColor: '#eff6ff', border: '2px solid #2563eb', borderRadius: '12px' }}>
-            <CardHeader style={{ paddingBottom: '1.5rem' }}>
-                <CardTitle style={{ marginBottom: '1rem', fontSize: '1.75rem' }}>有料サービス記録</CardTitle>
-                <CardDescription style={{ fontSize: '1rem' }}>
-                    利用者: {currentUser.name}
-                </CardDescription>
-            </CardHeader>
+        <section className="app-surface mx-auto max-w-lg overflow-hidden">
+            <div className="border-b border-slate-100 px-5 py-4 md:px-6">
+                <h2 className="font-semibold text-slate-800">新しい利用記録</h2>
+                <p className="mt-1 text-xs text-slate-500">利用者：{currentUser.name}</p>
+            </div>
             <form onSubmit={handleSubmit}>
-                <CardContent className="flex flex-col" style={{ gap: '2rem', paddingLeft: '1.5rem', paddingRight: '1.5rem' }}>
-                    <div className="space-y-4">
-                        <Label className="text-base" style={{ display: 'block', marginTop: '1rem' }}>サービス・試薬</Label>
+                <div className="space-y-5 px-5 py-5 md:px-6">
+                    <div className="space-y-2">
+                        <Label className="app-label">サービス・試薬</Label>
                         <Select onValueChange={setSelectedReagent} value={selectedReagent} required>
-                            <SelectTrigger style={{ backgroundColor: 'white', height: '3.5rem', fontSize: '1.1rem' }}>
+                            <SelectTrigger className="h-11 rounded-xl border-slate-300 bg-white text-base">
                                 <SelectValue placeholder="選択してください" />
                             </SelectTrigger>
-                            <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} style={{ backgroundColor: 'white', maxHeight: '400px' }}>
+                            <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} className="max-h-[400px] bg-white">
                                 {reagents.map((r) => (
-                                    <SelectItem key={r.id} value={r.id} className="text-base" style={{ padding: '0.625rem 0.75rem', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
+                                    <SelectItem key={r.id} value={r.id} className="min-h-10 px-3 py-2 text-base">
                                         {r.name} (¥{r.unitPrice})
                                     </SelectItem>
                                 ))}
@@ -90,27 +80,26 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
                         </Select>
                     </div>
 
-                    <div className="space-y-4">
-                        <Label className="text-base">数量</Label>
+                    <div className="space-y-2">
+                        <Label className="app-label">数量</Label>
                         <Input
                             type="number"
                             min="1"
                             value={quantity}
                             onChange={(e) => setQuantity(parseInt(e.target.value))}
                             required
-                            style={{ backgroundColor: 'white', fontSize: '1.1rem', height: '3.5rem', width: '100%' }}
+                            className="h-11 w-full rounded-xl border-slate-300 bg-white text-base"
                         />
                         {currentReagent && (
-                            <p className="text-sm text-muted-foreground text-right">
-                                合計: ¥{(currentReagent.unitPrice * quantity).toLocaleString()}
-                            </p>
+                            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+                                <span className="text-sm text-slate-500">合計</span>
+                                <strong className="text-xl font-semibold text-slate-800">¥{(currentReagent.unitPrice * quantity).toLocaleString()}</strong>
+                            </div>
                         )}
                     </div>
-                </CardContent>
-                <CardFooter>
-                    <Button type="submit" className="w-full font-bold" style={{ backgroundColor: '#2563eb', color: 'white', padding: '1.5rem', fontSize: '1.5rem', borderRadius: '12px' }}>記録する</Button>
-                </CardFooter>
+                    <Button type="submit" className="h-12 w-full rounded-xl bg-blue-700 text-base font-semibold text-white hover:bg-blue-800">記録する</Button>
+                </div>
             </form>
-        </Card>
+        </section>
     )
 }

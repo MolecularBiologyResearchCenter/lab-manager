@@ -1,11 +1,19 @@
 'use client'
 
 import { getDashboardData, getCurrentUser } from './actions'
-import { Card, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
-import { Home, Calendar, FlaskConical, FileText, Settings, ChevronDown, ChevronUp } from 'lucide-react'
+import {
+    CalendarDays,
+    ChevronDown,
+    ChevronRight,
+    ChevronUp,
+    ExternalLink,
+    FileText,
+    FlaskConical,
+    Settings,
+} from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function HomePage() {
     const router = useRouter()
@@ -16,8 +24,7 @@ export default function HomePage() {
     const [showFutureReservations, setShowFutureReservations] = useState(false)
     const [showDetails, setShowDetails] = useState(false)
     const [usageLogs, setUsageLogs] = useState<any[]>([])
-    const [periodLabel, setPeriodLabel] = useState<string>('')
-
+    const [periodLabel, setPeriodLabel] = useState('')
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
@@ -30,277 +37,201 @@ export default function HomePage() {
                 }
                 setUser(currentUser)
 
-                const { totalCost: fetchedTotalCost, upcomingReservations, usageLogs: fetchedUsageLogs, fiscalYear, quarterLabel } = await getDashboardData()
-                setPeriodLabel(`(${fiscalYear}年${quarterLabel})`)
+                const {
+                    upcomingReservations,
+                    usageLogs: fetchedUsageLogs,
+                    fiscalYear,
+                    quarterLabel,
+                } = await getDashboardData()
+                setPeriodLabel(`${fiscalYear}年 ${quarterLabel}`)
 
-                // Filter usage logs for current user and calculate total cost
                 const userUsageLogs = fetchedUsageLogs.filter((log: any) => log.userId === currentUser.id)
-                const userTotalCost = userUsageLogs.reduce((sum: number, log: any) => sum + log.totalCost, 0)
+                setUsageLogs(userUsageLogs)
+                setTotalCost(userUsageLogs.reduce((sum: number, log: any) => sum + log.totalCost, 0))
 
-                setTotalCost(userTotalCost)
-
-                // Get user's upcoming reservations (all of them)
-                const userReservations = upcomingReservations.filter((r: any) => r.userId === currentUser.id)
-
+                const userReservations = upcomingReservations.filter((reservation: any) => reservation.userId === currentUser.id)
                 const today = new Date()
                 today.setHours(0, 0, 0, 0)
                 const tomorrow = new Date(today)
                 tomorrow.setDate(tomorrow.getDate() + 1)
 
-                const todayRes = []
-                const futureRes = []
-
-                for (const res of userReservations) {
-                    const startDate = new Date(res.startTime)
-                    if (startDate >= today && startDate < tomorrow) {
-                        todayRes.push(res)
-                    } else if (startDate >= tomorrow) {
-                        futureRes.push(res)
-                    }
-                }
-
-                setTodayReservations(todayRes)
-                setFutureReservations(futureRes)
-
-                setUsageLogs(fetchedUsageLogs.filter((log: any) => log.userId === currentUser.id))
+                setTodayReservations(userReservations.filter((reservation: any) => {
+                    const start = new Date(reservation.startTime)
+                    return start >= today && start < tomorrow
+                }))
+                setFutureReservations(userReservations.filter((reservation: any) => new Date(reservation.startTime) >= tomorrow))
             } catch (err) {
                 console.error('Failed to load dashboard data:', err)
                 setError((err as Error).message)
             }
         }
         loadData()
-    }, [])
+    }, [router])
 
     if (error) {
         return (
-            <div className="p-8 text-center">
-                <h1 className="text-2xl font-bold text-red-600 mb-4">エラーが発生しました</h1>
-                <p className="text-gray-700">{error}</p>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                    再読み込み
-                </button>
+            <div className="content-wrapper app-page text-center">
+                <div className="app-surface mx-auto max-w-lg p-8">
+                    <h1 className="text-xl font-bold text-red-600">エラーが発生しました</h1>
+                    <p className="mt-2 text-sm text-slate-600">{error}</p>
+                    <button onClick={() => window.location.reload()} className="mt-5 rounded-xl bg-blue-700 px-4 py-2 text-sm font-medium text-white">
+                        再読み込み
+                    </button>
+                </div>
             </div>
         )
     }
 
     if (!user) return null
 
-    return (
-        <div className="py-8">
-            <div style={{ maxWidth: '480px', margin: '0 auto', padding: '0 1.5rem' }}>
-                {/* Billing Summary */}
-                <Card className="border-2 border-blue-500 rounded-xl overflow-hidden" style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '2px solid #2563eb', marginTop: '1rem', marginBottom: '1rem' }}>
-                    <CardContent className="p-8 text-center">
-                        <h2 className="text-3xl font-bold text-gray-800 mb-0 leading-none">今期の利用料金</h2>
-                        <p className="text-sm text-gray-500 mb-0 -mt-1 leading-none">{periodLabel}</p>
-                        <div
-                            className="text-5xl font-bold text-gray-700 cursor-pointer hover:text-blue-600 transition-colors flex items-center justify-center gap-2 -mt-1"
-                            onClick={() => setShowDetails(!showDetails)}
-                        >
-                            {totalCost.toLocaleString()}円
-                            {showDetails ? <ChevronUp className="h-8 w-8" /> : <ChevronDown className="h-8 w-8" />}
-                        </div>
-                        {showDetails && (
-                            <div className="mt-4 border-t pt-4">
-                                {usageLogs.length === 0 ? (
-                                    <p className="text-gray-600 text-center py-2">利用履歴はありません</p>
-                                ) : (
-                                    <>
-                                        <div className="space-y-0">
-                                            {usageLogs.map((log: any, index: number) => (
-                                                <div key={log.id} className="flex justify-between text-sm py-2 px-3" style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
-                                                    <span>
-                                                        {new Date(log.date).toLocaleDateString('ja-JP', {
-                                                            year: 'numeric',
-                                                            month: '2-digit',
-                                                            day: '2-digit',
-                                                        })}
-                                                    </span>
-                                                    <span>{log.reagent.name}</span>
-                                                    <span>¥{log.totalCost.toLocaleString()}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="mt-2 pt-2 border-t border-gray-200 flex justify-between font-bold text-sm px-3 py-2" style={{ backgroundColor: '#f9fafb' }}>
-                                            <span>利用料合計</span>
-                                            <span>¥{totalCost.toLocaleString()}</span>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+    const formatTime = (date: string | Date) => new Date(date).toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+    })
 
-                {/* Reservations Summary */}
-                <Card className="border-2 border-blue-500 rounded-xl overflow-hidden" style={{ backgroundColor: 'white', borderRadius: '0.75rem', border: '2px solid #2563eb', marginBottom: '1rem' }}>
-                    <CardContent className="p-8">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">今日の予約</h2>
-                        {todayReservations.length === 0 ? (
-                            <p className="text-gray-600 text-center py-2">本日の予約はありません</p>
-                        ) : (
-                            <div className="space-y-0">
-                                {todayReservations.map((reservation, index: number) => (
-                                    <div key={reservation.id} className="flex justify-between text-sm py-2 px-3" style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
-                                        <span>
-                                            {new Date(reservation.startTime).toLocaleDateString('ja-JP', {
-                                                year: 'numeric',
-                                                month: '2-digit',
-                                                day: '2-digit',
-                                            })}
-                                        </span>
-                                        <span>{reservation.equipment.name}</span>
-                                        <span>
-                                            {new Date(reservation.startTime).toLocaleTimeString('ja-JP', {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                            })}
-                                            -
-                                            {new Date(reservation.endTime).toLocaleTimeString('ja-JP', {
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                            })}
-                                        </span>
+    const formatDate = (date: string | Date) => new Date(date).toLocaleDateString('ja-JP', {
+        month: 'numeric',
+        day: 'numeric',
+    })
+
+    const menuItems = [
+        { href: '/reservations', label: '機器予約', description: '空き状況を確認して予約', icon: CalendarDays },
+        { href: '/reagents', label: '有料サービス', description: '利用内容と数量を記録', icon: FlaskConical },
+        { href: '/invoices', label: '請求書', description: '請求内容を確認', icon: FileText },
+    ]
+
+    return (
+        <div className="content-wrapper app-page">
+            <div className="mb-6">
+                <h1 className="app-page-title">おはようございます、{user.name}さん</h1>
+                <p className="app-page-description">今日の予定と利用状況を確認できます</p>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+                <section className="app-surface p-5 md:p-6">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                        <h2 className="font-semibold text-slate-800">今日の予約</h2>
+                        <Link href="/reservations?view=calendar" className="text-xs font-medium text-blue-700 hover:underline">
+                            すべて見る
+                        </Link>
+                    </div>
+
+                    {todayReservations.length === 0 ? (
+                        <div className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                            本日の予約はありません
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-slate-100">
+                            {todayReservations.map((reservation) => (
+                                <div key={reservation.id} className="grid grid-cols-[3.5rem_1fr_auto] items-center gap-3 py-3">
+                                    <span className="font-semibold text-blue-700">{formatTime(reservation.startTime)}</span>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium text-slate-800">{reservation.equipment.name}</p>
+                                        <p className="mt-0.5 text-xs text-slate-500">{formatTime(reservation.startTime)}–{formatTime(reservation.endTime)}</p>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="mt-4 border-t border-slate-100 pt-4">
+                        <button
+                            type="button"
+                            onClick={() => setShowFutureReservations(!showFutureReservations)}
+                            className="flex min-h-10 w-full items-center justify-between rounded-lg px-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            aria-expanded={showFutureReservations}
+                        >
+                            <span>明日以降の予約</span>
+                            <span className="flex items-center gap-2 text-xs text-slate-500">
+                                {futureReservations.length}件
+                                {showFutureReservations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </span>
+                        </button>
+                        {showFutureReservations && (
+                            <div className="mt-2 divide-y divide-slate-100">
+                                {futureReservations.length === 0 ? (
+                                    <p className="py-4 text-center text-sm text-slate-500">予約はありません</p>
+                                ) : futureReservations.map((reservation) => (
+                                    <div key={reservation.id} className="grid grid-cols-[4rem_1fr_auto] gap-3 px-2 py-3 text-sm">
+                                        <span className="text-slate-500">{formatDate(reservation.startTime)}</span>
+                                        <span className="truncate font-medium text-slate-700">{reservation.equipment.name}</span>
+                                        <span className="text-slate-500">{formatTime(reservation.startTime)}</span>
                                     </div>
                                 ))}
                             </div>
                         )}
+                    </div>
+                </section>
 
-                        {/* Future Reservations Collapsible */}
-                        <div className="mt-6 pt-4 border-t border-gray-200">
-                            <div
-                                className="flex items-center justify-center gap-2 cursor-pointer hover:text-blue-600 transition-colors"
-                                onClick={() => setShowFutureReservations(!showFutureReservations)}
-                            >
-                                <h3 className="text-xl font-bold text-gray-700">明日以降の予約</h3>
-                                {showFutureReservations ? <ChevronUp className="h-6 w-6" /> : <ChevronDown className="h-6 w-6" />}
-                            </div>
+                <section className="app-surface p-5 md:p-6">
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 className="font-semibold text-slate-800">今期の利用料金</h2>
+                            <p className="mt-1 text-xs text-slate-500">{periodLabel}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowDetails(!showDetails)}
+                            className="flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                            aria-expanded={showDetails}
+                        >
+                            明細
+                            {showDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
+                    </div>
+                    <p className="mt-5 text-3xl font-bold tracking-tight text-slate-800 md:text-4xl">{totalCost.toLocaleString()}円</p>
 
-                            {showFutureReservations && (
-                                <div className="mt-4">
-                                    {futureReservations.length === 0 ? (
-                                        <p className="text-gray-600 text-center py-2">明日以降の予約はありません</p>
-                                    ) : (
-                                        <div className="space-y-0">
-                                            {futureReservations.map((reservation, index: number) => (
-                                                <div key={reservation.id} className="flex justify-between text-sm py-2 px-3" style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
-                                                    <span>
-                                                        {new Date(reservation.startTime).toLocaleDateString('ja-JP', {
-                                                            year: 'numeric',
-                                                            month: '2-digit',
-                                                            day: '2-digit',
-                                                        })}
-                                                    </span>
-                                                    <span>{reservation.equipment.name}</span>
-                                                    <span>
-                                                        {new Date(reservation.startTime).toLocaleTimeString('ja-JP', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                        })}
-                                                        -
-                                                        {new Date(reservation.endTime).toLocaleTimeString('ja-JP', {
-                                                            hour: '2-digit',
-                                                            minute: '2-digit',
-                                                        })}
-                                                    </span>
-                                                </div>
-                                            ))}
+                    {showDetails && (
+                        <div className="mt-5 border-t border-slate-100 pt-3">
+                            {usageLogs.length === 0 ? (
+                                <p className="py-3 text-center text-sm text-slate-500">利用履歴はありません</p>
+                            ) : (
+                                <div className="divide-y divide-slate-100">
+                                    {usageLogs.map((log: any) => (
+                                        <div key={log.id} className="grid grid-cols-[4.5rem_1fr_auto] gap-2 py-2 text-xs">
+                                            <span className="text-slate-500">{formatDate(log.date)}</span>
+                                            <span className="truncate text-slate-700">{log.reagent.name}</span>
+                                            <span className="font-medium text-slate-700">{log.totalCost.toLocaleString()}円</span>
                                         </div>
-                                    )}
+                                    ))}
                                 </div>
                             )}
                         </div>
-                    </CardContent>
-                </Card>
-
-                {/* Navigation Grid - 2x2 Layout */}
-                <div className="grid grid-cols-2 auto-rows-fr" style={{ gap: '1rem' }}>
-                    {/* Home Button */}
-                    <a href="https://www.med.kitasato-u.ac.jp/lab/dnalab/home/" target="_blank" rel="noopener noreferrer" className="h-full block" style={{ textDecoration: 'none' }}>
-                        <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
-                            style={{
-                                backgroundColor: 'white',
-                                border: '3px solid #3b82f6',
-                                borderRadius: '24px',
-                                minHeight: '120px'
-                            }}>
-                            <div className="bg-blue-100 p-6 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                                <Home style={{ color: '#1e40af', width: '80px', height: '80px' }} />
-                            </div>
-                            <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>センターHP</span>
-                        </div>
-                    </a>
-
-                    {/* Equipment Reservation Button */}
-                    <Link href="/reservations" className="h-full block" style={{ textDecoration: 'none' }}>
-                        <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
-                            style={{
-                                backgroundColor: 'white',
-                                border: '3px solid #3b82f6',
-                                borderRadius: '24px',
-                                minHeight: '120px'
-                            }}>
-                            <div className="bg-blue-100 p-6 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                                <Calendar style={{ color: '#1e40af', width: '80px', height: '80px' }} />
-                            </div>
-                            <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>機器予約</span>
-                        </div>
-                    </Link>
-
-                    {/* Paid Service Button */}
-                    <Link href="/reagents" className="h-full block" style={{ textDecoration: 'none' }}>
-                        <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
-                            style={{
-                                backgroundColor: 'white',
-                                border: '3px solid #3b82f6',
-                                borderRadius: '24px',
-                                minHeight: '120px'
-                            }}>
-                            <div className="bg-blue-100 p-6 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                                <FlaskConical style={{ color: '#1e40af', width: '80px', height: '80px' }} />
-                            </div>
-                            <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>有料サービス</span>
-                        </div>
-                    </Link>
-
-                    {/* Invoice Button */}
-                    <Link href="/invoices" className="h-full block" style={{ textDecoration: 'none' }}>
-                        <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
-                            style={{
-                                backgroundColor: 'white',
-                                border: '3px solid #3b82f6',
-                                borderRadius: '24px',
-                                minHeight: '120px'
-                            }}>
-                            <div className="bg-blue-100 p-6 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                                <FileText style={{ color: '#1e40af', width: '80px', height: '80px' }} />
-                            </div>
-                            <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>請求書</span>
-                        </div>
-                    </Link>
-
-                    {/* Admin Button (only for admins) */}
-                    {user.role === 'ADMIN' && (
-                        <Link href="/admin" className="col-span-2 h-full block" style={{ textDecoration: 'none' }}>
-                            <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center gap-4"
-                                style={{
-                                    backgroundColor: 'white',
-                                    border: '3px solid #3b82f6',
-                                    borderRadius: '24px',
-                                    minHeight: '120px'
-                                }}>
-                                <div className="bg-blue-100 p-6 rounded-lg" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                                    <Settings style={{ color: '#1e40af', width: '80px', height: '80px' }} />
-                                </div>
-                                <span className="text-xl font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700, textDecoration: 'none' }}>管理画面</span>
-                            </div>
-                        </Link>
                     )}
-                </div>
+                </section>
             </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {menuItems.map(({ href, label, description, icon: Icon }) => (
+                    <Link key={href} href={href} className="app-surface group flex min-h-24 items-center gap-4 p-4 transition hover:-translate-y-0.5 hover:shadow-md">
+                        <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700">
+                            <Icon className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0">
+                            <span className="block text-sm font-semibold text-slate-800">{label}</span>
+                            <span className="mt-1 block text-xs text-slate-500">{description}</span>
+                        </span>
+                    </Link>
+                ))}
+                <a href="https://www.med.kitasato-u.ac.jp/lab/dnalab/home/" target="_blank" rel="noopener noreferrer" className="app-surface group flex min-h-24 items-center gap-4 p-4 transition hover:-translate-y-0.5 hover:shadow-md">
+                    <span className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700">
+                        <ExternalLink className="h-5 w-5" />
+                    </span>
+                    <span>
+                        <span className="block text-sm font-semibold text-slate-800">センターHP</span>
+                        <span className="mt-1 block text-xs text-slate-500">公式サイトを開く</span>
+                    </span>
+                </a>
+            </div>
+
+            {user.role === 'ADMIN' && (
+                <Link href="/admin" className="app-surface mt-3 flex min-h-16 items-center gap-4 p-4 transition hover:shadow-md">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-700"><Settings className="h-5 w-5" /></span>
+                    <span className="text-sm font-semibold text-slate-800">管理画面</span>
+                    <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
+                </Link>
+            )}
         </div>
     )
 }
