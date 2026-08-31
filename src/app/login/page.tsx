@@ -4,7 +4,7 @@ import { login } from '@/app/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardFooter } from '@/components/ui/card'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
@@ -18,11 +18,11 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
-            <Card className="w-[450px] shadow-xl border-blue-100 overflow-hidden">
-                <CardHeader className="header-gradient text-center py-8 space-y-4" style={{ background: 'linear-gradient(to right, rgb(96 165 250), rgb(29 78 216))' }}>
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8">
+            <Card className="w-full max-w-md overflow-hidden rounded-2xl border-slate-200 shadow-[0_16px_48px_rgba(30,64,175,0.10)]">
+                <CardHeader className="space-y-3 bg-blue-700 py-7 text-center">
                     <div className="flex justify-center">
-                        <div className="bg-white rounded-full p-1 w-[80px] h-[80px] flex items-center justify-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white p-1">
                             <img
                                 src="/images/kitasato-logo.png"
                                 alt="Kitasato University Logo"
@@ -30,16 +30,16 @@ export default function LoginPage() {
                             />
                         </div>
                     </div>
-                    <div className="font-bold tracking-wide" style={{ color: 'white', fontSize: '1.75rem' }}>
+                    <div className="text-xl font-semibold tracking-wide text-white">
                         分子生物実験センター
                     </div>
-                    <div className="font-medium" style={{ color: 'white', fontSize: '1.125rem', opacity: 0.9 }}>
+                    <div className="text-sm font-medium text-blue-100">
                         ログイン
                     </div>
                 </CardHeader>
                 <form action={handleSubmit}>
-                    <CardContent className="space-y-12" style={{ paddingTop: '2.5rem', paddingBottom: '2.5rem' }}>
-                        <div className="text-center" style={{ marginBottom: '2.5rem' }}>
+                    <CardContent className="space-y-5 px-6 py-7">
+                        <div className="text-center">
                             <CardDescription className="text-center text-gray-600">
                                 メールアドレスとパスワードを入力してください
                             </CardDescription>
@@ -52,24 +52,22 @@ export default function LoginPage() {
                                 type="email"
                                 required
                                 placeholder="user@example.com"
-                                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                                style={{ height: '3rem', fontSize: '1.125rem' }}
+                                className="h-11 rounded-xl border-slate-300 text-base"
                             />
                         </div>
-                        <div className="space-y-2" style={{ marginTop: '3rem' }}>
+                        <div className="space-y-2">
                             <Label htmlFor="password" className="text-gray-700">パスワード</Label>
                             <Input
                                 id="password"
                                 name="password"
                                 type="password"
                                 required
-                                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                                style={{ height: '3rem', fontSize: '1.125rem' }}
+                                className="h-11 rounded-xl border-slate-300 text-base"
                             />
                         </div>
                     </CardContent>
-                    <CardFooter className="flex flex-col space-y-5 pt-4 pb-6">
-                        <Button type="submit" className="w-full btn-primary h-11" style={{ fontSize: '1.5rem' }}>
+                    <CardFooter className="flex flex-col space-y-4 px-6 pb-7">
+                        <Button type="submit" className="h-12 w-full rounded-xl bg-blue-700 text-base font-semibold text-white hover:bg-blue-800">
                             ログイン
                         </Button>
                         <div className="text-sm text-center text-gray-600">
