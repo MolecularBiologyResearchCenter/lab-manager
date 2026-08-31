@@ -435,14 +435,14 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         <div className="h-full flex flex-row gap-4">
             {/* Sidebar for Equipment Filtering - Desktop only */}
             {!isMobile && (
-                <div className="w-64 flex-shrink-0 bg-white p-4 rounded-lg shadow overflow-y-auto" style={{ maxHeight: 'calc(100vh - 100px)' }}>
+                <div className="app-surface w-64 flex-shrink-0 overflow-y-auto p-4" style={{ maxHeight: 'calc(100vh - 100px)' }}>
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-bold text-gray-700">表示機器</h3>
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={toggleAllEquipment}
-                            className="text-xs text-blue-600 hover:text-blue-800"
+                                className="rounded-lg text-xs text-blue-700 hover:text-blue-800"
                         >
                             {visibleEquipmentIds.length === equipmentList.length ? '全解除' : '全選択'}
                         </Button>
@@ -476,23 +476,26 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
             {/* Main Calendar/List Area */}
             <div className="flex-1 flex flex-col h-full">
-                <div className="flex justify-between items-center mb-4 px-4">
+                    <div className="mb-4 flex items-center justify-between px-1 md:px-4">
                     {!isMobile && (
                         <div className="flex gap-2">
                             <Button
                                 variant={view === 'month' ? 'default' : 'outline'}
+                                className="rounded-xl"
                                 onClick={() => setView('month')}
                             >
                                 月
                             </Button>
                             <Button
                                 variant={view === 'week' ? 'default' : 'outline'}
+                                className="rounded-xl"
                                 onClick={() => setView('week')}
                             >
                                 週
                             </Button>
                             <Button
                                 variant={view === 'day' ? 'default' : 'outline'}
+                                className="rounded-xl"
                                 onClick={() => setView('day')}
                             >
                                 日
@@ -501,7 +504,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                     )}
                     {isMobile && <div></div>} {/* Spacer for mobile */}
                     <div className="flex items-center gap-4">
-                        <Button variant="outline" onClick={() => setDate(new Date())}>
+                        <Button variant="outline" onClick={() => setDate(new Date())} className="rounded-xl border-slate-300 bg-white">
                             今日
                         </Button>
                         <span className="text-lg font-bold">
@@ -514,7 +517,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                 {isMobile ? (
                     <MobileReservationList />
                 ) : (
-                    <div className="flex-1 px-4 pb-4">
+                    <div className="app-surface flex-1 overflow-hidden px-4 pb-4 pt-3">
                         <Calendar
                             localizer={localizer}
                             events={filteredReservations}
@@ -557,7 +560,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             </div>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-md bg-white" style={{ maxWidth: '280px', backgroundColor: '#eff6ff', border: '2px solid #2563eb', borderRadius: '12px' }}>
+                <DialogContent className="max-w-sm rounded-2xl border border-slate-200 bg-white shadow-xl">
                     <DialogHeader>
                         <DialogTitle>{editingReservation ? '予約の編集' : '新規予約'}</DialogTitle>
                     </DialogHeader>
@@ -611,15 +614,14 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                         </div>
 
                         <div className="flex gap-2">
-                            <Button type="submit" className="flex-1 text-xl font-bold" style={{ backgroundColor: '#2563eb', color: 'white', padding: '1.5rem' }}>
+                            <Button type="submit" className="h-11 flex-1 rounded-xl bg-blue-700 font-semibold text-white hover:bg-blue-800">
                                 {editingReservation ? '更新する' : '予約する'}
                             </Button>
                             {editingReservation && (
                                 <Button
                                     type="button"
                                     variant="destructive"
-                                    className="flex-1 text-xl font-bold"
-                                    style={{ padding: '1.5rem' }}
+                                    className="h-11 flex-1 rounded-xl font-semibold"
                                     onClick={handleDelete}
                                 >
                                     削除する
