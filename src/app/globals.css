@@ -283,6 +283,193 @@
     color: rgb(23 48 80);
     box-shadow: 0 1px 3px rgb(15 23 42 / 0.08);
   }
+
+  /* Admin screens share the same quiet dashboard language as the user area. */
+  .admin-nav-shell {
+    position: sticky;
+    top: 4rem;
+    z-index: 40;
+    border-bottom: 1px solid rgb(226 232 240);
+    background: rgb(255 255 255 / 0.96);
+    box-shadow: 0 1px 8px rgb(30 64 175 / 0.04);
+    backdrop-filter: blur(12px);
+  }
+
+  .admin-nav-row {
+    display: flex;
+    min-height: 3.5rem;
+    align-items: center;
+    gap: 1.25rem;
+  }
+
+  .admin-nav-label {
+    flex-shrink: 0;
+    color: rgb(23 48 80);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .admin-nav-links {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .admin-nav-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-nav-link {
+    display: inline-flex;
+    min-height: 2.5rem;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.45rem;
+    border-radius: 0.75rem;
+    padding: 0 0.8rem;
+    color: rgb(100 116 139);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: color 0.2s, background-color 0.2s;
+  }
+
+  .admin-nav-link:hover {
+    background: rgb(239 246 255);
+    color: rgb(29 78 216);
+  }
+
+  .admin-nav-link-active {
+    background: rgb(219 234 254);
+    color: rgb(29 78 216);
+    font-weight: 600;
+  }
+
+  .admin-area .content-wrapper {
+    max-width: 80rem;
+  }
+
+  .admin-area h1 {
+    color: rgb(23 48 80);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+  }
+
+  .admin-area [data-slot="card"] {
+    border: 1px solid rgb(226 232 240) !important;
+    border-radius: 1rem !important;
+    background: white !important;
+    box-shadow: 0 8px 24px rgb(30 64 175 / 0.05) !important;
+  }
+
+  .admin-area [data-slot="card-title"] {
+    color: rgb(30 41 59);
+  }
+
+  .admin-area [data-slot="table-container"] {
+    border: 1px solid rgb(226 232 240);
+    border-radius: 0.875rem;
+  }
+
+  .admin-area [data-slot="table-header"] {
+    background: rgb(248 250 252);
+  }
+
+  .admin-area [data-slot="table-head"] {
+    height: 2.75rem;
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+    color: rgb(71 85 105);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .admin-area [data-slot="table-cell"] {
+    padding: 0.8rem 0.875rem;
+    color: rgb(51 65 85);
+  }
+
+  .admin-area [data-slot="table-row"] {
+    background: white !important;
+    border-color: rgb(241 245 249);
+  }
+
+  .admin-area [data-slot="table-row"]:hover {
+    background: rgb(248 250 252) !important;
+  }
+
+  .admin-area input:not([type="file"]),
+  .admin-area textarea {
+    border: 1px solid rgb(203 213 225);
+    border-radius: 0.75rem;
+    background: white;
+    color: rgb(30 41 59);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .admin-area input:not([type="file"]):focus,
+  .admin-area textarea:focus {
+    border-color: rgb(37 99 235);
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.12);
+  }
+
+  .admin-management-grid {
+    display: grid;
+    max-width: 64rem;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0 auto;
+  }
+
+  .admin-management-card {
+    display: flex;
+    min-height: 8.5rem;
+    height: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 1rem;
+    background: white;
+    padding: 1.25rem;
+    box-shadow: 0 8px 24px rgb(30 64 175 / 0.04);
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .admin-management-card:hover {
+    transform: translateY(-2px);
+    border-color: rgb(191 219 254);
+    box-shadow: 0 12px 28px rgb(30 64 175 / 0.09);
+  }
+
+  .admin-management-icon {
+    display: flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.875rem;
+    background: rgb(239 246 255);
+    color: rgb(37 99 235);
+  }
+
+  .admin-management-icon svg {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .admin-management-title {
+    color: rgb(30 41 59);
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
 }
 
 @media (max-width: 767px) {
@@ -302,6 +489,37 @@
 
   .app-page-title {
     font-size: 1.4rem;
+  }
+
+  .admin-nav-shell {
+    top: 4rem;
+  }
+
+  .admin-nav-row {
+    gap: 0.75rem;
+  }
+
+  .admin-nav-label {
+    display: none;
+  }
+
+  .admin-area h1 {
+    font-size: 1.4rem;
+  }
+
+  .admin-area [data-slot="card-header"],
+  .admin-area [data-slot="card-content"] {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .admin-management-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-management-card {
+    min-height: 7.5rem;
+    padding: 1rem;
   }
 }
 
