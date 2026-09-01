@@ -22,7 +22,7 @@ export default async function Header() {
                         <img
                             src="/images/kitasato-logo.png"
                             alt="北里大学"
-                            className="h-10 w-10 flex-shrink-0 rounded-full bg-white object-contain md:h-11 md:w-11"
+                            className="h-10 w-10 flex-shrink-0 object-contain md:h-11 md:w-11"
                         />
                         <div className="min-w-0 leading-tight">
                             <div className="truncate text-sm font-medium md:text-base">分子生物実験センター</div>
