@@ -22,11 +22,11 @@ export default function LoginPage() {
             <Card className="w-full max-w-md overflow-hidden rounded-2xl border-slate-200 shadow-[0_16px_48px_rgba(30,64,175,0.10)]">
                 <CardHeader className="space-y-3 bg-blue-700 py-7 text-center">
                     <div className="flex justify-center">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white p-1">
+                        <div className="flex h-16 w-16 items-center justify-center">
                             <img
                                 src="/images/kitasato-logo.png"
                                 alt="Kitasato University Logo"
-                                className="w-full h-full rounded-full"
+                                className="h-full w-full object-contain"
                             />
                         </div>
                     </div>
