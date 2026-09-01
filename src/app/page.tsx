@@ -84,6 +84,18 @@ export default function HomePage() {
 
     if (!user) return null
 
+    const hourInJapan = Number(new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        hourCycle: 'h23',
+        timeZone: 'Asia/Tokyo',
+    }).format(new Date()))
+
+    const greeting = hourInJapan >= 5 && hourInJapan < 11
+        ? 'おはようございます'
+        : hourInJapan >= 11 && hourInJapan < 18
+            ? 'こんにちは'
+            : 'こんばんは'
+
     const formatTime = (date: string | Date) => new Date(date).toLocaleTimeString('ja-JP', {
         hour: '2-digit',
         minute: '2-digit',
@@ -103,7 +115,7 @@ export default function HomePage() {
     return (
         <div className="content-wrapper app-page">
             <div className="mb-6">
-                <h1 className="app-page-title">おはようございます、{user.name}さん</h1>
+                <h1 className="app-page-title">{greeting}、{user.name}さん</h1>
                 <p className="app-page-description">今日の予定と利用状況を確認できます</p>
             </div>
 
