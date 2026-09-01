@@ -99,9 +99,10 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
     })
 
     return (
-        <div className="content-wrapper py-8 space-y-8">
-            <div className="flex justify-center items-center">
-                <h1 className="text-4xl font-bold">管理者ダッシュボード</h1>
+        <div className="content-wrapper space-y-8 py-8">
+            <div>
+                <h1>管理者ダッシュボード</h1>
+                <p className="mt-2 text-sm text-slate-500">センターの利用状況と各種設定を確認できます</p>
             </div>
 
             <div className="space-y-4">
@@ -132,84 +133,54 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
             </div>
 
             {/* Management Cards Grid - 2x2 Layout */}
-            <div className="grid grid-cols-2 auto-rows-fr" style={{ gap: '1rem', maxWidth: '800px', margin: '0 auto' }}>
+            <div className="admin-management-grid">
                 {/* Invoice Management */}
-                <Link href="/admin/invoices" className="h-full block" style={{ textDecoration: 'none' }}>
-                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
-                        style={{
-                            backgroundColor: 'white',
-                            border: '3px solid #3b82f6',
-                            borderRadius: '24px',
-                            minHeight: '140px'
-                        }}>
-                        <div className="bg-blue-100 p-4 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                            <FileText style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                <Link href="/admin/invoices">
+                    <div className="admin-management-card">
+                        <div className="admin-management-icon">
+                            <FileText />
                         </div>
-                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>請求書管理</span>
+                        <span className="admin-management-title">請求書管理</span>
                     </div>
                 </Link>
 
                 {/* Usage Logs Management */}
-                <Link href="/admin/usage-logs" className="h-full block" style={{ textDecoration: 'none' }}>
-                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
-                        style={{
-                            backgroundColor: 'white',
-                            border: '3px solid #3b82f6',
-                            borderRadius: '24px',
-                            minHeight: '140px'
-                        }}>
-                        <div className="bg-blue-100 p-4 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                            <DollarSign style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                <Link href="/admin/usage-logs">
+                    <div className="admin-management-card">
+                        <div className="admin-management-icon">
+                            <DollarSign />
                         </div>
-                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>利用料金管理</span>
+                        <span className="admin-management-title">利用料金管理</span>
                     </div>
                 </Link>
 
                 {/* Reagent Management */}
-                <Link href="/admin/reagents" className="h-full block" style={{ textDecoration: 'none' }}>
-                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
-                        style={{
-                            backgroundColor: 'white',
-                            border: '3px solid #3b82f6',
-                            borderRadius: '24px',
-                            minHeight: '140px'
-                        }}>
-                        <div className="bg-blue-100 p-4 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                            <FlaskConical style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                <Link href="/admin/reagents">
+                    <div className="admin-management-card">
+                        <div className="admin-management-icon">
+                            <FlaskConical />
                         </div>
-                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>有料サービス管理</span>
+                        <span className="admin-management-title">有料サービス管理</span>
                     </div>
                 </Link>
 
                 {/* Equipment Management */}
-                <Link href="/admin/equipment" className="h-full block" style={{ textDecoration: 'none' }}>
-                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex flex-col items-center justify-center text-center"
-                        style={{
-                            backgroundColor: 'white',
-                            border: '3px solid #3b82f6',
-                            borderRadius: '24px',
-                            minHeight: '140px'
-                        }}>
-                        <div className="bg-blue-100 p-4 rounded-lg mb-3" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                            <Wrench style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                <Link href="/admin/equipment">
+                    <div className="admin-management-card">
+                        <div className="admin-management-icon">
+                            <Wrench />
                         </div>
-                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>機器管理</span>
+                        <span className="admin-management-title">機器管理</span>
                     </div>
                 </Link>
 
                 {/* User Management - Full Width */}
-                <Link href="/admin/users" className="col-span-2 h-full block" style={{ textDecoration: 'none' }}>
-                    <div className="h-full rounded-3xl p-6 hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center gap-4"
-                        style={{
-                            backgroundColor: 'white',
-                            border: '3px solid #3b82f6',
-                            borderRadius: '24px',
-                            minHeight: '140px'
-                        }}>
-                        <div className="bg-blue-100 p-4 rounded-lg" style={{ backgroundColor: '#bfdbfe', borderRadius: '12px' }}>
-                            <Users style={{ color: '#1e40af', width: '60px', height: '60px' }} />
+                <Link href="/admin/users">
+                    <div className="admin-management-card">
+                        <div className="admin-management-icon">
+                            <Users />
                         </div>
-                        <span className="text-lg font-bold text-gray-900 leading-tight" style={{ color: '#000000', fontWeight: 700 }}>利用者管理</span>
+                        <span className="admin-management-title">利用者管理</span>
                     </div>
                 </Link>
             </div>

@@ -112,10 +112,10 @@ export default function InvoiceManager({ invoices }: Props) {
 
     return (
         <div className="content-wrapper py-8">
-            <div className="mb-8 flex items-center justify-between">
+            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">請求書管理（管理者）</h1>
-                    <p className="text-gray-600">全ユーザーの請求書を管理できます</p>
+                    <h1>請求書管理</h1>
+                    <p className="mt-2 text-sm text-slate-500">すべての利用者の請求書を管理できます</p>
                 </div>
                 <form action={generateCurrentQuarterInvoices}>
                     <Button type="submit" className="btn-primary">

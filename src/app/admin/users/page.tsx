@@ -131,14 +131,14 @@ export default function UsersPage() {
 
     if (loading) {
         return (
-            <div className="content-wrapper py-8 space-y-8">
+            <div className="content-wrapper space-y-8 py-8">
                 <div className="flex items-center gap-4">
                     <Link href="/admin">
                         <Button variant="ghost" size="icon">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
                     </Link>
-                    <h1 className="text-3xl font-bold">利用者一覧</h1>
+                    <h1>利用者一覧</h1>
                 </div>
                 <Card>
                     <CardContent className="py-8">
@@ -150,14 +150,17 @@ export default function UsersPage() {
     }
 
     return (
-        <div className="content-wrapper py-8 space-y-8">
+        <div className="content-wrapper space-y-8 py-8">
             <div className="flex items-center gap-4">
                 <Link href="/admin">
                     <Button variant="ghost" size="icon">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                 </Link>
-                <h1 className="text-3xl font-bold">利用者一覧</h1>
+                <div>
+                    <h1>利用者一覧</h1>
+                    <p className="mt-2 text-sm text-slate-500">登録情報と管理権限を確認・変更できます</p>
+                </div>
             </div>
 
             <Card>
@@ -234,7 +237,7 @@ export default function UsersPage() {
 
             {/* Edit User Dialog */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                <DialogContent style={{ maxWidth: '400px', border: '2px solid #3b82f6', backgroundColor: '#ffffff' }}>
+                <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white">
                     <DialogHeader>
                         <DialogTitle>権限の変更</DialogTitle>
                         <DialogDescription>
@@ -269,7 +272,7 @@ export default function UsersPage() {
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <DialogContent style={{ maxWidth: '400px', border: '2px solid #3b82f6', backgroundColor: '#ffffff' }}>
+                <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white">
                     <DialogHeader>
                         <DialogTitle>削除の確認</DialogTitle>
                         <DialogDescription>
