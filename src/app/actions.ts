@@ -131,7 +131,13 @@ export async function getEquipmentList() {
 }
 
 export async function getReagentList() {
-    return await prisma.reagent.findMany()
+    const reagents = await prisma.reagent.findMany()
+    const nameCollator = new Intl.Collator('ja', {
+        numeric: true,
+        sensitivity: 'base',
+    })
+
+    return reagents.sort((a, b) => nameCollator.compare(a.name, b.name))
 }
 
 export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string) {
