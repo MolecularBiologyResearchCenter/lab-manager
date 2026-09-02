@@ -34,8 +34,8 @@ export default async function ReservationsPage(props: { searchParams: Promise<{ 
         userExtension: res.user.extension || undefined,
     }))
 
-    // Get view preference from URL params, default to 'list'
-    const view = searchParams.view || 'list'
+    // Get view preference from URL params, default to 'calendar'
+    const view = searchParams.view || 'calendar'
 
     return (
         <div className="content-wrapper app-page">
