@@ -104,26 +104,27 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
                 <h1 className="text-4xl font-bold">管理者ダッシュボード</h1>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
                 {/* Year Selector */}
                 <div className="flex items-center justify-center gap-2">
                     <AdminYearSelect currentYear={currentYear} />
                 </div>
 
                 {/* Month Selector */}
-                <div className="flex flex-wrap justify-center gap-2">
+                <div className="admin-month-picker">
                     {months.map((m) => {
                         // Active if it matches the targetDate
                         const isTarget = targetDate.getFullYear() === parseInt(m.value.split('-')[0]) &&
                             (targetDate.getMonth() + 1) === parseInt(m.value.split('-')[1])
 
                         return (
-                            <Link key={m.value} href={`/admin?month=${m.value}`}>
+                            <Link key={m.value} href={`/admin?month=${m.value}`} className="block">
                                 <Button
-                                    variant={isTarget ? 'default' : 'outline'}
+                                    variant="outline"
                                     size="sm"
+                                    className={`admin-month-button ${isTarget ? 'admin-month-button-active' : ''}`}
                                 >
-                                    {m.label}
+                                    {parseInt(m.value.split('-')[1])}月
                                 </Button>
                             </Link>
                         )
