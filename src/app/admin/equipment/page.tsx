@@ -178,17 +178,20 @@ export default function EquipmentPage() {
     }
 
     if (loading) {
-        return <div className="content-wrapper py-8">読み込み中...</div>
+        return <div className="content-wrapper py-8 text-sm text-slate-500">読み込み中...</div>
     }
 
     if (error) {
-        return <div className="content-wrapper py-8 text-red-600">エラー: {error}</div>
+        return <div className="content-wrapper py-8 text-sm text-red-600">エラー: {error}</div>
     }
 
     return (
-        <div className="content-wrapper py-8 space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-4xl font-bold">機器管理</h1>
+        <div className="content-wrapper space-y-6 py-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h1>機器管理</h1>
+                    <p className="mt-2 text-sm text-slate-500">予約対象の機器とアイコンを管理します</p>
+                </div>
                 {!showAddForm && !editingId && (
                     <Button onClick={startAdd} className="flex items-center gap-2">
                         <Plus className="h-4 w-4" />
@@ -379,7 +382,7 @@ export default function EquipmentPage() {
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <DialogContent style={{ maxWidth: '400px', border: '2px solid #3b82f6', backgroundColor: '#ffffff' }}>
+                <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white">
                     <DialogHeader>
                         <DialogTitle>削除の確認</DialogTitle>
                         <DialogDescription>
