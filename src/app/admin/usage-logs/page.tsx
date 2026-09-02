@@ -89,8 +89,8 @@ export default async function AdminUsageLogsPage(props: { searchParams: Promise<
     return (
         <div className="content-wrapper py-8">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">利用料金管理</h1>
-                <p className="text-gray-600">試薬利用履歴の確認・編集・削除ができます</p>
+                <h1>利用料金管理</h1>
+                <p className="mt-2 text-sm text-slate-500">有料サービスの利用履歴を確認・編集・削除できます</p>
             </div>
 
             <div className="mb-8 space-y-3">
