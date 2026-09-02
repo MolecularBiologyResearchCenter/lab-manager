@@ -93,7 +93,7 @@ export default async function AdminUsageLogsPage(props: { searchParams: Promise<
                 <p className="text-gray-600">試薬利用履歴の確認・編集・削除ができます</p>
             </div>
 
-            <div className="space-y-4 mb-8">
+            <div className="mb-8 space-y-3">
                 {/* Year Selector */}
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-700">年選択:</span>
@@ -101,20 +101,20 @@ export default async function AdminUsageLogsPage(props: { searchParams: Promise<
                 </div>
 
                 {/* Month Selector */}
-                <div className="flex flex-wrap gap-2">
+                <div className="admin-month-picker mx-0">
                     {months.map((m) => {
                         // Active if it matches the targetDate
                         const isTarget = targetDate.getFullYear() === parseInt(m.value.split('-')[0]) &&
                             (targetDate.getMonth() + 1) === parseInt(m.value.split('-')[1])
 
                         return (
-                            <Link key={m.value} href={`/admin/usage-logs?month=${m.value}`}>
+                            <Link key={m.value} href={`/admin/usage-logs?month=${m.value}`} className="block">
                                 <Button
-                                    variant={isTarget ? 'default' : 'outline'}
+                                    variant="outline"
                                     size="sm"
-                                    className="min-w-[80px]"
+                                    className={`admin-month-button ${isTarget ? 'admin-month-button-active' : ''}`}
                                 >
-                                    {m.label}
+                                    {parseInt(m.value.split('-')[1])}月
                                 </Button>
                             </Link>
                         )
