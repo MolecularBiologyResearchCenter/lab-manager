@@ -45,7 +45,7 @@ export default function UsageLogEditForm({
                 </Link>
             </div>
 
-            <Card className="card-elevated max-w-2xl mx-auto">
+            <Card className="card-elevated mx-auto max-w-2xl">
                 <CardHeader>
                     <CardTitle>利用料金の編集</CardTitle>
                 </CardHeader>
