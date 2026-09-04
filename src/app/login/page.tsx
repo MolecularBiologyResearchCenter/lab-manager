@@ -65,6 +65,17 @@ export default function LoginPage() {
                                 className="h-11 rounded-xl border-slate-300 text-base"
                             />
                         </div>
+                        <div className="flex items-center gap-3">
+                            <input
+                                id="rememberMe"
+                                name="rememberMe"
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 text-blue-700 accent-blue-700"
+                            />
+                            <Label htmlFor="rememberMe" className="cursor-pointer text-sm font-normal text-slate-600">
+                                30日間ログイン状態を保持する
+                            </Label>
+                        </div>
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-4 px-6 pb-7">
                         <Button type="submit" className="h-12 w-full rounded-xl bg-blue-700 text-base font-semibold text-white hover:bg-blue-800">
