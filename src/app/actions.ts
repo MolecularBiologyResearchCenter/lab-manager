@@ -274,6 +274,7 @@ export async function getCurrentUser() {
 export async function login(formData: FormData) {
     const email = (formData.get('email') as string).trim()
     const password = (formData.get('password') as string).trim()
+    const rememberMe = formData.get('rememberMe') === 'on'
 
     if (!email || !password) {
         throw new Error('メールアドレスとパスワードを入力してください。')
@@ -288,7 +289,13 @@ export async function login(formData: FormData) {
     }
 
     const cookieStore = await cookies()
-    cookieStore.set('userId', user.id, { httpOnly: true, secure: process.env.NODE_ENV === 'production' })
+    cookieStore.set('userId', user.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        ...(rememberMe ? { maxAge: 60 * 60 * 24 * 30 } : {}),
+    })
 
     redirect('/')
 }
