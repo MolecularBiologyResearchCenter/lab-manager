@@ -550,6 +550,12 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                             formats={{
                                 timeGutterFormat: (date: Date, culture?: string, localizer?: any) =>
                                     localizer.format(date, 'HH:mm', culture),
+                                eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }, culture?: string, localizer?: any) =>
+                                    `${localizer.format(start, 'HH:mm', culture)} - ${localizer.format(end, 'HH:mm', culture)}`,
+                                eventTimeRangeStartFormat: ({ start }: { start: Date; end: Date }, culture?: string, localizer?: any) =>
+                                    `${localizer.format(start, 'HH:mm', culture)} -`,
+                                eventTimeRangeEndFormat: ({ end }: { start: Date; end: Date }, culture?: string, localizer?: any) =>
+                                    `- ${localizer.format(end, 'HH:mm', culture)}`,
                             }}
                             tooltipAccessor={(event: Reservation) => {
                                 return `${event.title}${event.phoneNumber ? ` Tel: ${event.phoneNumber}` : ''}`
