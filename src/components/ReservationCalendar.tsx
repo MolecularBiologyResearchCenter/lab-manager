@@ -432,42 +432,43 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     }
 
     return (
-        <div className="h-full flex flex-row gap-4">
+        <div className="flex h-full flex-row gap-3">
             {/* Sidebar for Equipment Filtering - Desktop only */}
             {!isMobile && (
-                <div className="app-surface w-64 flex-shrink-0 overflow-y-auto p-4" style={{ maxHeight: 'calc(100vh - 100px)' }}>
-                    <div className="flex justify-between items-center mb-4">
+                <div className="app-surface w-40 flex-shrink-0 overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 100px)' }}>
+                    <div className="mb-2">
                         <h3 className="font-bold text-gray-700">表示機器</h3>
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={toggleAllEquipment}
-                                className="rounded-lg text-xs text-blue-700 hover:text-blue-800"
+                            className="mt-1 h-7 justify-start rounded-lg px-0 text-xs text-blue-700 hover:bg-transparent hover:text-blue-800"
                         >
                             {visibleEquipmentIds.length === equipmentList.length ? '全解除' : '全選択'}
                         </Button>
                     </div>
                     <div className="space-y-2">
                         {equipmentList.map(eq => (
-                            <div key={eq.id} className="flex items-center space-x-2">
+                            <div key={eq.id} className="flex items-center gap-1.5 whitespace-nowrap">
                                 <input
                                     type="checkbox"
                                     id={`eq-${eq.id}`}
                                     checked={visibleEquipmentIds.includes(eq.id)}
                                     onChange={() => toggleEquipment(eq.id)}
-                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    className="flex-shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+
+                                <div
+                                    className="h-3 w-3 flex-shrink-0 rounded-full"
+                                    style={{ backgroundColor: getEquipmentColor(eq.id) }}
                                 />
                                 <label
                                     htmlFor={`eq-${eq.id}`}
-                                    className="text-sm text-gray-700 cursor-pointer flex-1 truncate"
+                                    className="cursor-pointer whitespace-nowrap text-sm text-gray-700"
                                     title={eq.name}
                                 >
                                     {eq.name}
                                 </label>
-                                <div
-                                    className="w-3 h-3 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: getEquipmentColor(eq.id) }}
-                                />
                             </div>
                         ))}
                     </div>
@@ -475,7 +476,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             )}
 
             {/* Main Calendar/List Area */}
-            <div className="flex-1 flex flex-col h-full">
+            <div className="flex h-full min-w-0 flex-1 flex-col">
                     <div className="mb-4 flex items-center justify-between px-1 md:px-4">
                     {!isMobile && (
                         <div className="flex gap-2">
