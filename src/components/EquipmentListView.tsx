@@ -101,7 +101,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
 
     return (
         <div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                 {equipmentList.map((equipment) => {
                     // Use icon from database, or fallback to default
                     const imagePath = equipment.icon || '/icons-blue/3500xL.jpg'
@@ -111,7 +111,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                     return (
                         <div
                             key={equipment.id}
-                            className="app-surface flex min-w-0 flex-col justify-between p-3 transition-shadow hover:shadow-md md:p-4"
+                            className="app-surface flex min-w-0 flex-col justify-between p-3 transition-shadow hover:shadow-md"
                         >
                             <div>
                                 {/* Left: Icon */}
