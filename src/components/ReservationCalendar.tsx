@@ -457,7 +457,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                     onChange={() => toggleEquipment(eq.id)}
                                     className="flex-shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                 />
-                                
+
                                 <div
                                     className="h-3 w-3 flex-shrink-0 rounded-full"
                                     style={{ backgroundColor: getEquipmentColor(eq.id) }}
