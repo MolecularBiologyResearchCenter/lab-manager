@@ -39,6 +39,8 @@ const localizer = dateFnsLocalizer({
     locales,
 })
 
+const DEFAULT_CALENDAR_SCROLL_TIME = new Date(1970, 0, 1, 8, 0, 0)
+
 interface Equipment {
     id: string
     name: string
@@ -457,7 +459,6 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                     onChange={() => toggleEquipment(eq.id)}
                                     className="flex-shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                 />
-
                                 <div
                                     className="h-3 w-3 flex-shrink-0 rounded-full"
                                     style={{ backgroundColor: getEquipmentColor(eq.id) }}
@@ -529,6 +530,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                             onView={setView}
                             date={date}
                             onNavigate={setDate}
+                            scrollToTime={DEFAULT_CALENDAR_SCROLL_TIME}
                             selectable
                             onSelectSlot={handleSelectSlot}
                             onSelectEvent={handleSelectEvent}
