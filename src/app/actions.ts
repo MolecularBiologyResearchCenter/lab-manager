@@ -534,8 +534,8 @@ export async function uploadSeal(formData: FormData) {
         throw new Error('権限がありません。')
     }
 
-    const file = formData.get('file') as File
-    if (!file) {
+    const file = formData.get('file')
+    if (!(file instanceof File) || file.size === 0) {
         throw new Error('ファイルが選択されていません。')
     }
 
@@ -543,31 +543,17 @@ export async function uploadSeal(formData: FormData) {
         throw new Error('画像ファイルを選択してください。')
     }
 
-    // Save to public/uploads/seals
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-
-    // Ensure directory exists
-    const fs = require('fs')
-    const path = require('path')
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'seals')
-
-    if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true })
+    const maxFileSize = 1024 * 1024
+    if (file.size > maxFileSize) {
+        throw new Error('画像ファイルは1MB以下にしてください。')
     }
 
-    // Create unique filename
-    const filename = `${currentUser.id}-${Date.now()}${path.extname(file.name)}`
-    const filepath = path.join(uploadDir, filename)
+    const base64 = Buffer.from(await file.arrayBuffer()).toString('base64')
+    const sealImage = `data:${file.type};base64,${base64}`
 
-    fs.writeFileSync(filepath, buffer)
-
-    // Update user profile
     await prisma.user.update({
         where: { id: currentUser.id },
-        data: {
-            sealImage: `/uploads/seals/${filename}`,
-        },
+        data: { sealImage },
     })
 
     revalidatePath('/mypage')
