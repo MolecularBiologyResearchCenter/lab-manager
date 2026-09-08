@@ -1,14 +1,14 @@
 'use client'
 
-import { getCurrentUser, updateProfile, uploadSeal } from '@/app/actions'
+import { getCurrentUser, updateProfile } from '@/app/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Building, FileCheck, KeyRound, Mail, Pencil, Phone, Save, Upload, UserRound, X } from 'lucide-react'
+import { Building, KeyRound, Mail, Pencil, Phone, Save, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
@@ -21,7 +21,7 @@ type UserData = {
     extension: string | null
     role: string
     password?: string
-    sealImage?: string | null
+
 }
 
 export default function MyPage() {
@@ -106,21 +106,6 @@ export default function MyPage() {
             toast.error('変更に失敗しました: ' + (error as Error).message)
         }
     }
-
-    async function handleSealUpload(file?: File) {
-        if (!file) return
-        const formData = new FormData()
-        formData.append('file', file)
-        try {
-            toast.info('アップロード中...')
-            await uploadSeal(formData)
-            toast.success('印鑑画像を登録しました')
-            await loadUser()
-        } catch (error) {
-            toast.error('アップロードに失敗しました: ' + (error as Error).message)
-        }
-    }
-
     if (loading) return <div className="content-wrapper app-page text-center text-sm text-slate-500">読み込み中...</div>
     if (!user) return null
 
@@ -194,29 +179,6 @@ export default function MyPage() {
                     )}
                 </section>
             </div>
-
-            {user.role === 'CENTER_DIRECTOR' && (
-                <section className="mt-6">
-                    <h2 className="mb-3 text-sm font-semibold text-slate-800">センター長メニュー</h2>
-                    <div className="grid gap-3 md:grid-cols-2">
-                        <Link href="/admin/invoices" className="app-surface flex min-h-20 items-center gap-4 p-4 transition hover:shadow-md">
-                            <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-blue-700"><FileCheck className="h-5 w-5" /></span>
-                            <span><strong className="block text-sm font-semibold text-slate-800">請求書承認</strong><span className="mt-1 block text-xs text-slate-500">請求書を確認して電子印を押す</span></span>
-                        </Link>
-                        <label className="app-surface flex min-h-20 cursor-pointer items-center gap-4 p-4 transition hover:shadow-md">
-                            <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-blue-700"><Upload className="h-5 w-5" /></span>
-                            <span><strong className="block text-sm font-semibold text-slate-800">印鑑画像の登録</strong><span className="mt-1 block text-xs text-slate-500">電子印として使用する画像</span></span>
-                            <input type="file" accept="image/*" className="hidden" onChange={e => handleSealUpload(e.target.files?.[0])} />
-                        </label>
-                    </div>
-                    {user.sealImage && (
-                        <div className="app-surface mt-3 flex items-center gap-4 p-4">
-                            <img src={user.sealImage} alt="現在の印鑑画像" className="h-14 w-14 object-contain" />
-                            <span className="text-sm text-slate-600">現在の印鑑画像</span>
-                        </div>
-                    )}
-                </section>
-            )}
 
             <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
                 <DialogContent className="max-w-sm rounded-2xl border border-slate-200 bg-white shadow-xl">
