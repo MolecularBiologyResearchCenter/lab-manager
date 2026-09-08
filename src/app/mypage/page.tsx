@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Building, KeyRound, Mail, Pencil, Phone, Save, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-
-import { useRouter } from 'next/navigation'
+import { useRouter }    password?: string
+} from 'next/navigation'
 import { toast } from 'sonner'
 
 type UserData = {
@@ -106,6 +106,7 @@ export default function MyPage() {
             toast.error('変更に失敗しました: ' + (error as Error).message)
         }
     }
+
     if (loading) return <div className="content-wrapper app-page text-center text-sm text-slate-500">読み込み中...</div>
     if (!user) return null
 
