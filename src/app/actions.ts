@@ -155,7 +155,7 @@ export async function createReservation(equipmentId: string, userId: string, sta
     })
 
     if (overlap) {
-        throw new Error('Reservation overlaps with an existing booking')
+        throw new Error('この時間帯は既に予約が入っています。別の時間帯を選択してください。')
     }
 
     await prisma.reservation.create({
