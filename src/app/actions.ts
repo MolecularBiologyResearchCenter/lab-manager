@@ -556,5 +556,5 @@ export async function uploadSeal(formData: FormData) {
         data: { sealImage },
     })
 
-    revalidatePath('/mypage')
+    revalidatePath('/')
 }
