@@ -8,8 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Building, KeyRound, Mail, Pencil, Phone, Save, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useRouter }    password?: string
-} from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 type UserData = {
@@ -21,7 +20,6 @@ type UserData = {
     extension: string | null
     role: string
     password?: string
-
 }
 
 export default function MyPage() {
