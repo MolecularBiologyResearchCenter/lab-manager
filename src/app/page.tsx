@@ -1,6 +1,6 @@
 'use client'
 
-import { getDashboardData, getCurrentUser } from './actions'
+import { getDashboardData, getCurrentUser, uploadSeal } from './actions'
 import Link from 'next/link'
 import {
     CalendarDays,
@@ -8,12 +8,18 @@ import {
     ChevronRight,
     ChevronUp,
     ExternalLink,
+    FileCheck,
+
     FileText,
     FlaskConical,
     Settings,
+    Upload,
+
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+
 
 export default function HomePage() {
     const router = useRouter()
@@ -105,6 +111,24 @@ export default function HomePage() {
         month: 'numeric',
         day: 'numeric',
     })
+
+    async function handleSealUpload(file?: File) {
+        if (!file) return
+
+        const formData = new FormData()
+        formData.append('file', file)
+
+        try {
+            toast.info('アップロード中...')
+            await uploadSeal(formData)
+            const currentUser = await getCurrentUser()
+            setUser(currentUser)
+            router.refresh()
+            toast.success('印鑑画像を登録しました')
+        } catch (error) {
+            toast.error('アップロードに失敗しました: ' + (error as Error).message)
+        }
+    }
 
     const menuItems = [
         { href: '/reservations', label: '機器予約', description: '空き状況を確認して予約', icon: CalendarDays },
@@ -236,6 +260,29 @@ export default function HomePage() {
                     </span>
                 </a>
             </div>
+
+            {user.role === 'CENTER_DIRECTOR' && (
+                <section className="mt-6">
+                    <h2 className="mb-3 text-sm font-semibold text-slate-800">センター長メニュー</h2>
+                    <div className="grid gap-3 md:grid-cols-2">
+                        <Link href="/admin/invoices" className="app-surface flex min-h-20 items-center gap-4 p-4 transition hover:shadow-md">
+                            <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-blue-700"><FileCheck className="h-5 w-5" /></span>
+                            <span><strong className="block text-sm font-semibold text-slate-800">請求書承認</strong><span className="mt-1 block text-xs text-slate-500">請求書を確認して電子印を押す</span></span>
+                        </Link>
+                        <label className="app-surface flex min-h-20 cursor-pointer items-center gap-4 p-4 transition hover:shadow-md">
+                            <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-blue-700"><Upload className="h-5 w-5" /></span>
+                            <span><strong className="block text-sm font-semibold text-slate-800">印鑑画像の登録</strong><span className="mt-1 block text-xs text-slate-500">電子印として使用する画像</span></span>
+                            <input type="file" accept="image/*" className="hidden" onChange={event => handleSealUpload(event.target.files?.[0])} />
+                        </label>
+                    </div>
+                    {user.sealImage && (
+                        <div className="app-surface mt-3 flex items-center gap-4 p-4">
+                            <img src={user.sealImage} alt="現在の印鑑画像" className="h-14 w-14 object-contain" />
+                            <span className="text-sm text-slate-600">現在の印鑑画像</span>
+                        </div>
+                    )}
+                </section>
+            )}
 
             {user.role === 'ADMIN' && (
                 <Link href="/admin" className="app-surface mt-3 flex min-h-16 items-center gap-4 p-4 transition hover:shadow-md">
