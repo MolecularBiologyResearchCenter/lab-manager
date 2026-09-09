@@ -13,9 +13,6 @@ const transporter = nodemailer.createTransport({
 export async function sendEmail({ to, subject, text }: { to: string; subject: string; text: string }) {
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
         console.warn('SMTP settings are not configured. Email not sent.')
-        console.log('Would have sent email to:', to)
-        console.log('Subject:', subject)
-        console.log('Text:', text)
         return
     }
 

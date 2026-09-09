@@ -2,8 +2,10 @@
 
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { requireAdmin } from '@/lib/auth'
 
 export async function getReagents() {
+    await requireAdmin()
     try {
         const reagents = await prisma.reagent.findMany({
             orderBy: {
@@ -18,6 +20,7 @@ export async function getReagents() {
 }
 
 export async function createReagent(formData: FormData) {
+    await requireAdmin()
     try {
         const name = formData.get('name') as string
         const unitPrice = parseFloat(formData.get('unitPrice') as string)
@@ -42,6 +45,7 @@ export async function createReagent(formData: FormData) {
 }
 
 export async function updateReagent(id: string, formData: FormData) {
+    await requireAdmin()
     try {
         const name = formData.get('name') as string
         const unitPrice = parseFloat(formData.get('unitPrice') as string)
@@ -67,6 +71,7 @@ export async function updateReagent(id: string, formData: FormData) {
 }
 
 export async function deleteReagent(id: string) {
+    await requireAdmin()
     try {
         // Check if reagent is used in any usage logs
         const usageCount = await prisma.usageLog.count({

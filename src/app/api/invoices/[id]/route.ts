@@ -17,7 +17,9 @@ export async function GET(
         const invoice = await prisma.invoice.findUnique({
             where: { id },
             include: {
-                user: true,
+                user: {
+                    select: { id: true, name: true, department: true, laboratory: true },
+                },
                 sealer: {
                     select: {
                         name: true,

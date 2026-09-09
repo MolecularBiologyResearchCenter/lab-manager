@@ -12,8 +12,13 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import AdminYearSelect from '@/components/AdminYearSelect'
 import { FileText, DollarSign, FlaskConical, Wrench, Users } from 'lucide-react'
+import { getAuthenticatedUser } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 
 export default async function AdminPage(props: { searchParams: Promise<{ month?: string; year?: string }> }) {
+    const currentUser = await getAuthenticatedUser()
+    if (!currentUser) redirect('/login')
+    if (currentUser.role !== 'ADMIN') redirect('/')
     const searchParams = await props.searchParams
 
     // Date Filtering Logic
@@ -66,7 +71,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
             },
         },
         include: {
-            user: true,
+            user: { select: { id: true, name: true } },
             reagent: true,
         },
         orderBy: {
@@ -83,7 +88,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
             },
         },
         include: {
-            user: true,
+            user: { select: { id: true, name: true } },
             equipment: true,
         },
         orderBy: {

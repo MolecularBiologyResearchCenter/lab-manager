@@ -14,7 +14,7 @@ export default async function EditUsageLogPage({ params }: { params: Promise<{ i
     const log = await prisma.usageLog.findUnique({
         where: { id },
         include: {
-            user: true,
+            user: { select: { id: true, name: true } },
             reagent: true,
         },
     })

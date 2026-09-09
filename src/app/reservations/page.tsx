@@ -15,7 +15,9 @@ export default async function ReservationsPage(props: { searchParams: Promise<{ 
     const reservations = await prisma.reservation.findMany({
         include: {
             equipment: true,
-            user: true,
+            user: {
+                select: { id: true, name: true, laboratory: true, extension: true },
+            },
         },
     })
 
