@@ -4,7 +4,7 @@ const prisma = new PrismaClient()
 async function main() {
     console.log('Checking Reservations...')
     const reservations = await prisma.reservation.findMany({
-        include: { equipment: true, user: true }
+        include: { equipment: true, user: { select: { id: true } } }
     })
 
     let reservationErrors = 0
@@ -22,7 +22,7 @@ async function main() {
 
     console.log('\nChecking UsageLogs...')
     const logs = await prisma.usageLog.findMany({
-        include: { reagent: true, user: true }
+        include: { reagent: true, user: { select: { id: true } } }
     })
 
     let logErrors = 0
