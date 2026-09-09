@@ -1,6 +1,6 @@
 ALTER TABLE "User"
-ADD COLUMN "passwordResetTokenHash" TEXT,
-ADD COLUMN "passwordResetTokenExpiresAt" TIMESTAMP(3);
+ADD COLUMN IF NOT EXISTS "passwordResetTokenHash" TEXT,
+ADD COLUMN IF NOT EXISTS "passwordResetTokenExpiresAt" TIMESTAMP(3);
 
-CREATE INDEX "User_passwordResetTokenHash_idx"
+CREATE INDEX IF NOT EXISTS "User_passwordResetTokenHash_idx"
 ON "User"("passwordResetTokenHash");
