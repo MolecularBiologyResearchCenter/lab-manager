@@ -131,7 +131,7 @@ export async function generateInvoiceForUser(
         },
         include: {
             items: true,
-            user: true,
+            user: { select: { id: true, name: true, department: true, laboratory: true } },
         },
     })
 
