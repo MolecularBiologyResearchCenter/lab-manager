@@ -20,16 +20,19 @@ const adminNavigation = [
     { href: '/admin/users', label: '利用者', icon: Users },
 ]
 
-export default function AdminNav() {
+export default function AdminNav({ role }: { role: string }) {
     const pathname = usePathname()
+    const navigation = role === 'CENTER_DIRECTOR'
+        ? adminNavigation.filter(item => item.href === '/admin/invoices')
+        : adminNavigation
 
     return (
         <div className="admin-nav-shell print:hidden">
             <div className="content-wrapper">
                 <div className="admin-nav-row">
-                    <span className="admin-nav-label">管理者</span>
+                    <span className="admin-nav-label">{role === 'CENTER_DIRECTOR' ? 'センター長' : '管理者'}</span>
                     <nav className="admin-nav-links" aria-label="管理者メニュー">
-                        {adminNavigation.map(({ href, label, icon: Icon }) => {
+                        {navigation.map(({ href, label, icon: Icon }) => {
                             const isActive = href === '/admin'
                                 ? pathname === href
                                 : pathname.startsWith(href)
