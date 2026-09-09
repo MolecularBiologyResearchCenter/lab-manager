@@ -78,7 +78,7 @@ export default async function AdminUsageLogsPage(props: { searchParams: Promise<
             },
         },
         include: {
-            user: true,
+            user: { select: { id: true, name: true, department: true, laboratory: true } },
             reagent: true,
         },
         orderBy: {
