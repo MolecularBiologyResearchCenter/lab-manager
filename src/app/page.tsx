@@ -1,6 +1,6 @@
 'use client'
 
-import { getDashboardData, getCurrentUser, uploadSeal } from './actions'
+import { getCurrentUserSealImage, getDashboardData, getCurrentUser, uploadSeal } from './actions'
 import Link from 'next/link'
 import {
     CalendarDays,
@@ -42,6 +42,10 @@ export default function HomePage() {
                     return
                 }
                 setUser(currentUser)
+                if (currentUser.role === 'CENTER_DIRECTOR') {
+                    const sealImage = await getCurrentUserSealImage()
+                    setUser({ ...currentUser, sealImage })
+                }
 
                 const {
                     upcomingReservations,
@@ -122,7 +126,8 @@ export default function HomePage() {
             toast.info('アップロード中...')
             await uploadSeal(formData)
             const currentUser = await getCurrentUser()
-            setUser(currentUser)
+            const sealImage = await getCurrentUserSealImage()
+            setUser(currentUser ? { ...currentUser, sealImage } : null)
             router.refresh()
             toast.success('印鑑画像を登録しました')
         } catch (error) {
