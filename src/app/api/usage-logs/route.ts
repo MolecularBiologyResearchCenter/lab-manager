@@ -23,7 +23,7 @@ export async function GET() {
         },
         include: {
             reagent: true,
-            user: true,
+            user: { select: { id: true, name: true } },
         },
         orderBy: {
             date: 'desc',
