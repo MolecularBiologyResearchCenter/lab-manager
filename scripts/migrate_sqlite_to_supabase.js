@@ -1,7 +1,14 @@
 const { execSync } = require('child_process');
 const { PrismaClient } = require('@prisma/client');
+const { randomBytes, scryptSync } = require('crypto');
 
 const prisma = new PrismaClient();
+
+function hashImportedPassword(value) {
+  if (value.startsWith('scrypt$')) return value;
+  const salt = randomBytes(16).toString('hex');
+  return `scrypt$${salt}$${scryptSync(value, salt, 64).toString('hex')}`;
+}
 
 function getJsonFromSqlite(table) {
   try {
@@ -31,12 +38,13 @@ async function migrate() {
   const users = getJsonFromSqlite('User');
   console.log(`Found ${users.length} users in dev.db`);
   for (const u of users) {
+    const passwordHash = hashImportedPassword(u.password);
     await prisma.user.upsert({
       where: { id: u.id },
       update: {
         name: u.name,
         email: u.email,
-        password: u.password,
+        password: passwordHash,
         department: u.department || null,
         laboratory: u.laboratory || null,
         extension: u.extension || null,
@@ -50,7 +58,7 @@ async function migrate() {
         id: u.id,
         name: u.name,
         email: u.email,
-        password: u.password,
+        password: passwordHash,
         department: u.department || null,
         laboratory: u.laboratory || null,
         extension: u.extension || null,
