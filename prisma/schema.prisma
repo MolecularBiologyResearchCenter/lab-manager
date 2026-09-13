@@ -61,6 +61,9 @@ model Reservation {
 
   equipment Equipment @relation(fields: [equipmentId], references: [id])
   user      User      @relation(fields: [userId], references: [id])
+
+  @@index([equipmentId, startTime, endTime])
+  @@index([userId, startTime])
 }
 
 model Reagent {

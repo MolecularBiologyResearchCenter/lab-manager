@@ -1,5 +1,6 @@
 'use server'
 
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/mail'
 import { revalidatePath } from 'next/cache'
@@ -62,6 +63,12 @@ function getQuarterDates(year: number, quarter: number): { start: Date; end: Dat
     const end = new Date(year, endMonth + 1, 0, 23, 59, 59, 999)
 
     return { start, end }
+}
+
+const concurrentReservationError = '同時に別の予約が登録されました。画面を更新して空き状況を確認してください。'
+
+function isTransactionConflict(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
 }
 
 export async function getDashboardData() {
@@ -173,32 +180,28 @@ export async function getReagentList() {
 export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string) {
     const currentUser = await requireUser()
     if (currentUser.id !== userId) throw new Error('他のユーザーの予約は作成できません。')
-    // Check for overlaps
-    const overlap = await prisma.reservation.findFirst({
-        where: {
-            equipmentId,
-            OR: [
-                {
-                    startTime: { lte: endTime },
-                    endTime: { gte: startTime },
+
+    try {
+        await prisma.$transaction(async (transaction) => {
+            const overlap = await transaction.reservation.findFirst({
+                where: {
+                    equipmentId,
+                    startTime: { lt: endTime },
+                    endTime: { gt: startTime },
                 },
-            ],
-        },
-    })
+                select: { id: true },
+            })
 
-    if (overlap) {
-        throw new Error('Reservation overlaps with an existing booking')
+            if (overlap) throw new Error('この時間帯は既に予約が入っています。')
+
+            await transaction.reservation.create({
+                data: { equipmentId, userId, startTime, endTime, ...(phoneNumber ? { phoneNumber } : {}) },
+            })
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    } catch (error) {
+        if (isTransactionConflict(error)) throw new Error(concurrentReservationError)
+        throw error
     }
-
-    await prisma.reservation.create({
-        data: {
-            equipmentId,
-            userId,
-            startTime,
-            endTime,
-            ...(phoneNumber ? { phoneNumber } : {}),
-        },
-    })
 
     revalidatePath('/reservations')
     revalidatePath('/')
@@ -272,34 +275,29 @@ export async function updateReservation(
     if (currentUser.role !== 'ADMIN' && userId !== currentUser.id) {
         throw new Error('予約者を変更する権限がありません。')
     }
-    // Check for overlapping reservations (excluding the current one)
-    const overlap = await prisma.reservation.findFirst({
-        where: {
-            id: { not: id },
-            equipmentId,
-            OR: [
-                {
+    try {
+        await prisma.$transaction(async (transaction) => {
+            const overlap = await transaction.reservation.findFirst({
+                where: {
+                    id: { not: id },
+                    equipmentId,
                     startTime: { lt: endTime },
                     endTime: { gt: startTime },
                 },
-            ],
-        },
-    })
+                select: { id: true },
+            })
 
-    if (overlap) {
-        throw new Error('この時間帯は既に予約が入っています。')
+            if (overlap) throw new Error('この時間帯は既に予約が入っています。')
+
+            await transaction.reservation.update({
+                where: { id },
+                data: { equipmentId, userId, startTime, endTime, ...(phoneNumber ? { phoneNumber } : {}) },
+            })
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    } catch (error) {
+        if (isTransactionConflict(error)) throw new Error(concurrentReservationError)
+        throw error
     }
-
-    await prisma.reservation.update({
-        where: { id },
-        data: {
-            equipmentId,
-            userId,
-            startTime,
-            endTime,
-            ...(phoneNumber ? { phoneNumber } : {}),
-        },
-    })
 
     revalidatePath('/reservations')
     revalidatePath('/')
