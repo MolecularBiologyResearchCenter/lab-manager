@@ -3,13 +3,16 @@
 import { prisma } from '@/lib/prisma'
 import { generateInvoiceForUser, getCurrentQuarter, getQuarterDates } from '@/lib/invoice'
 import { revalidatePath } from 'next/cache'
+import { requireAdmin } from '@/lib/auth'
 
 export async function generateInvoicesForQuarter(year: number, quarter: number) {
+    await requireAdmin()
     // Get all users
     const users = await prisma.user.findMany({
         where: {
             role: 'USER', // Only generate for regular users
         },
+        select: { id: true, name: true },
     })
 
     const { start, end } = getQuarterDates(year, quarter)
@@ -73,6 +76,7 @@ export async function generateInvoicesForQuarter(year: number, quarter: number) 
 }
 
 export async function generateCurrentQuarterInvoices() {
+    await requireAdmin()
     const now = new Date()
     const quarter = getCurrentQuarter(now)
     const year = now.getFullYear()

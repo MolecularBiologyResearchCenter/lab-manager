@@ -15,8 +15,8 @@ export default function ForgotPasswordPage() {
     const handleSubmit = async (formData: FormData) => {
         setIsSubmitting(true)
         try {
-            await remindPassword(formData)
-            toast.success('パスワードを記載したメールを送信しました。ご確認ください。')
+            const result = await remindPassword(formData)
+            toast.success(result.message)
         } catch (error) {
             toast.error((error as Error).message)
         } finally {
@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
                     <CardContent className="space-y-5 px-6 py-7">
                         <CardDescription className="text-center text-gray-600">
                             登録されているメールアドレスと職員番号を入力してください。<br />
-                            パスワードをメールでお知らせします。
+                            一致する登録がある場合、再設定用リンクをメールでお送りします。
                         </CardDescription>
                         <div className="space-y-2">
                             <Label htmlFor="email">メールアドレス</Label>
@@ -80,7 +80,7 @@ export default function ForgotPasswordPage() {
                             className="h-12 w-full rounded-xl bg-blue-700 text-base font-semibold text-white hover:bg-blue-800"
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? '送信中...' : 'パスワードを通知する'}
+                            {isSubmitting ? '送信中...' : '再設定メールを送る'}
                         </Button>
                         <div className="text-sm text-center text-gray-600">
                             <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium hover:underline">

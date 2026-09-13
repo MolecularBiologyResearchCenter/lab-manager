@@ -18,7 +18,7 @@ async function fixInvalidReservations() {
         },
         include: {
             equipment: true,
-            user: true
+            user: { select: { id: true, name: true } }
         }
     })
 
@@ -29,7 +29,7 @@ async function fixInvalidReservations() {
     for (const reservation of await prisma.reservation.findMany({
         include: {
             equipment: true,
-            user: true
+            user: { select: { id: true, name: true } }
         }
     })) {
         if (reservation.endTime <= reservation.startTime) {
