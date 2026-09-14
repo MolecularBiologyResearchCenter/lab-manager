@@ -11,10 +11,18 @@ const roleLabels: Record<string, string> = {
 export default async function AuditLogsPage() {
     await requireAdmin()
 
-    const logs = await prisma.auditLog.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-    })
+    let logs: Awaited<ReturnType<typeof prisma.auditLog.findMany>> = []
+    let databaseMessage: string | null = null
+
+    try {
+        logs = await prisma.auditLog.findMany({
+            orderBy: { createdAt: 'desc' },
+            take: 200,
+        })
+    } catch (error) {
+        console.error('監査ログの読み込みに失敗しました。', error)
+        databaseMessage = '監査ログ用のデータベース設定がまだ反映されていません。管理者に npx prisma db push の実行を依頼してください。'
+    }
 
     return (
         <main className="app-page page-container">
@@ -25,6 +33,7 @@ export default async function AuditLogsPage() {
                         <p className="text-sm text-slate-500">誰が、いつ、どの操作を行ったかを最新200件まで表示します。</p>
                     </CardHeader>
                     <CardContent>
+                        {databaseMessage && <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">{databaseMessage}</p>}
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[760px] text-sm">
                                 <thead>

@@ -417,6 +417,8 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
         return { success: false, error: 'ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。' }
     }
 
+    // Next.jsのredirectは例外を使って処理を終了するため、ログイン処理の
+    // try/catchの外で呼び出す。内側に置くと成功後にもエラー表示が出る。
     redirect('/')
 }
 
