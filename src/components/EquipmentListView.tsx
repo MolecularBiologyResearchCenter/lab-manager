@@ -76,7 +76,11 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
         }
 
         try {
-            await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+            const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+            if (!result.success) {
+                toast.error('予約に失敗しました: ' + result.error)
+                return
+            }
             toast.success('予約が完了しました!')
             setIsDialogOpen(false)
             setTimeout(() => {

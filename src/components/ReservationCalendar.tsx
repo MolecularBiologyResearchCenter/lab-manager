@@ -180,10 +180,18 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                     return
                 }
 
-                await updateReservation(editingReservation.id, selectedEquipment, editingReservation.userId, startTime, endTime, phoneNumber)
+                const result = await updateReservation(editingReservation.id, selectedEquipment, editingReservation.userId, startTime, endTime, phoneNumber)
+                if (!result.success) {
+                    toast.error('操作に失敗しました: ' + result.error)
+                    return
+                }
                 toast.success('予約を更新しました！')
             } else {
-                await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+                const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+                if (!result.success) {
+                    toast.error('操作に失敗しました: ' + result.error)
+                    return
+                }
                 toast.success('予約が完了しました！')
             }
             setIsDialogOpen(false)

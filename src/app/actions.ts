@@ -66,6 +66,7 @@ function getQuarterDates(year: number, quarter: number): { start: Date; end: Dat
 }
 
 const concurrentReservationError = '同時に別の予約が登録されました。画面を更新して空き状況を確認してください。'
+type ReservationActionResult = { success: true } | { success: false; error: string }
 
 function isTransactionConflict(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
@@ -177,12 +178,12 @@ export async function getReagentList() {
     return reagents.sort((a, b) => nameCollator.compare(a.name, b.name))
 }
 
-export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string) {
+export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string): Promise<ReservationActionResult> {
     const currentUser = await requireUser()
     if (currentUser.id !== userId) throw new Error('他のユーザーの予約は作成できません。')
 
     try {
-        await prisma.$transaction(async (transaction) => {
+        const created = await prisma.$transaction(async (transaction) => {
             const overlap = await transaction.reservation.findFirst({
                 where: {
                     equipmentId,
@@ -192,19 +193,22 @@ export async function createReservation(equipmentId: string, userId: string, sta
                 select: { id: true },
             })
 
-            if (overlap) throw new Error('この時間帯は既に予約が入っています。')
+            if (overlap) return false
 
             await transaction.reservation.create({
                 data: { equipmentId, userId, startTime, endTime, ...(phoneNumber ? { phoneNumber } : {}) },
             })
+            return true
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+        if (!created) return { success: false, error: 'この時間帯は既に予約が入っています。' }
     } catch (error) {
-        if (isTransactionConflict(error)) throw new Error(concurrentReservationError)
+        if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
         throw error
     }
 
     revalidatePath('/reservations')
     revalidatePath('/')
+    return { success: true }
 }
 
 export async function logReagentUsage(userId: string, reagentId: string, quantity: number) {
@@ -263,7 +267,7 @@ export async function updateReservation(
     startTime: Date,
     endTime: Date,
     phoneNumber?: string
-) {
+): Promise<ReservationActionResult> {
     const currentUser = await requireUser()
     const existingReservation = await prisma.reservation.findUnique({
         where: { id },
@@ -276,7 +280,7 @@ export async function updateReservation(
         throw new Error('予約者を変更する権限がありません。')
     }
     try {
-        await prisma.$transaction(async (transaction) => {
+        const updated = await prisma.$transaction(async (transaction) => {
             const overlap = await transaction.reservation.findFirst({
                 where: {
                     id: { not: id },
@@ -287,21 +291,24 @@ export async function updateReservation(
                 select: { id: true },
             })
 
-            if (overlap) throw new Error('この時間帯は既に予約が入っています。')
+            if (overlap) return false
 
             await transaction.reservation.update({
                 where: { id },
                 data: { equipmentId, userId, startTime, endTime, ...(phoneNumber ? { phoneNumber } : {}) },
             })
+            return true
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+        if (!updated) return { success: false, error: 'この時間帯は既に予約が入っています。' }
     } catch (error) {
-        if (isTransactionConflict(error)) throw new Error(concurrentReservationError)
+        if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
         throw error
     }
 
     revalidatePath('/reservations')
     revalidatePath('/')
     revalidatePath('/admin')
+    return { success: true }
 }
 
 export async function deleteReservation(id: string) {
