@@ -40,6 +40,12 @@ interface User {
     createdAt: Date
 }
 
+const roleLabels: Record<string, string> = {
+    ADMIN: '管理者',
+    CENTER_DIRECTOR: 'センター長',
+    USER: '一般利用者',
+}
+
 export default function UsersPage() {
     const router = useRouter()
     const [users, setUsers] = useState<User[]>([])
@@ -47,7 +53,8 @@ export default function UsersPage() {
 
     // Delete dialog state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-    const [userToDelete, setUserToDelete] = useState<{ id: string; name: string } | null>(null)
+    const [userToDelete, setUserToDelete] = useState<{ id: string; name: string; email: string } | null>(null)
+    const [deleteNameConfirmation, setDeleteNameConfirmation] = useState('')
 
     // Edit dialog state
     const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -70,10 +77,11 @@ export default function UsersPage() {
         }
     }
 
-    const openDeleteDialog = (e: React.MouseEvent, userId: string, userName: string) => {
+    const openDeleteDialog = (e: React.MouseEvent, user: User) => {
         e.preventDefault()
         e.stopPropagation()
-        setUserToDelete({ id: userId, name: userName })
+        setUserToDelete({ id: user.id, name: user.name, email: user.email })
+        setDeleteNameConfirmation('')
         setDeleteDialogOpen(true)
     }
 
@@ -86,7 +94,7 @@ export default function UsersPage() {
     }
 
     const confirmDelete = async () => {
-        if (!userToDelete) return
+        if (!userToDelete || deleteNameConfirmation !== userToDelete.name) return
 
         try {
             await deleteUser(userToDelete.id)
@@ -101,6 +109,7 @@ export default function UsersPage() {
 
         setDeleteDialogOpen(false)
         setUserToDelete(null)
+        setDeleteNameConfirmation('')
     }
 
     const confirmUpdate = async () => {
@@ -122,6 +131,7 @@ export default function UsersPage() {
     const cancelDelete = () => {
         setDeleteDialogOpen(false)
         setUserToDelete(null)
+        setDeleteNameConfirmation('')
     }
 
     const cancelEdit = () => {
@@ -163,6 +173,19 @@ export default function UsersPage() {
                 </div>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-3">
+                {(['ADMIN', 'CENTER_DIRECTOR', 'USER'] as const).map((role) => (
+                    <Card key={role} className="card-elevated">
+                        <CardContent className="p-5">
+                            <p className="text-sm text-slate-500">{roleLabels[role]}</p>
+                            <p className="mt-2 text-3xl font-bold text-slate-800">
+                                {users.filter((user) => user.role === role).length}名
+                            </p>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
             <Card>
                 <CardHeader>
                     <CardTitle>登録ユーザー ({users.length}名)</CardTitle>
@@ -194,7 +217,7 @@ export default function UsersPage() {
                                                     user.role === 'CENTER_DIRECTOR' ? 'bg-purple-100 text-purple-800' :
                                                         'bg-blue-100 text-blue-800'
                                                 }`}>
-                                                {user.role}
+                                                {roleLabels[user.role] ?? '一般利用者'}
                                             </span>
                                         </TableCell>
                                         <TableCell>{user.department || '-'}</TableCell>
@@ -220,7 +243,7 @@ export default function UsersPage() {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={(e) => openDeleteDialog(e, user.id, user.name)}
+                                                    onClick={(e) => openDeleteDialog(e, user)}
                                                     className="text-red-600 hover:text-red-800 hover:bg-red-50"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
@@ -245,6 +268,10 @@ export default function UsersPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-4">
+                        <div className="rounded-xl bg-slate-50 p-4 text-sm">
+                            <p className="font-medium text-slate-800">変更前 → 変更後</p>
+                            <p className="mt-1 text-slate-600">{userToEdit && roleLabels[userToEdit.role]} → {roleLabels[selectedRole]}</p>
+                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="role">権限</Label>
                             <Select value={selectedRole} onValueChange={setSelectedRole}>
@@ -252,18 +279,21 @@ export default function UsersPage() {
                                     <SelectValue placeholder="権限を選択" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="USER">USER (一般)</SelectItem>
-                                    <SelectItem value="CENTER_DIRECTOR">CENTER_DIRECTOR (センター長)</SelectItem>
-                                    <SelectItem value="ADMIN">ADMIN (管理者)</SelectItem>
+                                    <SelectItem value="USER">一般利用者</SelectItem>
+                                    <SelectItem value="CENTER_DIRECTOR">センター長</SelectItem>
+                                    <SelectItem value="ADMIN">管理者</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
+                        <p className="text-sm leading-6 text-slate-600">
+                            権限によってアクセスできる画面や実行できる操作が変わります。変更内容は監査ログに記録されます。
+                        </p>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={cancelEdit}>
                             キャンセル
                         </Button>
-                        <Button onClick={confirmUpdate} className="bg-blue-600 text-white hover:bg-blue-700">
+                        <Button onClick={confirmUpdate} disabled={!userToEdit || selectedRole === userToEdit.role} className="bg-blue-600 text-white hover:bg-blue-700">
                             保存
                         </Button>
                     </DialogFooter>
@@ -276,14 +306,28 @@ export default function UsersPage() {
                     <DialogHeader>
                         <DialogTitle>削除の確認</DialogTitle>
                         <DialogDescription>
-                            本当に {userToDelete?.name} さんを削除しますか？この操作は取り消せません。
+                            本当に次の利用者を削除しますか？この操作は取り消せません。
                         </DialogDescription>
                     </DialogHeader>
+                    <div className="space-y-3 rounded-xl bg-slate-50 p-4 text-sm">
+                        <p><span className="font-medium">氏名：</span>{userToDelete?.name}</p>
+                        <p><span className="font-medium">メールアドレス：</span>{userToDelete?.email}</p>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="delete-name-confirmation">確認のため氏名を入力してください</Label>
+                        <input
+                            id="delete-name-confirmation"
+                            value={deleteNameConfirmation}
+                            onChange={(event) => setDeleteNameConfirmation(event.target.value)}
+                            placeholder={userToDelete?.name}
+                            className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        />
+                    </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={cancelDelete}>
                             キャンセル
                         </Button>
-                        <Button variant="destructive" onClick={confirmDelete}>
+                        <Button variant="destructive" onClick={confirmDelete} disabled={!userToDelete || deleteNameConfirmation !== userToDelete.name}>
                             削除
                         </Button>
                     </DialogFooter>

@@ -658,6 +658,7 @@ export async function updateUserRole(userId: string, role: string) {
 
     const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true } })
     if (!targetUser) throw new Error('ユーザーが見つかりません。')
+    if (targetUser.role === role) return
     await prisma.user.update({
         where: { id: userId },
         data: { role },
