@@ -223,28 +223,30 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
                     <CardTitle>有料サービスログ</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>日時</TableHead>
-                                <TableHead>利用者</TableHead>
-                                <TableHead>試薬名</TableHead>
-                                <TableHead>数量</TableHead>
-                                <TableHead className="text-right">金額</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {usageLogs.map((log, index) => (
-                                <TableRow key={log.id} style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
-                                    <TableCell>{log.date.toLocaleDateString('ja-JP')}</TableCell>
-                                    <TableCell>{log.user.name}</TableCell>
-                                    <TableCell>{log.reagent.name}</TableCell>
-                                    <TableCell>{log.quantity}</TableCell>
-                                    <TableCell className="text-right">¥{log.totalCost.toLocaleString()}</TableCell>
+                    <div className="max-h-[440px] overflow-y-auto rounded-lg">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="sticky top-0 z-10 bg-white">日時</TableHead>
+                                    <TableHead className="sticky top-0 z-10 bg-white">利用者</TableHead>
+                                    <TableHead className="sticky top-0 z-10 bg-white">試薬名</TableHead>
+                                    <TableHead className="sticky top-0 z-10 bg-white">数量</TableHead>
+                                    <TableHead className="sticky top-0 z-10 bg-white text-right">金額</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {usageLogs.map((log, index) => (
+                                    <TableRow key={log.id} style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
+                                        <TableCell>{log.date.toLocaleDateString('ja-JP')}</TableCell>
+                                        <TableCell>{log.user.name}</TableCell>
+                                        <TableCell>{log.reagent.name}</TableCell>
+                                        <TableCell>{log.quantity}</TableCell>
+                                        <TableCell className="text-right">¥{log.totalCost.toLocaleString()}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -254,28 +256,30 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
                     <CardTitle>予約履歴</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>日付</TableHead>
-                                <TableHead>利用者</TableHead>
-                                <TableHead>機器名</TableHead>
-                                <TableHead>時間</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {reservations.map((res, index) => (
-                                <TableRow key={res.id} style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
-                                    <TableCell>{res.startTime.toLocaleDateString('ja-JP')}</TableCell>
-                                    <TableCell>{res.user.name}</TableCell>
-                                    <TableCell>{res.equipment.name}</TableCell>
-                                    <TableCell>
-                                        {res.startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - {res.endTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                                    </TableCell>
+                    <div className="max-h-[440px] overflow-y-auto rounded-lg">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="sticky top-0 z-10 bg-white">日付</TableHead>
+                                    <TableHead className="sticky top-0 z-10 bg-white">利用者</TableHead>
+                                    <TableHead className="sticky top-0 z-10 bg-white">機器名</TableHead>
+                                    <TableHead className="sticky top-0 z-10 bg-white">時間</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {reservations.map((res, index) => (
+                                    <TableRow key={res.id} style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
+                                        <TableCell>{res.startTime.toLocaleDateString('ja-JP')}</TableCell>
+                                        <TableCell>{res.user.name}</TableCell>
+                                        <TableCell>{res.equipment.name}</TableCell>
+                                        <TableCell>
+                                            {res.startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - {res.endTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>

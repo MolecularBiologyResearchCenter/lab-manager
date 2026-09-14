@@ -228,7 +228,7 @@ export default function HomePage() {
                             {usageLogs.length === 0 ? (
                                 <p className="py-3 text-center text-sm text-slate-500">利用履歴はありません</p>
                             ) : (
-                                <div className="divide-y divide-slate-100">
+                                <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-100">
                                     {usageLogs.map((log: any) => (
                                         <div key={log.id} className="grid grid-cols-[4.5rem_1fr_auto] gap-2 py-2 text-xs">
                                             <span className="text-slate-500">{formatDate(log.date)}</span>
