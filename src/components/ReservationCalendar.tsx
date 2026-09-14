@@ -334,8 +334,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             groupedReservations[dateKey].push(reservation)
         })
 
-        // Sort dates
-        const sortedDates = Object.keys(groupedReservations).sort()
+        // Show the newest dates first on mobile so recent reservations are easier to find.
+        const sortedDates = Object.keys(groupedReservations).sort().reverse()
 
         // Generate month options (current month ± 3 months)
         const monthOptions = []
