@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { generateInvoiceForUser, getCurrentQuarter, getQuarterDates } from '@/lib/invoice'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth'
+import { recordAuditLog } from '@/lib/audit'
 
 export async function generateInvoicesForQuarter(year: number, quarter: number) {
     await requireAdmin()
@@ -44,6 +45,8 @@ export async function generateInvoicesForQuarter(year: number, quarter: number) 
 
                 if (!existingInvoice) {
                     const invoiceId = await generateInvoiceForUser(user.id, year, quarter)
+                    const currentUser = await requireAdmin()
+                    await recordAuditLog({ actor: currentUser, action: 'INVOICE_CREATE', targetType: 'Invoice', targetId: invoiceId, targetLabel: user.name, summary: '請求書を生成しました。', metadata: { year, quarter, userId: user.id } })
                     results.push({
                         userId: user.id,
                         userName: user.name,
