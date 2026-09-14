@@ -15,7 +15,7 @@ export default function ReservationViewToggle({ currentView }: Props) {
                 className={`app-segmented-item ${currentView === 'list' ? 'app-segmented-item-active' : ''}`}
             >
                 <List className="h-4 w-4" />
-                一覧
+                機器一覧
             </Link>
             <Link
                 href="/reservations?view=calendar"

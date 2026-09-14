@@ -11,9 +11,10 @@ import { toast } from 'sonner'
 export default function LoginPage() {
     const handleSubmit = async (formData: FormData) => {
         try {
-            await login(formData)
-        } catch (error) {
-            toast.error((error as Error).message)
+            const result = await login(formData)
+            if (!result.success) toast.error(result.error)
+        } catch {
+            toast.error('ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
         }
     }
 
@@ -64,6 +65,17 @@ export default function LoginPage() {
                                 required
                                 className="h-11 rounded-xl border-slate-300 text-base"
                             />
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <input
+                                id="rememberMe"
+                                name="rememberMe"
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 text-blue-700 accent-blue-700"
+                            />
+                            <Label htmlFor="rememberMe" className="cursor-pointer text-sm font-normal text-slate-600">
+                                30日間ログイン状態を保持する
+                            </Label>
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-4 px-6 pb-7">

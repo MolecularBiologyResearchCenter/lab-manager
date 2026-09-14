@@ -76,7 +76,11 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
         }
 
         try {
-            await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+            const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+            if (!result.success) {
+                toast.error('予約に失敗しました: ' + result.error)
+                return
+            }
             toast.success('予約が完了しました!')
             setIsDialogOpen(false)
             setTimeout(() => {
@@ -84,7 +88,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
             }, 2000)
         } catch (error) {
             console.error('Error:', error)
-            toast.error('予約に失敗しました: ' + (error as Error).message)
+            toast.error('予約に失敗しました。画面を更新して、もう一度お試しください。')
         }
     }
 
@@ -101,7 +105,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
 
     return (
         <div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                 {equipmentList.map((equipment) => {
                     // Use icon from database, or fallback to default
                     const imagePath = equipment.icon || '/icons-blue/3500xL.jpg'
@@ -111,7 +115,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                     return (
                         <div
                             key={equipment.id}
-                            className="app-surface flex min-w-0 flex-col justify-between p-3 transition-shadow hover:shadow-md md:p-4"
+                            className="app-surface flex min-w-0 flex-col justify-between p-3 transition-shadow hover:shadow-md"
                         >
                             <div>
                                 {/* Left: Icon */}

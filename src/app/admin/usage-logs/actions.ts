@@ -3,12 +3,14 @@
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { requireAdmin } from '@/lib/auth'
 
 export async function updateUsageLog(
     id: string,
     quantity: number,
     totalCost: number
 ) {
+    await requireAdmin()
     await prisma.usageLog.update({
         where: { id },
         data: {
@@ -24,6 +26,7 @@ export async function updateUsageLog(
 }
 
 export async function deleteUsageLog(id: string) {
+    await requireAdmin()
     await prisma.usageLog.delete({
         where: { id },
     })

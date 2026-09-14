@@ -16,7 +16,7 @@ async function main() {
         },
         include: {
             equipment: true,
-            user: true
+            user: { select: { id: true, name: true } }
         }
     })
 

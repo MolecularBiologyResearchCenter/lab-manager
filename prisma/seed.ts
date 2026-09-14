@@ -1,13 +1,16 @@
 import { PrismaClient } from '@prisma/client'
+import { hashPassword } from '../src/lib/password'
 
 const prisma = new PrismaClient()
 
 async function main() {
+  const initialAdminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'admin123'
+  const adminPasswordHash = await hashPassword(initialAdminPassword)
   // Create Admin User
   const admin = await prisma.user.upsert({
     where: { email: 'admin@lab.com' },
     update: {
-      password: 'admin',
+      password: adminPasswordHash,
       department: '医学部',
       laboratory: '管理室',
       extension: '0000',
@@ -16,13 +19,14 @@ async function main() {
       email: 'admin@lab.com',
       name: '管理者',
       role: 'ADMIN',
-      password: 'admin', // Default password
+      password: adminPasswordHash,
       laboratory: '管理室',
       extension: '0000',
     },
+    select: { id: true },
   })
 
-  console.log({ admin })
+  console.log(`Seeded admin user ${admin.id}`)
 
   // Create Equipment Items
   const equipmentList = [

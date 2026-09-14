@@ -27,9 +27,10 @@ type Invoice = {
 
 type Props = {
     invoices: Invoice[]
+    canGenerate: boolean
 }
 
-export default function InvoiceManager({ invoices }: Props) {
+export default function InvoiceManager({ invoices, canGenerate }: Props) {
     // Helper functions
     const getQuarterLabel = (quarter: number) => {
         switch (quarter) {
@@ -117,12 +118,12 @@ export default function InvoiceManager({ invoices }: Props) {
                     <h1>請求書管理</h1>
                     <p className="mt-2 text-sm text-slate-500">すべての利用者の請求書を管理できます</p>
                 </div>
-                <form action={generateCurrentQuarterInvoices}>
+                {canGenerate && <form action={generateCurrentQuarterInvoices}>
                     <Button type="submit" className="btn-primary">
                         <Plus className="mr-2 h-4 w-4" />
                         今期の請求書を一括生成
                     </Button>
-                </form>
+                </form>}
             </div>
 
             {/* Term Selection Buttons */}

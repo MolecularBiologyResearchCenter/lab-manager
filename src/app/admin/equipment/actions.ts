@@ -4,8 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import fs from 'fs/promises'
 import path from 'path'
+import { requireAdmin } from '@/lib/auth'
 
 export async function getEquipment() {
+    await requireAdmin()
     try {
         const equipment = await prisma.equipment.findMany({
             orderBy: {
@@ -20,6 +22,7 @@ export async function getEquipment() {
 }
 
 export async function getAvailableIcons() {
+    await requireAdmin()
     try {
         const iconsDir = path.join(process.cwd(), 'public', 'icons-blue')
         const files = await fs.readdir(iconsDir)
@@ -35,6 +38,7 @@ export async function getAvailableIcons() {
 }
 
 export async function createEquipment(formData: FormData) {
+    await requireAdmin()
     try {
         const name = formData.get('name') as string
         const description = formData.get('description') as string
@@ -62,6 +66,7 @@ export async function createEquipment(formData: FormData) {
 }
 
 export async function updateEquipment(id: string, formData: FormData) {
+    await requireAdmin()
     try {
         const name = formData.get('name') as string
         const description = formData.get('description') as string
@@ -90,6 +95,7 @@ export async function updateEquipment(id: string, formData: FormData) {
 }
 
 export async function deleteEquipment(id: string) {
+    await requireAdmin()
     try {
         // Check if equipment is used in any reservations
         const reservationCount = await prisma.reservation.count({
@@ -117,6 +123,7 @@ export async function deleteEquipment(id: string) {
 }
 
 export async function uploadIcon(formData: FormData) {
+    await requireAdmin()
     try {
         const file = formData.get('file') as File
         if (!file) {

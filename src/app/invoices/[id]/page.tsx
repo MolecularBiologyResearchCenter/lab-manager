@@ -39,12 +39,23 @@ interface Invoice {
     user: User
     items: InvoiceItem[]
     sealedBy: string | null
-    sealedAt: Date | null
+    sealedAt: Date | string | null
     sealer?: {
         name: string
         sealImage: string | null
     }
     viewerRole?: string
+}
+
+const DEFAULT_SEAL_IMAGE = '/seals/center-director-fujioka.png'
+
+function formatSealDate(date: Date | string) {
+    return new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(new Date(date)).replace(/\//g, '.')
 }
 
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -449,83 +460,40 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                                 <div className="flex items-center justify-end relative">
                                     <p className="mb-2 text-xl" style={{ position: 'relative', zIndex: 10 }}>藤岡　正人　　印</p>
                                     {invoice.sealedAt && (
-                                        <>
-                                            {invoice.sealer?.sealImage ? (
-                                                <div
-                                                    className="absolute"
-                                                    style={{
-                                                        right: '0px',
-                                                        top: '-15px',
-                                                        zIndex: 5,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center'
-                                                    }}
-                                                >
-                                                    <img
-                                                        src={invoice.sealer.sealImage}
-                                                        alt="電子印"
-                                                        className="w-[60px] h-[60px] object-contain opacity-80"
-                                                    />
-                                                    <span
-                                                        style={{
-                                                            position: 'absolute',
-                                                            color: '#ef4444', // Red-500
-                                                            fontSize: '8px',
-                                                            fontWeight: 'bold',
-                                                            zIndex: 10,
-                                                            whiteSpace: 'nowrap',
-                                                            fontFamily: 'Arial, sans-serif'
-                                                        }}
-                                                    >
-                                                        {new Date(invoice.sealedAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '.')}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <div
-                                                    className="absolute"
-                                                    style={{
-                                                        width: '60px',
-                                                        height: '60px',
-                                                        border: '3px solid #ef4444',
-                                                        borderRadius: '50%',
-                                                        right: '0px',
-                                                        top: '-15px',
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        justifyContent: 'center',
-                                                        alignItems: 'center',
-                                                        color: '#ef4444',
-                                                        fontSize: '10px',
-                                                        fontWeight: 'bold',
-                                                        lineHeight: '1.1',
-                                                        opacity: 0.8,
-                                                        zIndex: 5,
-                                                        position: 'absolute'
-                                                    }}
-                                                >
-                                                    <span>北里大</span>
-                                                    <span>分子セ</span>
-                                                    <span>ンター</span>
-                                                    <span>長之印</span>
-                                                    <span
-                                                        style={{
-                                                            position: 'absolute',
-                                                            top: '50%',
-                                                            left: '50%',
-                                                            transform: 'translate(-50%, -50%)',
-                                                            color: '#ef4444',
-                                                            fontSize: '10px',
-                                                            fontWeight: 'bold',
-                                                            backgroundColor: 'rgba(255, 255, 255, 0.8)', // To make it readable over text
-                                                            padding: '0 2px'
-                                                        }}
-                                                    >
-                                                        {new Date(invoice.sealedAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '.')}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </>
+                                        <div
+                                            className="absolute"
+                                            style={{
+                                                right: '0px',
+                                                top: '-15px',
+                                                zIndex: 5,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                        >
+                                            <img
+                                                src={invoice.sealer?.sealImage || DEFAULT_SEAL_IMAGE}
+                                                alt="電子印"
+                                                className="h-[60px] w-[60px] object-contain opacity-80"
+                                                onError={(event) => {
+                                                    event.currentTarget.onerror = null
+                                                    event.currentTarget.src = DEFAULT_SEAL_IMAGE
+                                                }}
+                                            />
+                                            <span
+                                                style={{
+                                                    position: 'absolute',
+                                                    color: '#ef4444',
+                                                    fontSize: '8px',
+                                                    fontWeight: 'bold',
+                                                    zIndex: 10,
+                                                    whiteSpace: 'nowrap',
+                                                    fontFamily: 'Arial, sans-serif',
+                                                }}
+                                            >
+                                                {formatSealDate(invoice.sealedAt)}
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
                             </div>

@@ -12,7 +12,7 @@ export default async function AdminInvoicesPage() {
     // Get all invoices
     const invoices = await prisma.invoice.findMany({
         include: {
-            user: true,
+            user: { select: { name: true, department: true, laboratory: true } },
         },
         orderBy: [
             { fiscalYear: 'desc' },
@@ -21,5 +21,5 @@ export default async function AdminInvoicesPage() {
         ],
     })
 
-    return <InvoiceManager invoices={invoices} />
+    return <InvoiceManager invoices={invoices} canGenerate={user.role === 'ADMIN'} />
 }
