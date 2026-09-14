@@ -201,7 +201,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             }, 2000)
         } catch (error) {
             console.error('Error:', error)
-            toast.error('操作に失敗しました: ' + (error as Error).message)
+            toast.error('操作に失敗しました。画面を更新して、もう一度お試しください。')
         }
     }
 

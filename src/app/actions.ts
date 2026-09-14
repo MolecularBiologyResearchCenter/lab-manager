@@ -66,6 +66,7 @@ function getQuarterDates(year: number, quarter: number): { start: Date; end: Dat
 }
 
 const concurrentReservationError = '同時に別の予約が登録されました。画面を更新して空き状況を確認してください。'
+const reservationFailedError = '予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。'
 type ReservationActionResult = { success: true } | { success: false; error: string }
 
 function isTransactionConflict(error: unknown): boolean {
@@ -203,7 +204,8 @@ export async function createReservation(equipmentId: string, userId: string, sta
         if (!created) return { success: false, error: 'この時間帯は既に予約が入っています。' }
     } catch (error) {
         if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
-        throw error
+        console.error('Failed to create reservation', error)
+        return { success: false, error: reservationFailedError }
     }
 
     revalidatePath('/reservations')
@@ -302,7 +304,8 @@ export async function updateReservation(
         if (!updated) return { success: false, error: 'この時間帯は既に予約が入っています。' }
     } catch (error) {
         if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
-        throw error
+        console.error('Failed to update reservation', error)
+        return { success: false, error: reservationFailedError }
     }
 
     revalidatePath('/reservations')
