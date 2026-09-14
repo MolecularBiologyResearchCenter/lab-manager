@@ -10,6 +10,7 @@ import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { sealInvoice } from '@/app/actions'
 import { toast } from 'sonner'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface InvoiceItem {
     id: string
@@ -66,6 +67,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     const [loading, setLoading] = useState(true)
     const [downloading, setDownloading] = useState(false)
     const [sealing, setSealing] = useState(false)
+    const [sealDialogOpen, setSealDialogOpen] = useState(false)
+    const [sealConfirmed, setSealConfirmed] = useState(false)
 
     // Mobile detection
     const [isMobile, setIsMobile] = useState(false)
@@ -217,14 +220,19 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         }
     }
 
-    const handleSeal = async () => {
-        if (!confirm('この請求書に電子印を押しますか？\n※この操作は取り消せません。')) return
+    const handleSeal = () => {
+        setSealConfirmed(false)
+        setSealDialogOpen(true)
+    }
 
+    const confirmSeal = async () => {
+        if (!sealConfirmed) return
         setSealing(true)
         try {
             await sealInvoice(id)
             setInvoice(prev => prev ? { ...prev, sealedAt: new Date(), sealedBy: 'current-user' } : null)
             toast.success('電子印を押しました')
+            setSealDialogOpen(false)
         } catch (error) {
             toast.error((error as Error).message)
         } finally {
@@ -304,6 +312,38 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、学部経理に提出してください。
                 </p>
             </div>
+
+            <Dialog open={sealDialogOpen} onOpenChange={(open) => {
+                setSealDialogOpen(open)
+                if (!open) setSealConfirmed(false)
+            }}>
+                <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white">
+                    <DialogHeader>
+                        <DialogTitle>電子印押印の確認</DialogTitle>
+                        <DialogDescription>内容を確認してから押印してください。押印後は取り消せません。</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+                        <p><span className="font-medium">利用者：</span>{invoice.user.name}</p>
+                        <p><span className="font-medium">対象期間：</span>{invoice.fiscalYear}年 {getQuarterLabel(invoice.quarter)}</p>
+                        <p><span className="font-medium">請求額：</span>¥{invoice.totalAmount.toLocaleString()}</p>
+                    </div>
+                    <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
+                        <input
+                            type="checkbox"
+                            checked={sealConfirmed}
+                            onChange={(event) => setSealConfirmed(event.target.checked)}
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
+                        />
+                        <span>押印後は取り消せないことを確認しました</span>
+                    </label>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setSealDialogOpen(false)}>キャンセル</Button>
+                        <Button onClick={confirmSeal} disabled={!sealConfirmed || sealing} className="bg-red-600 font-semibold text-white hover:bg-red-700">
+                            {sealing ? '処理中...' : '電子印を押す'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Invoice Document - Fixed A4 Width */}
             <div className="app-surface flex justify-center overflow-auto p-3 md:p-8 print:border-0 print:p-0 print:shadow-none">
