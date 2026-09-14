@@ -13,16 +13,12 @@ export default function LoginPage() {
     const router = useRouter()
 
     const handleSubmit = async (formData: FormData) => {
-        try {
-            const result = await login(formData)
-            if (!result.success) {
-                toast.error(result.error)
-                return
-            }
-            router.push('/')
-        } catch {
-            toast.error('ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
+        const result = await login(formData)
+        if (!result.success) {
+            toast.error(result.error)
+            return
         }
+        router.push('/')
     }
 
     return (
