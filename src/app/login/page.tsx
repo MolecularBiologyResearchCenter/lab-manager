@@ -70,6 +70,12 @@ export default function LoginPage() {
                                 name="password"
                                 type="password"
                                 required
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault()
+                                        event.currentTarget.form?.requestSubmit()
+                                    }
+                                }}
                                 className="h-11 rounded-xl border-slate-300 text-base"
                             />
                         </div>
