@@ -137,10 +137,11 @@ export default async function AdminUsageLogsPage(props: { searchParams: Promise<
                             {targetDate.getFullYear()}年{targetDate.getMonth() + 1}月: {usageLogs.length}件の記録
                         </p>
                     </div>
-                    {usageLogs.map((log) => (
-                        <Card key={log.id} className="card-elevated">
-                            <CardContent className="p-6">
-                                <div className="flex items-center justify-between">
+                    <div className="max-h-[760px] space-y-4 overflow-y-auto rounded-lg">
+                        {usageLogs.map((log) => (
+                            <Card key={log.id} className="card-elevated">
+                                <CardContent className="p-6">
+                                    <div className="flex items-center justify-between">
                                     <div className="flex-1">
                                         <div className="grid grid-cols-5 gap-4">
                                             <div>
@@ -188,10 +189,11 @@ export default async function AdminUsageLogsPage(props: { searchParams: Promise<
                                             </Button>
                                         </form>
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>

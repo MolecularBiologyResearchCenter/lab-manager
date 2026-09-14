@@ -34,16 +34,16 @@ export default async function AuditLogsPage() {
                     </CardHeader>
                     <CardContent>
                         {databaseMessage && <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">{databaseMessage}</p>}
-                        <div className="overflow-x-auto">
+                        <div className="max-h-[440px] overflow-auto rounded-lg">
                             <table className="w-full min-w-[760px] text-sm">
                                 <thead>
-                                    <tr className="border-b text-left text-slate-600">
-                                        <th className="px-3 py-3 font-semibold">日時</th>
-                                        <th className="px-3 py-3 font-semibold">実行者</th>
-                                        <th className="px-3 py-3 font-semibold">権限</th>
-                                        <th className="px-3 py-3 font-semibold">操作</th>
-                                        <th className="px-3 py-3 font-semibold">対象</th>
-                                        <th className="px-3 py-3 font-semibold">内容</th>
+                                    <tr className="border-b bg-white text-left text-slate-600">
+                                        <th className="sticky top-0 z-10 bg-white px-3 py-3 font-semibold">日時</th>
+                                        <th className="sticky top-0 z-10 bg-white px-3 py-3 font-semibold">実行者</th>
+                                        <th className="sticky top-0 z-10 bg-white px-3 py-3 font-semibold">権限</th>
+                                        <th className="sticky top-0 z-10 bg-white px-3 py-3 font-semibold">操作</th>
+                                        <th className="sticky top-0 z-10 bg-white px-3 py-3 font-semibold">対象</th>
+                                        <th className="sticky top-0 z-10 bg-white px-3 py-3 font-semibold">内容</th>
                                     </tr>
                                 </thead>
                                 <tbody>
