@@ -68,7 +68,7 @@ function getQuarterDates(year: number, quarter: number): { start: Date; end: Dat
 const concurrentReservationError = '同時に別の予約が登録されました。画面を更新して空き状況を確認してください。'
 const reservationFailedError = '予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。'
 type ReservationActionResult = { success: true } | { success: false; error: string }
-type LoginActionResult = { success: false; error: string }
+type LoginActionResult = { success: true } | { success: false; error: string }
 
 function isTransactionConflict(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
@@ -378,7 +378,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
         return { success: false, error: 'ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。' }
     }
 
-    redirect('/')
+    return { success: true }
 }
 
 export async function logout() {
