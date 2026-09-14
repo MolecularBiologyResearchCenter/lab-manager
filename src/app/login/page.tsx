@@ -7,12 +7,19 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardFooter } from '@/components/ui/card'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
+    const router = useRouter()
+
     const handleSubmit = async (formData: FormData) => {
         try {
             const result = await login(formData)
-            if (!result.success) toast.error(result.error)
+            if (!result.success) {
+                toast.error(result.error)
+                return
+            }
+            router.push('/')
         } catch {
             toast.error('ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
         }
@@ -63,6 +70,12 @@ export default function LoginPage() {
                                 name="password"
                                 type="password"
                                 required
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault()
+                                        event.currentTarget.form?.requestSubmit()
+                                    }
+                                }}
                                 className="h-11 rounded-xl border-slate-300 text-base"
                             />
                         </div>
