@@ -68,6 +68,7 @@ function getQuarterDates(year: number, quarter: number): { start: Date; end: Dat
 const concurrentReservationError = '同時に別の予約が登録されました。画面を更新して空き状況を確認してください。'
 const reservationFailedError = '予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。'
 type ReservationActionResult = { success: true } | { success: false; error: string }
+type LoginActionResult = { success: false; error: string }
 
 function isTransactionConflict(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
@@ -345,32 +346,37 @@ export async function getCurrentUserSealImage() {
     return user?.sealImage ?? null
 }
 
-export async function login(formData: FormData) {
-    const email = (formData.get('email') as string).trim()
-    const password = (formData.get('password') as string).trim()
+export async function login(formData: FormData): Promise<LoginActionResult | never> {
+    const email = String(formData.get('email') || '').trim()
+    const password = String(formData.get('password') || '').trim()
     const rememberMe = formData.get('rememberMe') === 'on'
 
     if (!email || !password) {
         throw new Error('メールアドレスとパスワードを入力してください。')
     }
 
-    const user = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, password: true },
-    })
-
-    if (!user || !(await verifyPassword(password, user.password))) {
-        throw new Error('メールアドレスまたはパスワードが間違っています。')
-    }
-
-    if (!isPasswordHash(user.password)) {
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { password: await hashPassword(password) },
+    try {
+        const user = await prisma.user.findUnique({
+            where: { email },
+            select: { id: true, password: true },
         })
-    }
 
-    await setSessionCookie(user.id, rememberMe)
+        if (!user || !(await verifyPassword(password, user.password))) {
+            return { success: false, error: 'メールアドレスまたはパスワードが間違っています。' }
+        }
+
+        if (!isPasswordHash(user.password)) {
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { password: await hashPassword(password) },
+            })
+        }
+
+        await setSessionCookie(user.id, rememberMe)
+    } catch (error) {
+        console.error('Failed to log in', error)
+        return { success: false, error: 'ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。' }
+    }
 
     redirect('/')
 }
