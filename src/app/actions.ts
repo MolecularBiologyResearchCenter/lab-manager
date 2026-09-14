@@ -1,5 +1,6 @@
 'use server'
 
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/mail'
 import { revalidatePath } from 'next/cache'
@@ -62,6 +63,15 @@ function getQuarterDates(year: number, quarter: number): { start: Date; end: Dat
     const end = new Date(year, endMonth + 1, 0, 23, 59, 59, 999)
 
     return { start, end }
+}
+
+const concurrentReservationError = '同時に別の予約が登録されました。画面を更新して空き状況を確認してください。'
+const reservationFailedError = '予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。'
+type ReservationActionResult = { success: true } | { success: false; error: string }
+type LoginActionResult = { success: false; error: string }
+
+function isTransactionConflict(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
 }
 
 export async function getDashboardData() {
@@ -170,38 +180,38 @@ export async function getReagentList() {
     return reagents.sort((a, b) => nameCollator.compare(a.name, b.name))
 }
 
-export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string) {
+export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string): Promise<ReservationActionResult> {
     const currentUser = await requireUser()
     if (currentUser.id !== userId) throw new Error('他のユーザーの予約は作成できません。')
-    // Check for overlaps
-    const overlap = await prisma.reservation.findFirst({
-        where: {
-            equipmentId,
-            OR: [
-                {
-                    startTime: { lte: endTime },
-                    endTime: { gte: startTime },
+
+    try {
+        const created = await prisma.$transaction(async (transaction) => {
+            const overlap = await transaction.reservation.findFirst({
+                where: {
+                    equipmentId,
+                    startTime: { lt: endTime },
+                    endTime: { gt: startTime },
                 },
-            ],
-        },
-    })
+                select: { id: true },
+            })
 
-    if (overlap) {
-        throw new Error('Reservation overlaps with an existing booking')
+            if (overlap) return false
+
+            await transaction.reservation.create({
+                data: { equipmentId, userId, startTime, endTime, ...(phoneNumber ? { phoneNumber } : {}) },
+            })
+            return true
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+        if (!created) return { success: false, error: 'この時間帯は既に予約が入っています。' }
+    } catch (error) {
+        if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
+        console.error('Failed to create reservation', error)
+        return { success: false, error: reservationFailedError }
     }
-
-    await prisma.reservation.create({
-        data: {
-            equipmentId,
-            userId,
-            startTime,
-            endTime,
-            ...(phoneNumber ? { phoneNumber } : {}),
-        },
-    })
 
     revalidatePath('/reservations')
     revalidatePath('/')
+    return { success: true }
 }
 
 export async function logReagentUsage(userId: string, reagentId: string, quantity: number) {
@@ -260,7 +270,7 @@ export async function updateReservation(
     startTime: Date,
     endTime: Date,
     phoneNumber?: string
-) {
+): Promise<ReservationActionResult> {
     const currentUser = await requireUser()
     const existingReservation = await prisma.reservation.findUnique({
         where: { id },
@@ -272,38 +282,37 @@ export async function updateReservation(
     if (currentUser.role !== 'ADMIN' && userId !== currentUser.id) {
         throw new Error('予約者を変更する権限がありません。')
     }
-    // Check for overlapping reservations (excluding the current one)
-    const overlap = await prisma.reservation.findFirst({
-        where: {
-            id: { not: id },
-            equipmentId,
-            OR: [
-                {
+    try {
+        const updated = await prisma.$transaction(async (transaction) => {
+            const overlap = await transaction.reservation.findFirst({
+                where: {
+                    id: { not: id },
+                    equipmentId,
                     startTime: { lt: endTime },
                     endTime: { gt: startTime },
                 },
-            ],
-        },
-    })
+                select: { id: true },
+            })
 
-    if (overlap) {
-        throw new Error('この時間帯は既に予約が入っています。')
+            if (overlap) return false
+
+            await transaction.reservation.update({
+                where: { id },
+                data: { equipmentId, userId, startTime, endTime, ...(phoneNumber ? { phoneNumber } : {}) },
+            })
+            return true
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+        if (!updated) return { success: false, error: 'この時間帯は既に予約が入っています。' }
+    } catch (error) {
+        if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
+        console.error('Failed to update reservation', error)
+        return { success: false, error: reservationFailedError }
     }
-
-    await prisma.reservation.update({
-        where: { id },
-        data: {
-            equipmentId,
-            userId,
-            startTime,
-            endTime,
-            ...(phoneNumber ? { phoneNumber } : {}),
-        },
-    })
 
     revalidatePath('/reservations')
     revalidatePath('/')
     revalidatePath('/admin')
+    return { success: true }
 }
 
 export async function deleteReservation(id: string) {
@@ -337,32 +346,37 @@ export async function getCurrentUserSealImage() {
     return user?.sealImage ?? null
 }
 
-export async function login(formData: FormData) {
-    const email = (formData.get('email') as string).trim()
-    const password = (formData.get('password') as string).trim()
+export async function login(formData: FormData): Promise<LoginActionResult | never> {
+    const email = String(formData.get('email') || '').trim()
+    const password = String(formData.get('password') || '').trim()
     const rememberMe = formData.get('rememberMe') === 'on'
 
     if (!email || !password) {
         throw new Error('メールアドレスとパスワードを入力してください。')
     }
 
-    const user = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true, password: true },
-    })
-
-    if (!user || !(await verifyPassword(password, user.password))) {
-        throw new Error('メールアドレスまたはパスワードが間違っています。')
-    }
-
-    if (!isPasswordHash(user.password)) {
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { password: await hashPassword(password) },
+    try {
+        const user = await prisma.user.findUnique({
+            where: { email },
+            select: { id: true, password: true },
         })
-    }
 
-    await setSessionCookie(user.id, rememberMe)
+        if (!user || !(await verifyPassword(password, user.password))) {
+            return { success: false, error: 'メールアドレスまたはパスワードが間違っています。' }
+        }
+
+        if (!isPasswordHash(user.password)) {
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { password: await hashPassword(password) },
+            })
+        }
+
+        await setSessionCookie(user.id, rememberMe)
+    } catch (error) {
+        console.error('Failed to log in', error)
+        return { success: false, error: 'ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。' }
+    }
 
     redirect('/')
 }

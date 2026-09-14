@@ -11,9 +11,10 @@ import { toast } from 'sonner'
 export default function LoginPage() {
     const handleSubmit = async (formData: FormData) => {
         try {
-            await login(formData)
-        } catch (error) {
-            toast.error((error as Error).message)
+            const result = await login(formData)
+            if (!result.success) toast.error(result.error)
+        } catch {
+            toast.error('ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
         }
     }
 

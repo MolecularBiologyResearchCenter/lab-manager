@@ -180,10 +180,18 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                     return
                 }
 
-                await updateReservation(editingReservation.id, selectedEquipment, editingReservation.userId, startTime, endTime, phoneNumber)
+                const result = await updateReservation(editingReservation.id, selectedEquipment, editingReservation.userId, startTime, endTime, phoneNumber)
+                if (!result.success) {
+                    toast.error('操作に失敗しました: ' + result.error)
+                    return
+                }
                 toast.success('予約を更新しました！')
             } else {
-                await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+                const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+                if (!result.success) {
+                    toast.error('操作に失敗しました: ' + result.error)
+                    return
+                }
                 toast.success('予約が完了しました！')
             }
             setIsDialogOpen(false)
@@ -193,7 +201,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             }, 2000)
         } catch (error) {
             console.error('Error:', error)
-            toast.error('操作に失敗しました: ' + (error as Error).message)
+            toast.error('操作に失敗しました。画面を更新して、もう一度お試しください。')
         }
     }
 
@@ -326,8 +334,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             groupedReservations[dateKey].push(reservation)
         })
 
-        // Sort dates
-        const sortedDates = Object.keys(groupedReservations).sort()
+        // Show the newest dates first on mobile so recent reservations are easier to find.
+        const sortedDates = Object.keys(groupedReservations).sort().reverse()
 
         // Generate month options (current month ± 3 months)
         const monthOptions = []
