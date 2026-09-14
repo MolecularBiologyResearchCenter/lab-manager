@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth'
+import { recordAuditLog } from '@/lib/audit'
 
 export async function getReagents() {
     await requireAdmin()
@@ -20,7 +21,7 @@ export async function getReagents() {
 }
 
 export async function createReagent(formData: FormData) {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
     try {
         const name = formData.get('name') as string
         const unitPrice = parseFloat(formData.get('unitPrice') as string)
@@ -29,12 +30,13 @@ export async function createReagent(formData: FormData) {
             return { success: false, error: 'Invalid input' }
         }
 
-        await prisma.reagent.create({
+        const reagent = await prisma.reagent.create({
             data: {
                 name,
                 unitPrice,
             },
         })
+        await recordAuditLog({ actor: currentUser, action: 'REAGENT_CREATE', targetType: 'Reagent', targetId: reagent.id, targetLabel: reagent.name, summary: '有料サービスを追加しました。' })
 
         revalidatePath('/admin/reagents')
         return { success: true }
@@ -45,7 +47,7 @@ export async function createReagent(formData: FormData) {
 }
 
 export async function updateReagent(id: string, formData: FormData) {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
     try {
         const name = formData.get('name') as string
         const unitPrice = parseFloat(formData.get('unitPrice') as string)
@@ -54,13 +56,14 @@ export async function updateReagent(id: string, formData: FormData) {
             return { success: false, error: 'Invalid input' }
         }
 
-        await prisma.reagent.update({
+        const reagent = await prisma.reagent.update({
             where: { id },
             data: {
                 name,
                 unitPrice,
             },
         })
+        await recordAuditLog({ actor: currentUser, action: 'REAGENT_UPDATE', targetType: 'Reagent', targetId: reagent.id, targetLabel: reagent.name, summary: '有料サービスを更新しました。' })
 
         revalidatePath('/admin/reagents')
         return { success: true }
@@ -71,7 +74,7 @@ export async function updateReagent(id: string, formData: FormData) {
 }
 
 export async function deleteReagent(id: string) {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
     try {
         // Check if reagent is used in any usage logs
         const usageCount = await prisma.usageLog.count({
@@ -85,9 +88,10 @@ export async function deleteReagent(id: string) {
             }
         }
 
-        await prisma.reagent.delete({
+        const reagent = await prisma.reagent.delete({
             where: { id },
         })
+        await recordAuditLog({ actor: currentUser, action: 'REAGENT_DELETE', targetType: 'Reagent', targetId: id, targetLabel: reagent.name, summary: '有料サービスを削除しました。' })
 
         revalidatePath('/admin/reagents')
         return { success: true }

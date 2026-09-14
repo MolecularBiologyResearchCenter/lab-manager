@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import fs from 'fs/promises'
 import path from 'path'
 import { requireAdmin } from '@/lib/auth'
+import { recordAuditLog } from '@/lib/audit'
 
 export async function getEquipment() {
     await requireAdmin()
@@ -38,7 +39,7 @@ export async function getAvailableIcons() {
 }
 
 export async function createEquipment(formData: FormData) {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
     try {
         const name = formData.get('name') as string
         const description = formData.get('description') as string
@@ -48,13 +49,14 @@ export async function createEquipment(formData: FormData) {
             return { success: false, error: 'Invalid input' }
         }
 
-        await prisma.equipment.create({
+        const equipment = await prisma.equipment.create({
             data: {
                 name,
                 description: description || null,
                 icon: icon || null,
             },
         })
+        await recordAuditLog({ actor: currentUser, action: 'EQUIPMENT_CREATE', targetType: 'Equipment', targetId: equipment.id, targetLabel: equipment.name, summary: '機器を追加しました。' })
 
         revalidatePath('/admin/equipment')
         revalidatePath('/equipment')
@@ -66,7 +68,7 @@ export async function createEquipment(formData: FormData) {
 }
 
 export async function updateEquipment(id: string, formData: FormData) {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
     try {
         const name = formData.get('name') as string
         const description = formData.get('description') as string
@@ -76,7 +78,7 @@ export async function updateEquipment(id: string, formData: FormData) {
             return { success: false, error: 'Invalid input' }
         }
 
-        await prisma.equipment.update({
+        const equipment = await prisma.equipment.update({
             where: { id },
             data: {
                 name,
@@ -84,6 +86,7 @@ export async function updateEquipment(id: string, formData: FormData) {
                 icon: icon || null,
             },
         })
+        await recordAuditLog({ actor: currentUser, action: 'EQUIPMENT_UPDATE', targetType: 'Equipment', targetId: equipment.id, targetLabel: equipment.name, summary: '機器を更新しました。' })
 
         revalidatePath('/admin/equipment')
         revalidatePath('/equipment')
@@ -95,7 +98,7 @@ export async function updateEquipment(id: string, formData: FormData) {
 }
 
 export async function deleteEquipment(id: string) {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
     try {
         // Check if equipment is used in any reservations
         const reservationCount = await prisma.reservation.count({
@@ -109,9 +112,10 @@ export async function deleteEquipment(id: string) {
             }
         }
 
-        await prisma.equipment.delete({
+        const equipment = await prisma.equipment.delete({
             where: { id },
         })
+        await recordAuditLog({ actor: currentUser, action: 'EQUIPMENT_DELETE', targetType: 'Equipment', targetId: id, targetLabel: equipment.name, summary: '機器を削除しました。' })
 
         revalidatePath('/admin/equipment')
         revalidatePath('/equipment')
@@ -123,7 +127,7 @@ export async function deleteEquipment(id: string) {
 }
 
 export async function uploadIcon(formData: FormData) {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
     try {
         const file = formData.get('file') as File
         if (!file) {
@@ -138,6 +142,7 @@ export async function uploadIcon(formData: FormData) {
         await fs.writeFile(filePath, buffer)
 
         const iconPath = `/icons-blue/${filename}`
+        await recordAuditLog({ actor: currentUser, action: 'EQUIPMENT_ICON_UPLOAD', targetType: 'EquipmentIcon', targetLabel: filename, summary: '機器アイコンをアップロードしました。', metadata: { contentType: file.type, size: file.size } })
         return { success: true, iconPath }
     } catch (error) {
         console.error('Failed to upload icon:', error)

@@ -34,8 +34,30 @@ model User {
   invoices     Invoice[]
   sealedInvoices Invoice[] @relation("Sealer")
   sealImage    String? // 印鑑画像のパス
+  auditLogs    AuditLog[]
 
   @@index([passwordResetTokenHash])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actorName   String
+  actorRole   String
+  action      String
+  targetType  String
+  targetId    String?
+  targetLabel String?
+  summary     String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
 }
 
 model Equipment {

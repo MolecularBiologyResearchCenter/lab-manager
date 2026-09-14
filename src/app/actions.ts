@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { sendEmail } from '@/lib/mail'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { recordAuditLog } from '@/lib/audit'
 import {
     clearSessionCookie,
     getAuthenticatedUser,
@@ -195,14 +196,23 @@ export async function createReservation(equipmentId: string, userId: string, sta
                 select: { id: true },
             })
 
-            if (overlap) return false
+            if (overlap) return null
 
-            await transaction.reservation.create({
+            const reservation = await transaction.reservation.create({
                 data: { equipmentId, userId, startTime, endTime, ...(phoneNumber ? { phoneNumber } : {}) },
             })
-            return true
+            return reservation.id
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
         if (!created) return { success: false, error: 'この時間帯は既に予約が入っています。' }
+        await recordAuditLog({
+            actor: currentUser,
+            action: 'RESERVATION_CREATE',
+            targetType: 'Reservation',
+            targetId: created,
+            targetLabel: `${startTime.toLocaleString('ja-JP')}～${endTime.toLocaleString('ja-JP')}`,
+            summary: '機器予約を作成しました。',
+            metadata: { equipmentId, userId },
+        })
     } catch (error) {
         if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
         console.error('Failed to create reservation', error)
@@ -225,7 +235,7 @@ export async function logReagentUsage(userId: string, reagentId: string, quantit
 
     const totalCost = reagent.unitPrice * quantity
 
-    await prisma.usageLog.create({
+    const usageLog = await prisma.usageLog.create({
         data: {
             userId,
             reagentId,
@@ -241,6 +251,16 @@ export async function logReagentUsage(userId: string, reagentId: string, quantit
             data: { stock: reagent.stock - quantity },
         })
     }
+
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'USAGE_LOG_CREATE',
+        targetType: 'UsageLog',
+        targetId: usageLog.id,
+        targetLabel: reagent.name,
+        summary: '有料サービスの利用を記録しました。',
+        metadata: { reagentId, quantity, totalCost },
+    })
 
     revalidatePath('/reagents')
     revalidatePath('/')
@@ -294,15 +314,24 @@ export async function updateReservation(
                 select: { id: true },
             })
 
-            if (overlap) return false
+            if (overlap) return null
 
-            await transaction.reservation.update({
+            const reservation = await transaction.reservation.update({
                 where: { id },
                 data: { equipmentId, userId, startTime, endTime, ...(phoneNumber ? { phoneNumber } : {}) },
             })
-            return true
+            return reservation.id
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
         if (!updated) return { success: false, error: 'この時間帯は既に予約が入っています。' }
+        await recordAuditLog({
+            actor: currentUser,
+            action: 'RESERVATION_UPDATE',
+            targetType: 'Reservation',
+            targetId: updated,
+            targetLabel: `${startTime.toLocaleString('ja-JP')}～${endTime.toLocaleString('ja-JP')}`,
+            summary: '機器予約を更新しました。',
+            metadata: { equipmentId, userId },
+        })
     } catch (error) {
         if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
         console.error('Failed to update reservation', error)
@@ -319,13 +348,23 @@ export async function deleteReservation(id: string) {
     const currentUser = await requireUser()
     const reservation = await prisma.reservation.findUnique({
         where: { id },
-        select: { userId: true },
+        select: { userId: true, equipment: { select: { name: true } }, startTime: true, endTime: true },
     })
     if (!reservation || (reservation.userId !== currentUser.id && currentUser.role !== 'ADMIN')) {
         throw new Error('この予約を削除する権限がありません。')
     }
     await prisma.reservation.delete({
         where: { id },
+    })
+
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'RESERVATION_DELETE',
+        targetType: 'Reservation',
+        targetId: id,
+        targetLabel: reservation.equipment.name,
+        summary: '機器予約を削除しました。',
+        metadata: { startTime: reservation.startTime.toISOString(), endTime: reservation.endTime.toISOString() },
     })
 
     revalidatePath('/reservations')
@@ -501,9 +540,21 @@ export async function deleteUser(userId: string) {
         throw new Error('自分自身を削除することはできません。')
     }
 
-    // Delete the user
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true, role: true } })
+    if (!targetUser) throw new Error('ユーザーが見つかりません。')
+
     await prisma.user.delete({
         where: { id: userId },
+    })
+
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'USER_DELETE',
+        targetType: 'User',
+        targetId: userId,
+        targetLabel: targetUser.name,
+        summary: 'ユーザーを削除しました。',
+        metadata: { email: targetUser.email, role: targetUser.role },
     })
 
     revalidatePath('/admin/users')
@@ -581,6 +632,14 @@ export async function sealInvoice(invoiceId: string) {
         },
     })
 
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'INVOICE_SEAL',
+        targetType: 'Invoice',
+        targetId: invoiceId,
+        summary: '請求書に電子印を押しました。',
+    })
+
     revalidatePath(`/invoices/${invoiceId}`)
     revalidatePath('/invoices')
 }
@@ -597,9 +656,21 @@ export async function updateUserRole(userId: string, role: string) {
         throw new Error('自分自身の管理者権限を外すことはできません。')
     }
 
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true } })
+    if (!targetUser) throw new Error('ユーザーが見つかりません。')
     await prisma.user.update({
         where: { id: userId },
         data: { role },
+    })
+
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'USER_ROLE_UPDATE',
+        targetType: 'User',
+        targetId: userId,
+        targetLabel: targetUser.name,
+        summary: 'ユーザー権限を変更しました。',
+        metadata: { previousRole: targetUser.role, newRole: role },
     })
 
     revalidatePath('/admin/users')
@@ -618,6 +689,7 @@ export async function adminSetUserPassword(userId: string, newPassword: string) 
             passwordResetTokenExpiresAt: null,
         },
     })
+
 }
 
 export async function uploadSeal(formData: FormData) {
@@ -643,6 +715,16 @@ export async function uploadSeal(formData: FormData) {
     await prisma.user.update({
         where: { id: currentUser.id },
         data: { sealImage },
+    })
+
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'SEAL_UPLOAD',
+        targetType: 'User',
+        targetId: currentUser.id,
+        targetLabel: currentUser.name,
+        summary: '電子印をアップロードしました。',
+        metadata: { contentType: file.type, size: file.size },
     })
 
     revalidatePath('/')

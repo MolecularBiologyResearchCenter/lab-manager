@@ -9,6 +9,7 @@ import {
     DollarSign,
     Users,
     Wrench,
+    ClipboardList,
 } from 'lucide-react'
 
 const adminNavigation = [
@@ -18,6 +19,7 @@ const adminNavigation = [
     { href: '/admin/reagents', label: '有料サービス', icon: FlaskConical },
     { href: '/admin/equipment', label: '機器', icon: Wrench },
     { href: '/admin/users', label: '利用者', icon: Users },
+    { href: '/admin/audit-logs', label: '監査ログ', icon: ClipboardList },
 ]
 
 export default function AdminNav({ role }: { role: string }) {
