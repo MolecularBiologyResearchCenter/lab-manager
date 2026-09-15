@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { sealInvoice } from '@/app/actions'
@@ -61,6 +61,8 @@ function formatSealDate(date: Date | string) {
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const backHref = searchParams.get('from') === 'admin' ? '/admin/invoices' : '/invoices'
     const invoiceRef = useRef<HTMLDivElement>(null)
     const [invoice, setInvoice] = useState<Invoice | null>(null)
     const [loading, setLoading] = useState(true)
@@ -88,7 +90,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 if (!response.ok) {
                     const apiError = await readApiError(response, '請求書を取得できませんでした。')
                     toast.error(formatApiError(apiError))
-                    router.push('/invoices')
+                    router.push(backHref)
                     return
                 }
                 const data = await response.json()
@@ -101,13 +103,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     requestId: '取得できませんでした',
                 })
                 toast.error(formatApiError(apiError))
-                router.push('/invoices')
+                router.push(backHref)
             } finally {
                 setLoading(false)
             }
         }
         fetchInvoice()
-    }, [id, router])
+    }, [backHref, id, router])
 
     const getQuarterLabel = (quarter: number) => {
         switch (quarter) {
@@ -267,7 +269,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {/* Navigation */}
             <div className="mb-5 flex flex-col justify-between gap-3 print:hidden sm:flex-row">
                 <div className="flex flex-wrap gap-2">
-                    <Link href="/invoices">
+                    <Link href={backHref}>
                         <Button variant="outline" className="rounded-xl border-slate-300 bg-white">
                             <ArrowLeft className="h-4 w-4" />
                             請求書一覧に戻る
