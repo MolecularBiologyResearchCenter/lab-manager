@@ -136,6 +136,12 @@ export default function EquipmentPage() {
         setDeleteNameConfirmation('')
     }
 
+    function openEditingDeleteDialog(e: React.MouseEvent) {
+        if (!editingId) return
+        const equipment = equipmentList.find((item) => item.id === editingId)
+        if (equipment) openDeleteDialog(e, equipment)
+    }
+
     function startEdit(equipment: Equipment) {
         setEditingId(equipment.id)
         setFormName(equipment.name)
@@ -305,6 +311,17 @@ export default function EquipmentPage() {
                                     <X className="h-4 w-4" />
                                     キャンセル
                                 </Button>
+                                {editingId && (
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        onClick={openEditingDeleteDialog}
+                                        className="ml-auto flex items-center gap-2"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        この機器を削除
+                                    </Button>
+                                )}
                             </div>
                         </form>
                     </CardContent>
