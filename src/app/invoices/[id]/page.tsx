@@ -58,6 +58,11 @@ function formatSealDate(date: Date | string) {
     }).format(new Date(date)).replace(/\//g, '.')
 }
 
+function getSubmissionDeadline(fiscalYear: number, quarter: number) {
+    const deadline = new Date(fiscalYear, quarter * 4, 1)
+    return `${deadline.getFullYear()}年${deadline.getMonth() + 1}月末`
+}
+
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const router = useRouter()
@@ -321,7 +326,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {/* Print Instructions */}
             <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4 print:hidden">
                 <p className="text-sm text-blue-800">
-                    <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、学部経理に提出してください。
+                    <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、{getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください
                 </p>
             </div>
 
