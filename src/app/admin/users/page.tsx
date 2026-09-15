@@ -27,6 +27,7 @@ import { useState, useEffect } from 'react'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Pencil } from 'lucide-react'
+import { ApiClientError, formatApiError, readApiError } from '@/lib/api-client'
 
 interface User {
     id: string
@@ -68,10 +69,22 @@ export default function UsersPage() {
     const fetchUsers = async () => {
         try {
             const response = await fetch('/api/users')
+            if (!response.ok) {
+                const apiError = await readApiError(response, '利用者一覧を取得できませんでした。')
+                console.error('利用者一覧の取得に失敗しました。', apiError)
+                toast.error(formatApiError(apiError))
+                return
+            }
             const data = await response.json()
             setUsers(data)
         } catch (error) {
             console.error('Failed to fetch users:', error)
+            const apiError = new ApiClientError({
+                error: '利用者一覧を取得できませんでした。',
+                guidance: 'ネットワーク接続を確認して、もう一度お試しください。',
+                requestId: '取得できませんでした',
+            })
+            toast.error(formatApiError(apiError))
         } finally {
             setLoading(false)
         }

@@ -6,28 +6,23 @@ import signpdf, { plainAddPlaceholder } from 'node-signpdf'
 import { getAuthenticatedUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recordAuditLog } from '@/lib/audit'
+import { API_ERROR_CODES, apiErrorResponse, apiHeaders, createRequestId } from '@/lib/api-response'
 
 const MAX_PDF_SIZE = 10 * 1024 * 1024
 
-function errorResponse(message: string, status: number) {
-    return NextResponse.json({ error: message }, {
-        status,
-        headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
-    })
-}
-
 export async function POST(request: NextRequest) {
+    const requestId = createRequestId()
     try {
         const currentUser = await getAuthenticatedUser()
-        if (!currentUser) return errorResponse('ログインが必要です。', 401)
+        if (!currentUser) return apiErrorResponse(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。', requestId)
 
         const formData = await request.formData()
         const invoiceId = formData.get('invoiceId')
         const file = formData.get('file')
-        if (typeof invoiceId !== 'string' || !invoiceId.trim()) return errorResponse('請求書IDが指定されていません。', 400)
-        if (!(file instanceof File)) return errorResponse('PDFファイルが指定されていません。', 400)
-        if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return errorResponse('PDF形式のファイルを指定してください。', 400)
-        if (file.size > MAX_PDF_SIZE) return errorResponse('PDFファイルは10MB以下にしてください。', 413)
+        if (typeof invoiceId !== 'string' || !invoiceId.trim()) return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, '請求書IDが指定されていません。', '請求書画面からもう一度お試しください。', requestId)
+        if (!(file instanceof File)) return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, 'PDFファイルが指定されていません。', 'PDFファイルを選び直してください。', requestId)
+        if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, 'PDF形式のファイルを指定してください。', 'PDFファイルを選び直してください。', requestId)
+        if (file.size > MAX_PDF_SIZE) return apiErrorResponse(413, API_ERROR_CODES.INVALID_REQUEST, 'PDFファイルは10MB以下にしてください。', '10MB以下のPDFを選び直してください。', requestId)
 
         const invoice = await prisma.invoice.findUnique({
             where: { id: invoiceId },
@@ -40,22 +35,22 @@ export async function POST(request: NextRequest) {
                 sealer: { select: { name: true } },
             },
         })
-        if (!invoice) return errorResponse('請求書が見つかりません。', 404)
+        if (!invoice) return apiErrorResponse(404, API_ERROR_CODES.NOT_FOUND, '請求書が見つかりません。', '請求書一覧から対象を選び直してください。', requestId)
 
         const isPrivileged = currentUser.role === 'ADMIN' || currentUser.role === 'CENTER_DIRECTOR'
-        if (invoice.userId !== currentUser.id && !isPrivileged) return errorResponse('この請求書に署名する権限がありません。', 403)
-        if (!invoice.sealedAt || !invoice.sealedBy || !invoice.sealer) return errorResponse('押印済みの請求書のみ電子署名できます。', 409)
+        if (invoice.userId !== currentUser.id && !isPrivileged) return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この請求書に署名する権限がありません。', '請求書の所有者または管理者へ確認してください。', requestId)
+        if (!invoice.sealedAt || !invoice.sealedBy || !invoice.sealer) return apiErrorResponse(409, API_ERROR_CODES.CONFLICT, '押印済みの請求書のみ電子署名できます。', '押印状態を確認してから、もう一度お試しください。', requestId)
 
         const passphrase = process.env.PDF_CERT_PASSPHRASE
-        if (!passphrase) return errorResponse('電子署名の設定が完了していません。', 500)
+        if (!passphrase) return apiErrorResponse(500, API_ERROR_CODES.CONFIGURATION_ERROR, '電子署名を利用できません。', '管理者へ問い合わせてください。', requestId)
 
         const buffer = Buffer.from(await file.arrayBuffer())
-        if (buffer.length > MAX_PDF_SIZE || buffer.subarray(0, 5).toString() !== '%PDF-') return errorResponse('有効なPDFファイルを指定してください。', 400)
+        if (buffer.length > MAX_PDF_SIZE || buffer.subarray(0, 5).toString() !== '%PDF-') return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, '有効なPDFファイルを指定してください。', 'PDFファイルを選び直してください。', requestId)
 
         const p12Path = path.join(process.cwd(), 'certificate.p12')
         if (!fs.existsSync(p12Path)) {
-            console.error('certificate.p12 がサーバー上にありません。')
-            return errorResponse('電子署名用証明書が見つかりません。', 500)
+            console.error(`[${requestId}] certificate.p12 がサーバー上にありません。`)
+            return apiErrorResponse(500, API_ERROR_CODES.CONFIGURATION_ERROR, '電子署名を利用できません。', '管理者へ問い合わせてください。', requestId)
         }
 
         const pdfWithPlaceholder = plainAddPlaceholder({
@@ -88,12 +83,11 @@ export async function POST(request: NextRequest) {
             headers: {
                 'Content-Type': 'application/pdf',
                 'Content-Disposition': 'attachment; filename="signed_invoice.pdf"',
-                'Cache-Control': 'no-store',
-                'X-Content-Type-Options': 'nosniff',
+                ...apiHeaders(requestId),
             },
         })
     } catch (error) {
-        console.error('PDF署名に失敗しました。', error)
-        return errorResponse('PDFの電子署名中にエラーが発生しました。', 500)
+        console.error(`[${requestId}] PDF署名に失敗しました。`, error)
+        return apiErrorResponse(500, API_ERROR_CODES.INTERNAL_ERROR, 'PDFの電子署名に失敗しました。', '時間をおいて、もう一度お試しください。', requestId)
     }
 }

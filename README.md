@@ -39,3 +39,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 - [バックアップ・復旧手順書](docs/backup-restore-runbook.md)
 - [ISMS / fail-safe 改善ロードマップ](docs/isms-roadmap.md)
+- [エラー対応・障害調査ガイド](docs/error-handling-guide.md)
