@@ -1,6 +1,4 @@
 import { createHash } from 'crypto'
-import fs from 'fs'
-import path from 'path'
 import { NextRequest, NextResponse } from 'next/server'
 import signpdf, { plainAddPlaceholder } from 'node-signpdf'
 import { getAuthenticatedUser } from '@/lib/auth'
@@ -47,9 +45,18 @@ export async function POST(request: NextRequest) {
         const buffer = Buffer.from(await file.arrayBuffer())
         if (buffer.length > MAX_PDF_SIZE || buffer.subarray(0, 5).toString() !== '%PDF-') return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, '有効なPDFファイルを指定してください。', 'PDFファイルを選び直してください。', requestId)
 
-        const p12Path = path.join(process.cwd(), 'certificate.p12')
-        if (!fs.existsSync(p12Path)) {
-            console.error(`[${requestId}] certificate.p12 がサーバー上にありません。`)
+        const certificateBase64 = process.env.PDF_CERT_BASE64
+        if (!certificateBase64) {
+            console.error(`[${requestId}] PDF署名証明書が設定されていません。`)
+            return apiErrorResponse(500, API_ERROR_CODES.CONFIGURATION_ERROR, '電子署名を利用できません。', '管理者へ問い合わせてください。', requestId)
+        }
+
+        let certificate: Buffer
+        try {
+            certificate = Buffer.from(certificateBase64, 'base64')
+            if (certificate.length === 0) throw new Error('empty certificate')
+        } catch (error) {
+            console.error(`[${requestId}] PDF署名証明書の読み込みに失敗しました。`, error)
             return apiErrorResponse(500, API_ERROR_CODES.CONFIGURATION_ERROR, '電子署名を利用できません。', '管理者へ問い合わせてください。', requestId)
         }
 
@@ -60,7 +67,7 @@ export async function POST(request: NextRequest) {
             name: invoice.sealer.name,
             location: '分子生物実験センター',
         })
-        const signedPdf = signpdf.sign(pdfWithPlaceholder, fs.readFileSync(p12Path), { passphrase })
+        const signedPdf = signpdf.sign(pdfWithPlaceholder, certificate, { passphrase })
         const digest = createHash('sha256').update(buffer).digest('hex')
 
         await recordAuditLog({

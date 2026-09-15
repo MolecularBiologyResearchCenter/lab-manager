@@ -220,7 +220,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             toast.success('電子署名付きPDFをダウンロードしました')
         } catch (error) {
             console.error('Failed to generate PDF:', error)
-            alert('PDFの生成に失敗しました')
+            toast.error('エラー：PDFの生成に失敗しました。\n次の操作：画面を更新して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
         } finally {
             // Restore mobile mode if it was enabled
             if (wasMobile) {
