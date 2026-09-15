@@ -11,7 +11,13 @@ export default async function AdminInvoicesPage() {
 
     // Get all invoices
     const invoices = await prisma.invoice.findMany({
-        include: {
+        select: {
+            id: true,
+            fiscalYear: true,
+            quarter: true,
+            invoiceNumber: true,
+            totalAmount: true,
+            status: true,
             user: { select: { name: true, department: true, laboratory: true } },
         },
         orderBy: [

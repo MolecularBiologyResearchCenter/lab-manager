@@ -9,16 +9,36 @@ export async function GET(
     try {
         const user = await getCurrentUser()
         if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            return NextResponse.json({ error: 'ログインが必要です。' }, { status: 401 })
         }
 
         const { id } = await params
 
+        const ownership = await prisma.invoice.findUnique({
+            where: { id },
+            select: { userId: true },
+        })
+
+        if (!ownership) {
+            return NextResponse.json({ error: '請求書が見つかりません。' }, { status: 404 })
+        }
+
+        if (ownership.userId !== user.id && user.role !== 'ADMIN' && user.role !== 'CENTER_DIRECTOR') {
+            return NextResponse.json({ error: 'この請求書を閲覧する権限がありません。' }, { status: 403 })
+        }
+
         const invoice = await prisma.invoice.findUnique({
             where: { id },
-            include: {
+            select: {
+                id: true,
+                fiscalYear: true,
+                quarter: true,
+                totalAmount: true,
+                budgetDepartment: true,
+                budgetCategory: true,
+                budgetCode: true,
                 user: {
-                    select: { id: true, name: true, department: true, laboratory: true },
+                    select: { name: true, department: true, laboratory: true },
                 },
                 sealer: {
                     select: {
@@ -27,20 +47,25 @@ export async function GET(
                     }
                 },
                 items: {
+                    select: {
+                        id: true,
+                        date: true,
+                        itemName: true,
+                        unitPrice: true,
+                        quantity: true,
+                        amount: true,
+                    },
                     orderBy: {
                         date: 'asc',
                     },
                 },
+                sealedBy: true,
+                sealedAt: true,
             },
         })
 
         if (!invoice) {
-            return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
-        }
-
-        // Check if user owns this invoice or is admin or is center director
-        if (invoice.userId !== user.id && user.role !== 'ADMIN' && user.role !== 'CENTER_DIRECTOR') {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+            return NextResponse.json({ error: '請求書が見つかりません。' }, { status: 404 })
         }
 
         return NextResponse.json({
@@ -49,6 +74,6 @@ export async function GET(
         })
     } catch (error) {
         console.error('Failed to fetch invoice:', error)
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+        return NextResponse.json({ error: '請求書の取得中にエラーが発生しました。' }, { status: 500 })
     }
 }

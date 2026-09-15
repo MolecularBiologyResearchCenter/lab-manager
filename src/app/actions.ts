@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation'
 import { recordAuditLog } from '@/lib/audit'
 import {
     clearSessionCookie,
+    credentialUserSelect,
     getAuthenticatedUser,
     requireAdmin,
     requireCenterDirector,
@@ -92,12 +93,9 @@ export async function getDashboardData() {
         },
         select: {
             id: true,
-            userId: true,
-            reagentId: true,
-            quantity: true,
             totalCost: true,
             date: true,
-            reagent: { select: { id: true, name: true, unitPrice: true } },
+            reagent: { select: { name: true } },
         },
         orderBy: {
             date: 'desc',
@@ -119,12 +117,9 @@ export async function getDashboardData() {
         },
         select: {
             id: true,
-            equipmentId: true,
-            userId: true,
             startTime: true,
             endTime: true,
-            phoneNumber: true,
-            equipment: { select: { id: true, name: true, icon: true } },
+            equipment: { select: { name: true } },
         },
         orderBy: {
             startTime: 'asc',
@@ -397,7 +392,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
     try {
         const user = await prisma.user.findUnique({
             where: { email },
-            select: { id: true, password: true },
+            select: credentialUserSelect,
         })
 
         if (!user || !(await verifyPassword(password, user.password))) {
@@ -590,7 +585,7 @@ export async function updateProfile(
 
         const credentials = await prisma.user.findUnique({
             where: { id: currentUser.id },
-            select: { password: true },
+            select: credentialUserSelect,
         })
         if (!credentials || !(await verifyPassword(data.currentPassword, credentials.password))) {
             throw new Error('現在のパスワードが間違っています。')

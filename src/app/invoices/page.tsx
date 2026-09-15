@@ -11,6 +11,14 @@ export default async function InvoicesPage() {
 
     const invoices = await prisma.invoice.findMany({
         where: { userId: user.id },
+        select: {
+            id: true,
+            fiscalYear: true,
+            quarter: true,
+            invoiceNumber: true,
+            totalAmount: true,
+            status: true,
+        },
         orderBy: [{ fiscalYear: 'desc' }, { quarter: 'desc' }],
     })
 
