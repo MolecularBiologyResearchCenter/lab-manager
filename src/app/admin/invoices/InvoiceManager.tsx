@@ -21,8 +21,6 @@ type Invoice = {
     status: string
     invoiceNumber: string
     user: User
-    createdAt: Date
-    updatedAt: Date
 }
 
 type Props = {

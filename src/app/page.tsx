@@ -55,21 +55,19 @@ export default function HomePage() {
                 } = await getDashboardData()
                 setPeriodLabel(`${fiscalYear}年 ${quarterLabel}`)
 
-                const userUsageLogs = fetchedUsageLogs.filter((log: any) => log.userId === currentUser.id)
-                setUsageLogs(userUsageLogs)
-                setTotalCost(userUsageLogs.reduce((sum: number, log: any) => sum + log.totalCost, 0))
+                setUsageLogs(fetchedUsageLogs)
+                setTotalCost(fetchedUsageLogs.reduce((sum: number, log: any) => sum + log.totalCost, 0))
 
-                const userReservations = upcomingReservations.filter((reservation: any) => reservation.userId === currentUser.id)
                 const today = new Date()
                 today.setHours(0, 0, 0, 0)
                 const tomorrow = new Date(today)
                 tomorrow.setDate(tomorrow.getDate() + 1)
 
-                setTodayReservations(userReservations.filter((reservation: any) => {
+                setTodayReservations(upcomingReservations.filter((reservation: any) => {
                     const start = new Date(reservation.startTime)
                     return start >= today && start < tomorrow
                 }))
-                setFutureReservations(userReservations.filter((reservation: any) => new Date(reservation.startTime) >= tomorrow))
+                setFutureReservations(upcomingReservations.filter((reservation: any) => new Date(reservation.startTime) >= tomorrow))
             } catch (err) {
                 console.error('Failed to load dashboard data:', err)
                 setError((err as Error).message)

@@ -22,7 +22,6 @@ interface InvoiceItem {
 }
 
 interface User {
-    id: string
     name: string
     department: string | null
     laboratory: string | null
@@ -36,7 +35,6 @@ interface Invoice {
     budgetDepartment: string | null
     budgetCategory: string | null
     budgetCode: string | null
-    userId: string
     user: User
     items: InvoiceItem[]
     sealedBy: string | null

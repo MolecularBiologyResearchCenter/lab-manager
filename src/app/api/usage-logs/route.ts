@@ -21,9 +21,12 @@ export async function GET() {
                 lte: end,
             },
         },
-        include: {
-            reagent: true,
-            user: { select: { id: true, name: true } },
+        select: {
+            id: true,
+            date: true,
+            quantity: true,
+            totalCost: true,
+            reagent: { select: { id: true, name: true, unitPrice: true } },
         },
         orderBy: {
             date: 'desc',

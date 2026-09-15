@@ -15,6 +15,11 @@ export const currentUserSelect = {
     role: true,
 } as const
 
+export const credentialUserSelect = {
+    id: true,
+    password: true,
+} as const
+
 function getAuthSecret(): string {
     const secret = process.env.AUTH_SECRET
     if (secret) return secret
