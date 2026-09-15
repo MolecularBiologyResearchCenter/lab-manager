@@ -1,19 +1,18 @@
-import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthenticatedUser } from '@/lib/auth'
 import { authorizationStatus } from '@/lib/authorization'
-
-const noStoreHeaders = { 'Cache-Control': 'private, no-store' }
+import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
 
 export async function GET() {
+    const requestId = createRequestId()
     try {
         const currentUser = await getAuthenticatedUser()
         const status = authorizationStatus(currentUser, 'ADMIN')
         if (status === 401) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: noStoreHeaders })
+            return apiErrorResponse(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。', requestId)
         }
         if (status === 403) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: noStoreHeaders })
+            return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この操作を行う権限がありません。', '管理者権限でログインしてください。', requestId)
         }
 
         const users = await prisma.user.findMany({
@@ -33,9 +32,9 @@ export async function GET() {
             },
         })
 
-        return NextResponse.json(users, { headers: noStoreHeaders })
+        return apiSuccessResponse(users, requestId)
     } catch (error) {
-        console.error('Error fetching users:', error)
-        return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500, headers: noStoreHeaders })
+        console.error(`[${requestId}] 利用者一覧の取得に失敗しました。`, error)
+        return apiErrorResponse(500, API_ERROR_CODES.INTERNAL_ERROR, '利用者一覧を取得できませんでした。', '時間をおいて、もう一度お試しください。', requestId)
     }
 }

@@ -11,6 +11,7 @@ import html2canvas from 'html2canvas'
 import { sealInvoice } from '@/app/actions'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ApiClientError, formatApiError, readApiError } from '@/lib/api-client'
 
 interface InvoiceItem {
     id: string
@@ -85,6 +86,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             try {
                 const response = await fetch(`/api/invoices/${id}`)
                 if (!response.ok) {
+                    const apiError = await readApiError(response, '請求書を取得できませんでした。')
+                    toast.error(formatApiError(apiError))
                     router.push('/invoices')
                     return
                 }
@@ -92,6 +95,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 setInvoice(data)
             } catch (error) {
                 console.error('Failed to fetch invoice:', error)
+                const apiError = new ApiClientError({
+                    error: '請求書を取得できませんでした。',
+                    guidance: 'ネットワーク接続を確認して、もう一度お試しください。',
+                    requestId: '取得できませんでした',
+                })
+                toast.error(formatApiError(apiError))
                 router.push('/invoices')
             } finally {
                 setLoading(false)
@@ -185,9 +194,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             const formData = new FormData()
             formData.append('invoiceId', invoice.id)
             formData.append('file', pdfBlob, filename)
-            const signResponse = await fetch('/api/sign-pdf', { method: 'POST', body: formData })
+            let signResponse: Response
+            try {
+                signResponse = await fetch('/api/sign-pdf', { method: 'POST', body: formData })
+            } catch (error) {
+                console.error('PDF署名APIへの接続に失敗しました。', error)
+                toast.error('エラー：PDFの電子署名に失敗しました。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
+                return
+            }
             if (!signResponse.ok) {
-                toast.error('電子署名の付与に失敗したため、PDFはダウンロードされませんでした')
+                const apiError = await readApiError(signResponse, 'PDFの電子署名に失敗しました。')
+                toast.error(`${formatApiError(apiError)}\nPDFはダウンロードされませんでした。`)
                 return
             }
 
