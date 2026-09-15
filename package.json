@@ -6,6 +6,7 @@
     "seed": "npx tsx prisma/seed.ts"
   },
   "scripts": {
+    "create:pdf-certificate": "bash scripts/create-pdf-signing-certificate.sh",
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
