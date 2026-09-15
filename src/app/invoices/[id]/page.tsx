@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import { sealInvoice } from '@/app/actions'
@@ -58,9 +58,16 @@ function formatSealDate(date: Date | string) {
     }).format(new Date(date)).replace(/\//g, '.')
 }
 
+function getSubmissionDeadline(fiscalYear: number, quarter: number) {
+    const deadline = new Date(fiscalYear, quarter * 4, 1)
+    return `${deadline.getFullYear()}年${deadline.getMonth() + 1}月末`
+}
+
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const backHref = searchParams.get('from') === 'admin' ? '/admin/invoices' : '/invoices'
     const invoiceRef = useRef<HTMLDivElement>(null)
     const [invoice, setInvoice] = useState<Invoice | null>(null)
     const [loading, setLoading] = useState(true)
@@ -88,7 +95,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 if (!response.ok) {
                     const apiError = await readApiError(response, '請求書を取得できませんでした。')
                     toast.error(formatApiError(apiError))
-                    router.push('/invoices')
+                    router.push(backHref)
                     return
                 }
                 const data = await response.json()
@@ -101,13 +108,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     requestId: '取得できませんでした',
                 })
                 toast.error(formatApiError(apiError))
-                router.push('/invoices')
+                router.push(backHref)
             } finally {
                 setLoading(false)
             }
         }
         fetchInvoice()
-    }, [id, router])
+    }, [backHref, id, router])
 
     const getQuarterLabel = (quarter: number) => {
         switch (quarter) {
@@ -220,7 +227,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             toast.success('電子署名付きPDFをダウンロードしました')
         } catch (error) {
             console.error('Failed to generate PDF:', error)
-            alert('PDFの生成に失敗しました')
+            toast.error('エラー：PDFの生成に失敗しました。\n次の操作：画面を更新して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
         } finally {
             // Restore mobile mode if it was enabled
             if (wasMobile) {
@@ -267,7 +274,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {/* Navigation */}
             <div className="mb-5 flex flex-col justify-between gap-3 print:hidden sm:flex-row">
                 <div className="flex flex-wrap gap-2">
-                    <Link href="/invoices">
+                    <Link href={backHref}>
                         <Button variant="outline" className="rounded-xl border-slate-300 bg-white">
                             <ArrowLeft className="h-4 w-4" />
                             請求書一覧に戻る
@@ -319,7 +326,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {/* Print Instructions */}
             <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4 print:hidden">
                 <p className="text-sm text-blue-800">
-                    <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、学部経理に提出してください。
+                    <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、{getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください
                 </p>
             </div>
 

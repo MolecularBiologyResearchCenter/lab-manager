@@ -14,7 +14,7 @@
 - データベース：PostgreSQL（提供事業者は本書作成時点では断定しない）
 - 接続設定：`DATABASE_URL`（通常接続）と`DIRECT_URL`（直接接続）を使用
 - 電子印画像：`User.sealImage`
-- PDF署名証明書：`certificate.p12`
+- PDF署名証明書：Vercel環境変数 `PDF_CERT_BASE64` にBase64形式で登録（証明書本体や値はGitHubへ保存しない）
 - Vercel環境変数：`AUTH_SECRET`、SMTP設定などの秘密情報を保持
 
 アプリケーションのソースコード、Prismaスキーマ、移行スクリプト、Vercel設定、データベースのバックアップは、それぞれ復旧に必要な構成要素として管理します。

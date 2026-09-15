@@ -223,7 +223,7 @@ export default function InvoiceManager({ invoices, canGenerate }: Props) {
                                         </p>
                                     </div>
                                     <div className="flex gap-2">
-                                        <Link href={`/invoices/${invoice.id}`}>
+                                        <Link href={`/invoices/${invoice.id}?from=admin`}>
                                             <Button className="btn-primary">
                                                 <FileText className="mr-2 h-4 w-4" />
                                                 詳細を見る
