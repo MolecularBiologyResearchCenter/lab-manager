@@ -8,14 +8,29 @@ const roleLabels: Record<string, string> = {
     USER: '利用者',
 }
 
-export default async function AuditLogsPage() {
+const actionLabels: Record<string, string> = {
+    'invoice.pdf_download': '署名付きPDF取得',
+}
+
+const actionOptions = [
+    ['invoice.pdf_download', '署名付きPDF取得'],
+]
+
+export default async function AuditLogsPage({
+    searchParams,
+}: {
+    searchParams?: Promise<{ action?: string }>
+}) {
     await requireAdmin()
+    const action = (await searchParams)?.action
+    const selectedAction = actionOptions.some(([value]) => value === action) ? action : undefined
 
     let logs: Awaited<ReturnType<typeof prisma.auditLog.findMany>> = []
     let databaseMessage: string | null = null
 
     try {
         logs = await prisma.auditLog.findMany({
+            where: selectedAction ? { action: selectedAction } : undefined,
             orderBy: { createdAt: 'desc' },
             take: 200,
         })
@@ -31,6 +46,14 @@ export default async function AuditLogsPage() {
                     <CardHeader>
                         <CardTitle>監査ログ</CardTitle>
                         <p className="text-sm text-slate-500">誰が、いつ、どの操作を行ったかを最新200件まで表示します。</p>
+                        <form method="get" className="flex items-center gap-2 pt-2">
+                            <label htmlFor="audit-action" className="text-sm font-medium text-slate-700">操作の絞り込み</label>
+                            <select id="audit-action" name="action" defaultValue={selectedAction ?? ''} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+                                <option value="">すべて</option>
+                                {actionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </select>
+                            <button type="submit" className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white">適用</button>
+                        </form>
                     </CardHeader>
                     <CardContent>
                         {databaseMessage && <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">{databaseMessage}</p>}
@@ -52,7 +75,7 @@ export default async function AuditLogsPage() {
                                             <td className="whitespace-nowrap px-3 py-3">{log.createdAt.toLocaleString('ja-JP')}</td>
                                             <td className="px-3 py-3">{log.actorName}</td>
                                             <td className="px-3 py-3">{roleLabels[log.actorRole] ?? log.actorRole}</td>
-                                            <td className="px-3 py-3">{log.action}</td>
+                                            <td className="px-3 py-3">{actionLabels[log.action] ?? log.action}</td>
                                             <td className="px-3 py-3">{log.targetLabel || log.targetType}</td>
                                             <td className="px-3 py-3">{log.summary}</td>
                                         </tr>

@@ -168,44 +168,39 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 heightLeft -= a4Height
             }
 
-            // Download PDF with formatted filename
-            const filename = `請求書_${invoice.fiscalYear}年_${invoice.quarter}期_${invoice.user.name}.pdf`
+            const isSealed = !!invoice.sealedAt
+            const filename = isSealed
+                ? `請求書_${invoice.fiscalYear}年_${invoice.quarter}期_${invoice.user.name}.pdf`
+                : `確認用_未押印_${invoice.fiscalYear}年_${invoice.quarter}期_${invoice.user.name}.pdf`
 
             // Get Blob from jsPDF
             const pdfBlob = pdf.output('blob')
 
-            // Send to server for signing
-            const formData = new FormData()
-            formData.append('file', pdfBlob, filename)
-
-            try {
-                const signResponse = await fetch('/api/sign-pdf', {
-                    method: 'POST',
-                    body: formData,
-                })
-
-                if (!signResponse.ok) {
-                    throw new Error('Signing failed')
-                }
-
-                const signedBlob = await signResponse.blob()
-
-                // Download signed PDF
-                const url = window.URL.createObjectURL(signedBlob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = filename
-                document.body.appendChild(a)
-                a.click()
-                window.URL.revokeObjectURL(url)
-                document.body.removeChild(a)
-
-                toast.success('電子署名付きPDFをダウンロードしました')
-            } catch (signError) {
-                console.error('Signing error, falling back to unsigned:', signError)
-                toast.error('電子署名の付与に失敗しました（署名なしでダウンロードします）')
+            if (!isSealed) {
                 pdf.save(filename)
+                toast.success('未押印の確認用PDFをダウンロードしました')
+                return
             }
+
+            const formData = new FormData()
+            formData.append('invoiceId', invoice.id)
+            formData.append('file', pdfBlob, filename)
+            const signResponse = await fetch('/api/sign-pdf', { method: 'POST', body: formData })
+            if (!signResponse.ok) {
+                toast.error('電子署名の付与に失敗したため、PDFはダウンロードされませんでした')
+                return
+            }
+
+            const signedBlob = await signResponse.blob()
+            const url = window.URL.createObjectURL(signedBlob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+            toast.success('電子署名付きPDFをダウンロードしました')
         } catch (error) {
             console.error('Failed to generate PDF:', error)
             alert('PDFの生成に失敗しました')
