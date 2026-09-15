@@ -308,7 +308,7 @@ export default function ReagentsPage() {
                                                             size="sm"
                                                             variant="destructive"
                                                             onClick={(e) => openDeleteDialog(e, reagent)}
-                                                            className="flex items-center gap-1"
+                                                            className="flex items-center gap-1 bg-red-600 text-white hover:bg-red-700"
                                                         >
                                                             <Trash2 className="h-3 w-3" />
                                                             削除

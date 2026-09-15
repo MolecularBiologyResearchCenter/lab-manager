@@ -316,7 +316,7 @@ export default function EquipmentPage() {
                                         type="button"
                                         variant="destructive"
                                         onClick={openEditingDeleteDialog}
-                                        className="ml-auto flex items-center gap-2"
+                                        className="ml-auto flex items-center gap-2 bg-red-600 text-white hover:bg-red-700"
                                     >
                                         <Trash2 className="h-4 w-4" />
                                         この機器を削除
@@ -386,7 +386,7 @@ export default function EquipmentPage() {
                                                     size="sm"
                                                     variant="destructive"
                                                     onClick={(e) => openDeleteDialog(e, equipment)}
-                                                    className="flex items-center gap-1"
+                                                    className="flex items-center gap-1 bg-red-600 text-white hover:bg-red-700"
                                                 >
                                                     <Trash2 className="h-3 w-3" />
                                                     削除
