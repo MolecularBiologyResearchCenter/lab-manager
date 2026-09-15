@@ -40,7 +40,8 @@ export default function EquipmentPage() {
 
     // Delete dialog state
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-    const [equipmentToDelete, setEquipmentToDelete] = useState<string | null>(null)
+    const [equipmentToDelete, setEquipmentToDelete] = useState<Equipment | null>(null)
+    const [deleteNameConfirmation, setDeleteNameConfirmation] = useState('')
 
     // Form states
     const [formName, setFormName] = useState('')
@@ -106,17 +107,18 @@ export default function EquipmentPage() {
         }
     }
 
-    function openDeleteDialog(e: React.MouseEvent, id: string) {
+    function openDeleteDialog(e: React.MouseEvent, equipment: Equipment) {
         e.preventDefault()
         e.stopPropagation()
-        setEquipmentToDelete(id)
+        setEquipmentToDelete(equipment)
+        setDeleteNameConfirmation('')
         setDeleteDialogOpen(true)
     }
 
     async function confirmDelete() {
-        if (!equipmentToDelete) return
+        if (!equipmentToDelete || deleteNameConfirmation !== equipmentToDelete.name) return
 
-        const result = await deleteEquipment(equipmentToDelete)
+        const result = await deleteEquipment(equipmentToDelete.id)
         if (result.success) {
             loadData()
         } else {
@@ -125,11 +127,19 @@ export default function EquipmentPage() {
 
         setDeleteDialogOpen(false)
         setEquipmentToDelete(null)
+        setDeleteNameConfirmation('')
     }
 
     function cancelDelete() {
         setDeleteDialogOpen(false)
         setEquipmentToDelete(null)
+        setDeleteNameConfirmation('')
+    }
+
+    function openEditingDeleteDialog(e: React.MouseEvent) {
+        if (!editingId) return
+        const equipment = equipmentList.find((item) => item.id === editingId)
+        if (equipment) openDeleteDialog(e, equipment)
     }
 
     function startEdit(equipment: Equipment) {
@@ -301,6 +311,17 @@ export default function EquipmentPage() {
                                     <X className="h-4 w-4" />
                                     キャンセル
                                 </Button>
+                                {editingId && (
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        onClick={openEditingDeleteDialog}
+                                        className="ml-auto flex items-center gap-2 bg-red-600 text-white hover:bg-red-700"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        この機器を削除
+                                    </Button>
+                                )}
                             </div>
                         </form>
                     </CardContent>
@@ -364,8 +385,8 @@ export default function EquipmentPage() {
                                                 <Button
                                                     size="sm"
                                                     variant="destructive"
-                                                    onClick={(e) => openDeleteDialog(e, equipment.id)}
-                                                    className="flex items-center gap-1"
+                                                    onClick={(e) => openDeleteDialog(e, equipment)}
+                                                    className="flex items-center gap-1 bg-red-600 text-white hover:bg-red-700"
                                                 >
                                                     <Trash2 className="h-3 w-3" />
                                                     削除
@@ -381,19 +402,38 @@ export default function EquipmentPage() {
             </Card>
 
             {/* Delete Confirmation Dialog */}
-            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
+                setDeleteDialogOpen(open)
+                if (!open) {
+                    setEquipmentToDelete(null)
+                    setDeleteNameConfirmation('')
+                }
+            }}>
                 <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white">
                     <DialogHeader>
                         <DialogTitle>削除の確認</DialogTitle>
                         <DialogDescription>
-                            本当にこの機器を削除しますか?この操作は取り消せません。
+                            本当に次の機器を削除しますか？この操作は取り消せません。
                         </DialogDescription>
                     </DialogHeader>
+                    <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+                        <p><span className="font-medium">機器名：</span>{equipmentToDelete?.name}</p>
+                    </div>
+                    <div className="space-y-2">
+                        <label htmlFor="equipment-delete-confirmation" className="text-sm font-medium">確認のため機器名を入力してください</label>
+                        <input
+                            id="equipment-delete-confirmation"
+                            value={deleteNameConfirmation}
+                            onChange={(event) => setDeleteNameConfirmation(event.target.value)}
+                            placeholder={equipmentToDelete?.name}
+                            className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        />
+                    </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={cancelDelete}>
                             キャンセル
                         </Button>
-                        <Button variant="destructive" onClick={confirmDelete}>
+                        <Button variant="destructive" onClick={confirmDelete} disabled={!equipmentToDelete || deleteNameConfirmation !== equipmentToDelete.name}>
                             削除
                         </Button>
                     </DialogFooter>

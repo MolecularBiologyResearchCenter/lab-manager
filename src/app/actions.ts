@@ -615,6 +615,14 @@ export async function updateProfile(
 export async function sealInvoice(invoiceId: string) {
     const currentUser = await requireCenterDirector()
 
+    const director = await prisma.user.findUnique({
+        where: { id: currentUser.id },
+        select: { sealImage: true },
+    })
+    if (!director?.sealImage) {
+        throw new Error('センター長の電子印が登録されていないため、押印できません。管理者に電子印の登録を依頼してください。')
+    }
+
     const invoice = await prisma.invoice.findUnique({
         where: { id: invoiceId },
         select: { id: true },
@@ -624,13 +632,17 @@ export async function sealInvoice(invoiceId: string) {
         throw new Error('請求書が見つかりません。')
     }
 
-    await prisma.invoice.update({
-        where: { id: invoiceId },
+    const result = await prisma.invoice.updateMany({
+        where: { id: invoiceId, sealedAt: null },
         data: {
             sealedBy: currentUser.id,
             sealedAt: new Date(),
         },
     })
+
+    if (result.count === 0) {
+        throw new Error('この請求書はすでに押印済みです。')
+    }
 
     await recordAuditLog({
         actor: currentUser,

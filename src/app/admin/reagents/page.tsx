@@ -35,7 +35,8 @@ export default function ReagentsPage() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [showAddForm, setShowAddForm] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-    const [reagentToDelete, setReagentToDelete] = useState<string | null>(null)
+    const [reagentToDelete, setReagentToDelete] = useState<Reagent | null>(null)
+    const [deleteNameConfirmation, setDeleteNameConfirmation] = useState('')
 
     // Form states
     const [formName, setFormName] = useState('')
@@ -89,17 +90,18 @@ export default function ReagentsPage() {
         }
     }
 
-    function openDeleteDialog(e: React.MouseEvent, id: string) {
+    function openDeleteDialog(e: React.MouseEvent, reagent: Reagent) {
         e.preventDefault()
         e.stopPropagation()
-        setReagentToDelete(id)
+        setReagentToDelete(reagent)
+        setDeleteNameConfirmation('')
         setDeleteDialogOpen(true)
     }
 
     async function confirmDelete() {
-        if (!reagentToDelete) return
+        if (!reagentToDelete || deleteNameConfirmation !== reagentToDelete.name) return
 
-        const result = await deleteReagent(reagentToDelete)
+        const result = await deleteReagent(reagentToDelete.id)
         if (result.success) {
             loadReagents()
         } else {
@@ -108,11 +110,13 @@ export default function ReagentsPage() {
 
         setDeleteDialogOpen(false)
         setReagentToDelete(null)
+        setDeleteNameConfirmation('')
     }
 
     function cancelDelete() {
         setDeleteDialogOpen(false)
         setReagentToDelete(null)
+        setDeleteNameConfirmation('')
     }
 
     function startEdit(reagent: Reagent) {
@@ -303,8 +307,8 @@ export default function ReagentsPage() {
                                                         <Button
                                                             size="sm"
                                                             variant="destructive"
-                                                            onClick={(e) => openDeleteDialog(e, reagent.id)}
-                                                            className="flex items-center gap-1"
+                                                            onClick={(e) => openDeleteDialog(e, reagent)}
+                                                            className="flex items-center gap-1 bg-red-600 text-white hover:bg-red-700"
                                                         >
                                                             <Trash2 className="h-3 w-3" />
                                                             削除
@@ -322,19 +326,39 @@ export default function ReagentsPage() {
             </Card>
 
             {/* Delete Confirmation Dialog */}
-            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <Dialog open={deleteDialogOpen} onOpenChange={(open) => {
+                setDeleteDialogOpen(open)
+                if (!open) {
+                    setReagentToDelete(null)
+                    setDeleteNameConfirmation('')
+                }
+            }}>
                 <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white">
                     <DialogHeader>
                         <DialogTitle>削除の確認</DialogTitle>
                         <DialogDescription>
-                            本当にこの有料サービスを削除しますか?この操作は取り消せません。
+                            本当に次の有料サービスを削除しますか？この操作は取り消せません。
                         </DialogDescription>
                     </DialogHeader>
+                    <div className="space-y-2 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+                        <p><span className="font-medium">サービス名：</span>{reagentToDelete?.name}</p>
+                        <p><span className="font-medium">単価：</span>¥{reagentToDelete?.unitPrice.toLocaleString()}</p>
+                    </div>
+                    <div className="space-y-2">
+                        <label htmlFor="reagent-delete-confirmation" className="text-sm font-medium">確認のためサービス名を入力してください</label>
+                        <input
+                            id="reagent-delete-confirmation"
+                            value={deleteNameConfirmation}
+                            onChange={(event) => setDeleteNameConfirmation(event.target.value)}
+                            placeholder={reagentToDelete?.name}
+                            className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        />
+                    </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={cancelDelete}>
                             キャンセル
                         </Button>
-                        <Button variant="destructive" onClick={confirmDelete}>
+                        <Button variant="destructive" onClick={confirmDelete} disabled={!reagentToDelete || deleteNameConfirmation !== reagentToDelete.name}>
                             削除
                         </Button>
                     </DialogFooter>
