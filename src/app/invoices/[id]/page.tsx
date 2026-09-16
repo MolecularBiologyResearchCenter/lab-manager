@@ -143,8 +143,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         }
 
         try {
-            // Capture the invoice card as canvas
-            const canvas = await html2canvas(invoiceRef.current, {
+            const captureOptions = {
                 // Keep the generated upload below the signing endpoint's
                 // 10 MB limit without introducing JPEG transparency artifacts.
                 scale: 1,
@@ -158,7 +157,46 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 imageTimeout: 0,
                 windowWidth: 1280, // Force desktop width
                 windowHeight: 720
-            })
+            }
+
+            // Safari and some embedded browsers can return an all-white canvas
+            // when foreignObjectRendering is used. Retry with html2canvas's
+            // normal renderer before creating or signing the PDF.
+            let canvas = await html2canvas(invoiceRef.current, captureOptions)
+            const context = canvas.getContext('2d', { willReadFrequently: true })
+            const pixels = context?.getImageData(0, 0, canvas.width, canvas.height).data
+            let hasVisibleContent = false
+            if (pixels) {
+                for (let index = 0; index < pixels.length; index += 4 * 64) {
+                    if (pixels[index] < 245 || pixels[index + 1] < 245 || pixels[index + 2] < 245) {
+                        hasVisibleContent = true
+                        break
+                    }
+                }
+            }
+
+            if (!hasVisibleContent) {
+                canvas = await html2canvas(invoiceRef.current, {
+                    ...captureOptions,
+                    foreignObjectRendering: false,
+                })
+            }
+
+            const finalContext = canvas.getContext('2d', { willReadFrequently: true })
+            const finalPixels = finalContext?.getImageData(0, 0, canvas.width, canvas.height).data
+            let hasFinalContent = false
+            if (finalPixels) {
+                for (let index = 0; index < finalPixels.length; index += 4 * 64) {
+                    if (finalPixels[index] < 245 || finalPixels[index + 1] < 245 || finalPixels[index + 2] < 245) {
+                        hasFinalContent = true
+                        break
+                    }
+                }
+            }
+
+            if (!hasFinalContent) {
+                throw new Error('請求書の画像化に失敗しました')
+            }
 
             // A4 dimensions in mm
             const a4Width = 210
