@@ -211,6 +211,53 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         }
     }
 
+    const handleServerDownloadPDF = async () => {
+        if (!invoice) return
+        setDownloading(true)
+        try {
+            const response = await fetch(`/api/invoices/${invoice.id}/pdf`, { cache: 'no-store' })
+            if (!response.ok) {
+                const apiError = await readApiError(response, '請求書PDFを生成できませんでした。')
+                toast.error(formatApiError(apiError))
+                return
+            }
+            const pdfBlob = await response.blob()
+            const filename = `請求書_${invoice.fiscalYear}年_${invoice.quarter}期_${invoice.user.name}.pdf`
+            if (!invoice.sealedAt) {
+                const url = window.URL.createObjectURL(pdfBlob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = `確認用_未押印_${filename}`
+                link.click()
+                window.URL.revokeObjectURL(url)
+                toast.success('未押印の確認用PDFをダウンロードしました')
+                return
+            }
+            const formData = new FormData()
+            formData.append('invoiceId', invoice.id)
+            formData.append('file', pdfBlob, filename)
+            const signResponse = await fetch('/api/sign-pdf', { method: 'POST', body: formData })
+            if (!signResponse.ok) {
+                const apiError = await readApiError(signResponse, 'PDFの電子署名に失敗しました。')
+                toast.error(`${formatApiError(apiError)}\nPDFはダウンロードされませんでした。`)
+                return
+            }
+            const signedBlob = await signResponse.blob()
+            const url = window.URL.createObjectURL(signedBlob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = filename
+            link.click()
+            window.URL.revokeObjectURL(url)
+            toast.success('電子署名付きPDFをダウンロードしました')
+        } catch (error) {
+            console.error('サーバー側PDF生成に失敗しました。', error)
+            toast.error('エラー：PDFを生成できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
+        } finally {
+            setDownloading(false)
+        }
+    }
+
     const handleDownloadPDF = async () => {
         if (!invoiceRef.current || !invoice) return
 
@@ -424,7 +471,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                         if (canDownload) {
                             return (
                                 <Button
-                                    onClick={handleDownloadPDF}
+                                    onClick={handleServerDownloadPDF}
                                     disabled={downloading}
                                     className="rounded-xl bg-blue-700 text-white hover:bg-blue-800"
                                 >
