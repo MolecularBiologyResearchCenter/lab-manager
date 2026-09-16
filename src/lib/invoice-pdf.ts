@@ -10,7 +10,7 @@ type InvoicePdfData = {
     sealer: { name: string; sealImage: string | null } | null
 }
 
-const fontPath = path.join(process.cwd(), 'node_modules/@fontsource/noto-sans-jp/files/noto-sans-jp-japanese-400-normal.woff2')
+const fontPath = path.join(process.cwd(), 'public/fonts/noto-sans-jp-japanese-400-normal.woff2')
 
 function quarterLabel(quarter: number) {
     return quarter === 1 ? '1～4月' : quarter === 2 ? '5～8月' : quarter === 3 ? '9～12月' : `${quarter}期`
