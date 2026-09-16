@@ -151,6 +151,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff',
+                // Tailwind v4 emits modern color functions such as oklch().
+                // foreignObjectRendering lets the browser render those styles
+                // instead of making html2canvas parse them itself.
+                foreignObjectRendering: true,
+                imageTimeout: 0,
                 windowWidth: 1280, // Force desktop width
                 windowHeight: 720
             })
@@ -177,14 +182,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             let position = 0
 
             // Add first page
-            pdf.addImage(imgData, 'PNG', 0, position, a4Width, imgHeight)
+            pdf.addImage(imgData, 'JPEG', 0, position, a4Width, imgHeight, undefined, 'MEDIUM')
             heightLeft -= a4Height
 
             // Add subsequent pages if content overflows
             while (heightLeft > 1) {
                 position = heightLeft - imgHeight
                 pdf.addPage()
-                pdf.addImage(imgData, 'PNG', 0, position, a4Width, imgHeight)
+                pdf.addImage(imgData, 'JPEG', 0, position, a4Width, imgHeight, undefined, 'MEDIUM')
                 heightLeft -= a4Height
             }
 
