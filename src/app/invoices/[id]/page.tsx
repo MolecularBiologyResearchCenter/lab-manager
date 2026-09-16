@@ -145,7 +145,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         try {
             // Capture the invoice card as canvas
             const canvas = await html2canvas(invoiceRef.current, {
-                scale: 2,
+                // Keep the generated upload comfortably below the signing
+                // endpoint's 10 MB limit while retaining print-ready detail.
+                scale: 1.5,
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff',
@@ -169,7 +171,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 format: 'a4'
             })
 
-            const imgData = canvas.toDataURL('image/png')
+            // PNG makes a full-page screenshot unnecessarily large. JPEG is
+            // sufficient for the printed invoice and keeps the signed upload
+            // below the API size limit.
+            const imgData = canvas.toDataURL('image/jpeg', 0.9)
 
             // Calculate height to maintain aspect ratio
             const imgHeight = (canvas.height * a4Width) / canvas.width
@@ -178,14 +183,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             let position = 0
 
             // Add first page
-            pdf.addImage(imgData, 'PNG', 0, position, a4Width, imgHeight)
+            pdf.addImage(imgData, 'JPEG', 0, position, a4Width, imgHeight, undefined, 'MEDIUM')
             heightLeft -= a4Height
 
             // Add subsequent pages if content overflows
             while (heightLeft > 1) {
                 position = heightLeft - imgHeight
                 pdf.addPage()
-                pdf.addImage(imgData, 'PNG', 0, position, a4Width, imgHeight)
+                pdf.addImage(imgData, 'JPEG', 0, position, a4Width, imgHeight, undefined, 'MEDIUM')
                 heightLeft -= a4Height
             }
 
