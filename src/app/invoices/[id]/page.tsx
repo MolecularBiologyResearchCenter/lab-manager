@@ -145,9 +145,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         try {
             // Capture the invoice card as canvas
             const canvas = await html2canvas(invoiceRef.current, {
-                // Keep the generated upload comfortably below the signing
-                // endpoint's 10 MB limit while retaining print-ready detail.
-                scale: 1.5,
+                // Keep the generated upload below the signing endpoint's
+                // 10 MB limit without introducing JPEG transparency artifacts.
+                scale: 1,
                 useCORS: true,
                 logging: false,
                 backgroundColor: '#ffffff',
@@ -171,10 +171,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 format: 'a4'
             })
 
-            // PNG makes a full-page screenshot unnecessarily large. JPEG is
-            // sufficient for the printed invoice and keeps the signed upload
-            // below the API size limit.
-            const imgData = canvas.toDataURL('image/jpeg', 0.9)
+            // PNG preserves the white invoice background and Japanese text
+            // without the black transparent-area artifacts seen with JPEG.
+            const imgData = canvas.toDataURL('image/png')
 
             // Calculate height to maintain aspect ratio
             const imgHeight = (canvas.height * a4Width) / canvas.width
