@@ -182,14 +182,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             let position = 0
 
             // Add first page
-            pdf.addImage(imgData, 'JPEG', 0, position, a4Width, imgHeight, undefined, 'MEDIUM')
+            pdf.addImage(imgData, 'PNG', 0, position, a4Width, imgHeight, undefined, 'MEDIUM')
             heightLeft -= a4Height
 
             // Add subsequent pages if content overflows
             while (heightLeft > 1) {
                 position = heightLeft - imgHeight
                 pdf.addPage()
-                pdf.addImage(imgData, 'JPEG', 0, position, a4Width, imgHeight, undefined, 'MEDIUM')
+                pdf.addImage(imgData, 'PNG', 0, position, a4Width, imgHeight, undefined, 'MEDIUM')
                 heightLeft -= a4Height
             }
 
