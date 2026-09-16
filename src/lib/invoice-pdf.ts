@@ -18,7 +18,7 @@ function quarterLabel(quarter: number) {
 
 export function createInvoicePdf(invoice: InvoicePdfData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-        const document = new PDFDocument({ size: 'A4', margin: 42, compress: true })
+        const document = new PDFDocument({ size: 'A4', margin: 42, compress: true, font: fontPath })
         const chunks: Buffer[] = []
         document.on('data', (chunk: Buffer) => chunks.push(chunk))
         document.on('end', () => resolve(Buffer.concat(chunks)))
