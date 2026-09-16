@@ -253,7 +253,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     // Ignore the pale card border. A real invoice contains
                     // dark text; otherwise the foreign-object renderer may
                     // have captured only the surrounding frame.
-                    if (pixels[index] < 160 || pixels[index + 1] < 160 || pixels[index + 2] < 160) {
+                    if (pixels[index] < 100 || pixels[index + 1] < 100 || pixels[index + 2] < 100) {
                         hasVisibleContent = true
                         break
                     }
@@ -272,7 +272,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             let hasFinalContent = false
             if (finalPixels) {
                 for (let index = 0; index < finalPixels.length; index += 4 * 64) {
-                    if (finalPixels[index] < 160 || finalPixels[index + 1] < 160 || finalPixels[index + 2] < 160) {
+                    if (finalPixels[index] < 100 || finalPixels[index + 1] < 100 || finalPixels[index + 2] < 100) {
                         hasFinalContent = true
                         break
                     }
