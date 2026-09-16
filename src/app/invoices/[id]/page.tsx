@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, use } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
@@ -61,6 +61,10 @@ function formatSealDate(date: Date | string) {
 function getSubmissionDeadline(fiscalYear: number, quarter: number) {
     const deadline = new Date(fiscalYear, quarter * 4, 1)
     return `${deadline.getFullYear()}年${deadline.getMonth() + 1}月末`
+}
+
+function sanitizeFilenamePart(value: string) {
+    return value.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim() || '利用者'
 }
 
 function drawInvoiceFallback(invoice: Invoice) {
@@ -211,53 +215,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         }
     }
 
-    const handleServerDownloadPDF = async () => {
-        if (!invoice) return
-        setDownloading(true)
-        try {
-            const response = await fetch(`/api/invoices/${invoice.id}/pdf`, { cache: 'no-store' })
-            if (!response.ok) {
-                const apiError = await readApiError(response, '請求書PDFを生成できませんでした。')
-                toast.error(formatApiError(apiError))
-                return
-            }
-            const pdfBlob = await response.blob()
-            const filename = `請求書_${invoice.fiscalYear}年_${invoice.quarter}期_${invoice.user.name}.pdf`
-            if (!invoice.sealedAt) {
-                const url = window.URL.createObjectURL(pdfBlob)
-                const link = document.createElement('a')
-                link.href = url
-                link.download = `確認用_未押印_${filename}`
-                link.click()
-                window.URL.revokeObjectURL(url)
-                toast.success('未押印の確認用PDFをダウンロードしました')
-                return
-            }
-            const formData = new FormData()
-            formData.append('invoiceId', invoice.id)
-            formData.append('file', pdfBlob, filename)
-            const signResponse = await fetch('/api/sign-pdf', { method: 'POST', body: formData })
-            if (!signResponse.ok) {
-                const apiError = await readApiError(signResponse, 'PDFの電子署名に失敗しました。')
-                toast.error(`${formatApiError(apiError)}\nPDFはダウンロードされませんでした。`)
-                return
-            }
-            const signedBlob = await signResponse.blob()
-            const url = window.URL.createObjectURL(signedBlob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = filename
-            link.click()
-            window.URL.revokeObjectURL(url)
-            toast.success('電子署名付きPDFをダウンロードしました')
-        } catch (error) {
-            console.error('サーバー側PDF生成に失敗しました。', error)
-            toast.error('エラー：PDFを生成できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
-        } finally {
-            setDownloading(false)
-        }
-    }
-
     const handleDownloadPDF = async () => {
         if (!invoiceRef.current || !invoice) return
 
@@ -329,7 +286,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             if (!hasFinalContent) {
                 // The DOM capture can fail in embedded browsers even though
                 // the invoice is visible. Draw the same invoice data directly
-                // so the downloaded PDF remains usable and signable.
+                // so the downloaded PDF remains usable in embedded browsers.
                 canvas = drawInvoiceFallback(invoice)
             }
 
@@ -367,9 +324,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             }
 
             const isSealed = !!invoice.sealedAt
+            const safeUserName = sanitizeFilenamePart(invoice.user.name)
             const filename = isSealed
-                ? `請求書_${invoice.fiscalYear}年_${invoice.quarter}期_${invoice.user.name}.pdf`
-                : `確認用_未押印_${invoice.fiscalYear}年_${invoice.quarter}期_${invoice.user.name}.pdf`
+                ? `請求書_${invoice.fiscalYear}年_${invoice.quarter}期_${safeUserName}.pdf`
+                : `確認用_未押印_${invoice.fiscalYear}年_${invoice.quarter}期_${safeUserName}.pdf`
 
             // Get Blob from jsPDF
             const pdfBlob = pdf.output('blob')
@@ -381,24 +339,23 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             }
 
             const formData = new FormData()
-            formData.append('invoiceId', invoice.id)
             formData.append('file', pdfBlob, filename)
-            let signResponse: Response
+            let downloadResponse: Response
             try {
-                signResponse = await fetch('/api/sign-pdf', { method: 'POST', body: formData })
+                downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, { method: 'POST', body: formData, cache: 'no-store' })
             } catch (error) {
-                console.error('PDF署名APIへの接続に失敗しました。', error)
-                toast.error('エラー：PDFの電子署名に失敗しました。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
+                console.error('押印済みPDF確認APIへの接続に失敗しました。', error)
+                toast.error('エラー：押印済みPDFを取得できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
                 return
             }
-            if (!signResponse.ok) {
-                const apiError = await readApiError(signResponse, 'PDFの電子署名に失敗しました。')
+            if (!downloadResponse.ok) {
+                const apiError = await readApiError(downloadResponse, '押印済みPDFを取得できませんでした。')
                 toast.error(`${formatApiError(apiError)}\nPDFはダウンロードされませんでした。`)
                 return
             }
 
-            const signedBlob = await signResponse.blob()
-            const url = window.URL.createObjectURL(signedBlob)
+            const approvedBlob = await downloadResponse.blob()
+            const url = window.URL.createObjectURL(approvedBlob)
             const a = document.createElement('a')
             a.href = url
             a.download = filename
@@ -406,7 +363,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             a.click()
             window.URL.revokeObjectURL(url)
             document.body.removeChild(a)
-            toast.success('電子署名付きPDFをダウンロードしました')
+            toast.success('押印済みPDFをダウンロードしました')
         } catch (error) {
             console.error('Failed to generate PDF:', error)
             toast.error('エラー：PDFの生成に失敗しました。\n次の操作：画面を更新して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
@@ -471,7 +428,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                         if (canDownload) {
                             return (
                                 <Button
-                                    onClick={handleServerDownloadPDF}
+                                    onClick={handleDownloadPDF}
                                     disabled={downloading}
                                     className="rounded-xl bg-blue-700 text-white hover:bg-blue-800"
                                 >
