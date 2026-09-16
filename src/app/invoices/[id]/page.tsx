@@ -305,23 +305,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             // without the black transparent-area artifacts seen with JPEG.
             const imgData = canvas.toDataURL('image/png')
 
-            // Calculate height to maintain aspect ratio
-            const imgHeight = (canvas.height * a4Width) / canvas.width
-
-            let heightLeft = imgHeight
-            let position = 0
-
-            // Add first page
-            pdf.addImage(imgData, 'PNG', 0, position, a4Width, imgHeight)
-            heightLeft -= a4Height
-
-            // Add subsequent pages if content overflows
-            while (heightLeft > 1) {
-                position = heightLeft - imgHeight
-                pdf.addPage()
-                pdf.addImage(imgData, 'PNG', 0, position, a4Width, imgHeight)
-                heightLeft -= a4Height
-            }
+            // Always produce one A4 page. The captured DOM can be a few
+            // pixels taller than the physical A4 card because of browser
+            // rounding and mobile/desktop layout differences. Splitting the
+            // same image into multiple pages creates a mostly blank second
+            // page, so fit the complete invoice within the page instead.
+            const fitScale = Math.min(a4Width / canvas.width, a4Height / canvas.height)
+            const renderWidth = canvas.width * fitScale
+            const renderHeight = canvas.height * fitScale
+            const left = (a4Width - renderWidth) / 2
+            const top = (a4Height - renderHeight) / 2
+            pdf.addImage(imgData, 'PNG', left, top, renderWidth, renderHeight)
 
             const isSealed = !!invoice.sealedAt
             const safeUserName = sanitizeFilenamePart(invoice.user.name)
