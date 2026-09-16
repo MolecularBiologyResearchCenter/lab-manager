@@ -63,6 +63,88 @@ function getSubmissionDeadline(fiscalYear: number, quarter: number) {
     return `${deadline.getFullYear()}年${deadline.getMonth() + 1}月末`
 }
 
+function drawInvoiceFallback(invoice: Invoice) {
+    const canvas = document.createElement('canvas')
+    canvas.width = 794
+    canvas.height = 1123
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('PDF用キャンバスを作成できませんでした')
+
+    const left = 56
+    const right = 738
+    const width = right - left
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.fillStyle = '#111827'
+    context.strokeStyle = '#94a3b8'
+    context.lineWidth = 1
+    context.textAlign = 'left'
+    context.font = 'bold 20px "Hiragino Sans", "Meiryo", sans-serif'
+    context.textAlign = 'center'
+    context.fillText(`${invoice.fiscalYear}年 ${getQuarterLabelStatic(invoice.quarter)} 分子生物実験センター利用料`, canvas.width / 2, 54)
+    context.font = '16px "Hiragino Sans", "Meiryo", sans-serif'
+    context.fillText('個人別請求書（研究用）', canvas.width / 2, 82)
+    context.textAlign = 'left'
+
+    const drawRow = (y: number, label: string, value: string) => {
+        context.strokeRect(left, y, width, 34)
+        context.font = 'bold 13px "Hiragino Sans", "Meiryo", sans-serif'
+        context.fillText(label, left + 10, y + 22)
+        context.font = '13px "Hiragino Sans", "Meiryo", sans-serif'
+        context.fillText(value, left + 130, y + 22)
+    }
+    drawRow(112, '学部', invoice.user.department ?? '')
+    drawRow(146, '所属', invoice.user.laboratory ?? '')
+    drawRow(180, '利用者', invoice.user.name)
+
+    const tableTop = 238
+    const columns = [left, 150, 280, 520, 600, right]
+    const headers = ['日付', '利用者', '利用項目', '単価', '個数', '合計']
+    context.font = 'bold 11px "Hiragino Sans", "Meiryo", sans-serif'
+    headers.forEach((header, index) => {
+        context.fillStyle = '#eff6ff'
+        context.fillRect(columns[index], tableTop, columns[index + 1] - columns[index], 28)
+        context.strokeRect(columns[index], tableTop, columns[index + 1] - columns[index], 28)
+        context.fillStyle = '#111827'
+        context.fillText(header, columns[index] + 7, tableTop + 19)
+    })
+    context.font = '10px "Hiragino Sans", "Meiryo", sans-serif'
+    invoice.items.forEach((item, index) => {
+        const y = tableTop + 28 + index * 26
+        const values = [new Intl.DateTimeFormat('ja-JP').format(new Date(item.date)), invoice.user.name, item.itemName, `¥${item.unitPrice.toLocaleString()}`, String(item.quantity), `¥${item.amount.toLocaleString()}`]
+        values.forEach((value, valueIndex) => {
+            context.strokeRect(columns[valueIndex], y, columns[valueIndex + 1] - columns[valueIndex], 26)
+            context.fillText(value, columns[valueIndex] + 7, y + 17)
+        })
+    })
+    const totalY = tableTop + 50 + invoice.items.length * 26
+    context.font = 'bold 14px "Hiragino Sans", "Meiryo", sans-serif'
+    context.strokeRect(left, totalY, width, 42)
+    context.fillText('利用料金合計', left + 10, totalY + 27)
+    context.textAlign = 'right'
+    context.font = 'bold 20px "Hiragino Sans", "Meiryo", sans-serif'
+    context.fillText(`¥${invoice.totalAmount.toLocaleString()}`, right - 10, totalY + 29)
+    context.textAlign = 'left'
+    context.font = '12px "Hiragino Sans", "Meiryo", sans-serif'
+    context.strokeRect(left, totalY + 70, width, 150)
+    context.fillText('支出予算（記載必須）', left + 12, totalY + 96)
+    context.fillText('●予算支出部門　________________ 学部', left + 12, totalY + 124)
+    context.fillText('●予算科目　①一般研究費　②実習費　③受託　④助成', left + 12, totalY + 152)
+    context.fillText('●配分先コード　________________', left + 12, totalY + 180)
+    context.fillText(`振込先　分子生物実験センター　　受注 No`, left + 12, totalY + 208)
+    context.textAlign = 'right'
+    context.font = 'bold 14px "Hiragino Sans", "Meiryo", sans-serif'
+    context.fillText('分子生物実験センター長', right - 12, 1014)
+    context.font = '16px "Hiragino Sans", "Meiryo", sans-serif'
+    context.fillText(invoice.sealer?.name ?? '', right - 12, 1042)
+    context.textAlign = 'left'
+    return canvas
+}
+
+function getQuarterLabelStatic(quarter: number) {
+    return quarter === 1 ? '1～4月' : quarter === 2 ? '5～8月' : quarter === 3 ? '9～12月' : `${quarter}期`
+}
+
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const router = useRouter()
@@ -198,7 +280,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             }
 
             if (!hasFinalContent) {
-                throw new Error('請求書の画像化に失敗しました')
+                // The DOM capture can fail in embedded browsers even though
+                // the invoice is visible. Draw the same invoice data directly
+                // so the downloaded PDF remains usable and signable.
+                canvas = drawInvoiceFallback(invoice)
             }
 
             // A4 dimensions in mm
