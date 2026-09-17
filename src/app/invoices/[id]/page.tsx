@@ -110,7 +110,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 const apiError = new ApiClientError({
                     error: '請求書を取得できませんでした。',
                     guidance: 'ネットワーク接続を確認して、もう一度お試しください。',
-                    requestId: '取得できませんでした',
+                    requestId: '問い合わせ番号を取得できませんでした',
                 })
                 toast.error(formatApiError(apiError))
                 router.push(backHref)
@@ -252,7 +252,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, { method: 'POST', body: formData, cache: 'no-store' })
             } catch (error) {
                 console.error('押印済みPDF確認APIへの接続に失敗しました。', error)
-                toast.error('エラー：押印済みPDFを取得できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
+                toast.error('エラー：押印済みPDFを取得できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
                 return
             }
             if (!downloadResponse.ok) {
@@ -273,7 +273,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             toast.success('押印済みPDFをダウンロードしました')
         } catch (error) {
             console.error('Failed to generate PDF:', error)
-            toast.error('エラー：PDFの生成に失敗しました。\n次の操作：画面を更新して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
+            toast.error('エラー：PDFの生成に失敗しました。\n次の操作：画面を更新して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
         } finally {
             setDownloading(false)
         }
