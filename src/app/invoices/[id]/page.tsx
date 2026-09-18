@@ -438,9 +438,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                         ['所属', invoice.user.laboratory || '生物学'],
                         ['利用者', invoice.user.name],
                     ].map(([label, value], index) => (
-                        <div key={label} style={{ padding: '8px', minHeight: '34px', borderTop: index > 1 ? '1px solid #94a3b8' : undefined, borderLeft: index % 2 === 1 ? '1px solid #94a3b8' : undefined }}>
+                        <div key={label} style={{ display: 'flex', alignItems: 'center', padding: '8px', minHeight: '34px', borderTop: index > 1 ? '1px solid #94a3b8' : undefined, borderLeft: index % 2 === 1 ? '1px solid #94a3b8' : undefined }}>
                             <span style={{ display: 'inline-block', width: '80px', fontWeight: 600 }}>{label}</span>
-                            <span style={{ color: label === '所属長' ? '#0f172a' : undefined }}>
+                            <span style={{ color: label === '所属長' ? '#0f172a' : undefined, marginLeft: label === '所属長' ? 'auto' : undefined, textAlign: label === '所属長' ? 'right' : undefined, whiteSpace: label === '所属長' ? 'nowrap' : undefined }}>
                                 {label === '所属長' ? (
                                     <>
                                         印<span style={{ color: '#dc2626' }}>（必須）</span>
