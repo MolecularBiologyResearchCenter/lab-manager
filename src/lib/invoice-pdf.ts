@@ -7,6 +7,7 @@ const PAGE_WIDTH = 595.28
 const PAGE_HEIGHT = 841.89
 const MARGIN = 42
 const BORDER = rgb(0.58, 0.65, 0.72)
+const HEADER_BACKGROUND = rgb(0.94, 0.97, 1)
 const TEXT = rgb(0.06, 0.09, 0.16)
 const RED = rgb(0.86, 0.15, 0.15)
 
@@ -113,8 +114,8 @@ function drawText(page: PDFPage, font: Font, text: string, x: number, y: number,
     }
 }
 
-function drawCell(page: PDFPage, font: Font, text: string, x: number, y: number, width: number, height: number, options: { bold?: boolean; align?: 'left' | 'right' | 'center'; color?: ReturnType<typeof rgb>; size?: number } = {}) {
-    page.drawRectangle({ x, y, width, height, borderColor: BORDER, borderWidth: 0.7 })
+function drawCell(page: PDFPage, font: Font, text: string, x: number, y: number, width: number, height: number, options: { bold?: boolean; align?: 'left' | 'right' | 'center'; color?: ReturnType<typeof rgb>; fillColor?: ReturnType<typeof rgb>; size?: number } = {}) {
+    page.drawRectangle({ x, y, width, height, borderColor: BORDER, borderWidth: 0.7, color: options.fillColor })
     const size = options.size ?? 9
     const padding = 6
     drawText(page, font, text, x + padding, y + (height - size) / 2 + 2, size, {
@@ -194,7 +195,7 @@ export async function generateInvoicePdf(invoice: InvoicePdfData) {
     const rowHeight = 19
     let x = MARGIN
     for (const column of columns) {
-        drawCell(page, font, column.label, x, y - rowHeight, column.width, rowHeight, { align: column.align, size: 8.5 })
+        drawCell(page, font, column.label, x, y - rowHeight, column.width, rowHeight, { align: column.align, fillColor: HEADER_BACKGROUND, size: 8.5 })
         x += column.width
     }
     y -= rowHeight
