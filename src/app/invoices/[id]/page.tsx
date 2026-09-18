@@ -135,7 +135,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
 
     const handleDownloadPDF = async () => {
-        if (!pdfRootRef.current || !invoice) return
+        if (!invoice) return
+        if (!invoice.sealedAt || !invoice.sealedBy) {
+            toast.info('案内：センター長の押印をお待ちください')
+            return
+        }
+        if (!pdfRootRef.current) return
 
         setDownloading(true)
 
@@ -216,11 +221,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 pdfBlob = pdf.output('blob')
             }
 
-            const isSealed = !!invoice.sealedAt
             const safeUserName = sanitizeFilenamePart(invoice.user.name)
-            const filename = isSealed
-                ? `請求書_${invoice.fiscalYear}年_${invoice.quarter}期_${safeUserName}.pdf`
-                : `確認用_未押印_${invoice.fiscalYear}年_${invoice.quarter}期_${safeUserName}.pdf`
+            const filename = `請求書_${invoice.fiscalYear}年_${invoice.quarter}期_${safeUserName}.pdf`
 
             if (pdfBlob.size < 1000) {
                 console.error('請求書PDFのファイルサイズが小さすぎます。', { invoiceId: invoice.id, fileSize: pdfBlob.size })
@@ -229,12 +231,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             }
             if (pdfBlob.size > 10 * 1024 * 1024) {
                 toast.error('PDFの容量が10MBを超えています。明細や画像を減らしてください。')
-                return
-            }
-
-            if (!isSealed) {
-                pdf.save(filename)
-                toast.success('未押印の確認用PDFをダウンロードしました')
                 return
             }
 
@@ -321,37 +317,31 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     </Link>
                     {/* Download Button Logic */}
                     {(() => {
-                        const isSealed = !!invoice.sealedAt
-                        const isAdminOrDirector = invoice.viewerRole === 'ADMIN' || invoice.viewerRole === 'CENTER_DIRECTOR'
-                        const canDownload = isSealed || isAdminOrDirector
+                        const isSealed = Boolean(invoice.sealedAt && invoice.sealedBy)
+                        const canDownload = isSealed
 
-                        if (canDownload) {
-                            return (
+                        return (
+                            <div>
                                 <Button
                                     onClick={handleDownloadPDF}
-                                    disabled={downloading}
-                                    className="rounded-xl bg-blue-700 text-white hover:bg-blue-800"
+                                    disabled={!canDownload || downloading}
+                                    className={canDownload
+                                        ? 'rounded-xl bg-blue-700 text-white hover:bg-blue-800'
+                                        : 'cursor-not-allowed rounded-xl bg-slate-200 text-slate-500'}
                                 >
                                     <Download className="h-4 w-4" />
                                     {downloading ? 'ダウンロード中...' : 'PDFダウンロード'}
                                 </Button>
-                            )
-                        } else {
-                            return (
-                                <Button
-                                    disabled={true}
-                                    variant="outline"
-                                    className="cursor-not-allowed rounded-xl border-slate-300 bg-slate-100 text-slate-500"
-                                >
-                                    <span className="flex items-center">
-                                        センター長承認待ち
-                                    </span>
-                                </Button>
-                            )
-                        }
+                                {!canDownload && (
+                                    <p className="mt-2 text-sm text-slate-600">
+                                        案内：センター長の押印をお待ちください
+                                    </p>
+                                )}
+                            </div>
+                        )
                     })()}
                 </div>
-                {invoice.viewerRole === 'CENTER_DIRECTOR' && !invoice.sealedAt && (
+                {invoice.viewerRole === 'CENTER_DIRECTOR' && (!invoice.sealedAt || !invoice.sealedBy) && (
                     <Button
                         onClick={handleSeal}
                         disabled={sealing}
