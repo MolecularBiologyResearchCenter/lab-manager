@@ -515,8 +515,84 @@ export async function register(formData: FormData) {
             laboratory,
             extension,
         },
-        select: { id: true },
+        select: {
+            id: true,
+            name: true,
+            department: true,
+            laboratory: true,
+            employeeId: true,
+            createdAt: true,
+        },
     })
+
+    await recordAuditLog({
+        actor: authAuditActor,
+        action: 'USER_REGISTRATION',
+        targetType: 'User',
+        targetId: user.id,
+        targetLabel: user.name,
+        summary: '新規利用者を登録しました。',
+    })
+
+    const notificationRecipient = process.env.REGISTRATION_NOTIFY_EMAIL?.trim()
+    if (!notificationRecipient) {
+        console.warn('REGISTRATION_NOTIFY_EMAIL is not configured. Registration notification not sent.')
+        await recordAuditLog({
+            actor: authAuditActor,
+            action: 'REGISTRATION_NOTIFICATION_FAILURE',
+            targetType: 'User',
+            targetId: user.id,
+            targetLabel: user.name,
+            summary: '新規利用者登録通知を送信できませんでした（送信先未設定）。',
+        })
+    } else {
+        try {
+            const mailResult = await sendEmail({
+                to: notificationRecipient,
+                subject: '新規利用者登録のお知らせ',
+                text: [
+                    '新規利用者の登録が完了しました。',
+                    '',
+                    `氏名：${user.name}`,
+                    `学部：${user.department || '未登録'}`,
+                    `所属・研究室：${user.laboratory || '未登録'}`,
+                    `職員番号：${user.employeeId || '未登録'}`,
+                    `登録日時：${user.createdAt.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`,
+                ].join('\n'),
+            })
+
+            if (mailResult.sent) {
+                await recordAuditLog({
+                    actor: authAuditActor,
+                    action: 'REGISTRATION_NOTIFICATION_SUCCESS',
+                    targetType: 'User',
+                    targetId: user.id,
+                    targetLabel: user.name,
+                    summary: '新規利用者登録通知を送信しました。',
+                })
+            } else {
+                console.warn('SMTP is not configured. Registration notification not sent.')
+                await recordAuditLog({
+                    actor: authAuditActor,
+                    action: 'REGISTRATION_NOTIFICATION_FAILURE',
+                    targetType: 'User',
+                    targetId: user.id,
+                    targetLabel: user.name,
+                    summary: '新規利用者登録通知を送信できませんでした（SMTP未設定）。',
+                })
+            }
+        } catch {
+            console.error('新規利用者登録通知メールの送信に失敗しました。')
+            await recordAuditLog({
+                actor: authAuditActor,
+                action: 'REGISTRATION_NOTIFICATION_FAILURE',
+                targetType: 'User',
+                targetId: user.id,
+                targetLabel: user.name,
+                summary: '新規利用者登録通知の送信に失敗しました。',
+            })
+        }
+    }
 
     await setSessionCookie(user.id)
 
