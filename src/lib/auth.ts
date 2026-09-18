@@ -12,6 +12,8 @@ export const currentUserSelect = {
     department: true,
     laboratory: true,
     extension: true,
+    employeeId: true,
+    mailingList: true,
     role: true,
 } as const
 

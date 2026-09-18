@@ -660,6 +660,7 @@ export async function updateProfile(
         department?: string
         laboratory?: string
         extension?: string
+        mailingList?: boolean
         currentPassword?: string
         newPassword?: string
     }
@@ -675,6 +676,20 @@ export async function updateProfile(
     if (data.department !== undefined) updateData.department = data.department
     if (data.laboratory !== undefined) updateData.laboratory = data.laboratory
     if (data.extension !== undefined) updateData.extension = data.extension
+    if (data.mailingList !== undefined) {
+        if (typeof data.mailingList !== 'boolean') {
+            throw new Error('メーリングリスト設定が不正です。')
+        }
+        updateData.mailingList = data.mailingList
+    }
+
+    const previousProfile = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { mailingList: true },
+    })
+    if (!previousProfile) {
+        throw new Error('ユーザーが見つかりません。')
+    }
 
     // Handle password change
     if (data.newPassword) {
@@ -701,6 +716,19 @@ export async function updateProfile(
     await prisma.user.update({
         where: { id: userId },
         data: updateData,
+    })
+
+    const mailingListChanged = data.mailingList !== undefined && previousProfile.mailingList !== data.mailingList
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'PROFILE_UPDATE',
+        targetType: 'User',
+        targetId: userId,
+        targetLabel: currentUser.name,
+        summary: 'プロフィール情報を更新しました。',
+        ...(mailingListChanged
+            ? { metadata: { mailingList: { previous: previousProfile.mailingList, next: data.mailingList } } }
+            : {}),
     })
 
     revalidatePath('/mypage')

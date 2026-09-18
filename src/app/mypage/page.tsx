@@ -18,6 +18,8 @@ type UserData = {
     department: string
     laboratory: string
     extension: string | null
+    employeeId: string | null
+    mailingList: boolean
     role: string
     password?: string
 }
@@ -30,6 +32,7 @@ export default function MyPage() {
     const [department, setDepartment] = useState('')
     const [laboratory, setLaboratory] = useState('')
     const [extension, setExtension] = useState('')
+    const [mailingList, setMailingList] = useState(false)
     const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
     const [currentPassword, setCurrentPassword] = useState('')
     const [newPassword, setNewPassword] = useState('')
@@ -46,6 +49,7 @@ export default function MyPage() {
             setDepartment(userData.department || '')
             setLaboratory(userData.laboratory || '')
             setExtension(userData.extension || '')
+            setMailingList(userData.mailingList)
         } catch (error) {
             console.error('Failed to load user:', error)
         } finally {
@@ -62,6 +66,7 @@ export default function MyPage() {
         setDepartment(user.department || '')
         setLaboratory(user.laboratory || '')
         setExtension(user.extension || '')
+        setMailingList(user.mailingList)
         setIsEditing(true)
     }
 
@@ -71,12 +76,13 @@ export default function MyPage() {
         setDepartment(user.department || '')
         setLaboratory(user.laboratory || '')
         setExtension(user.extension || '')
+        setMailingList(user.mailingList)
     }
 
     async function handleSaveProfile() {
         if (!user) return
         try {
-            await updateProfile(user.id, { department, laboratory, extension })
+            await updateProfile(user.id, { department, laboratory, extension, mailingList })
             toast.success('プロフィールを更新しました')
             setIsEditing(false)
             await loadUser()
@@ -160,6 +166,39 @@ export default function MyPage() {
                     <div className="grid gap-2 py-5 md:grid-cols-[9rem_1fr] md:items-center">
                         <span className="app-label flex items-center gap-2"><Mail className="h-4 w-4 text-slate-400" />メール</span>
                         <strong className="break-all text-sm font-medium text-slate-800">{user.email}</strong>
+                    </div>
+
+                    <div className="grid gap-2 py-5 md:grid-cols-[9rem_1fr] md:items-center">
+                        <span className="app-label">職員番号</span>
+                        <strong className="text-sm font-medium text-slate-800">{user.employeeId || '未登録'}</strong>
+                    </div>
+
+                    <div className="grid gap-3 py-5 md:grid-cols-[9rem_1fr] md:items-center">
+                        <span className="app-label">メーリングリスト</span>
+                        {isEditing ? (
+                            <div className="flex flex-wrap items-center gap-5">
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                                    <input
+                                        type="radio"
+                                        name="mypage-mailing-list"
+                                        checked={mailingList}
+                                        onChange={() => setMailingList(true)}
+                                        className="h-4 w-4 accent-blue-700"
+                                    />
+                                    参加する
+                                </label>
+                                <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                                    <input
+                                        type="radio"
+                                        name="mypage-mailing-list"
+                                        checked={!mailingList}
+                                        onChange={() => setMailingList(false)}
+                                        className="h-4 w-4 accent-blue-700"
+                                    />
+                                    参加しない
+                                </label>
+                            </div>
+                        ) : <strong className="text-sm font-medium text-slate-800">{user.mailingList ? '参加する' : '参加しない'}</strong>}
                     </div>
 
                     <div className="grid gap-3 py-5 md:grid-cols-[9rem_1fr] md:items-center">
