@@ -82,7 +82,7 @@ export default function UsersPage() {
             const apiError = new ApiClientError({
                 error: '利用者一覧を取得できませんでした。',
                 guidance: 'ネットワーク接続を確認して、もう一度お試しください。',
-                requestId: '取得できませんでした',
+                requestId: '問い合わせ番号を取得できませんでした',
             })
             toast.error(formatApiError(apiError))
         } finally {

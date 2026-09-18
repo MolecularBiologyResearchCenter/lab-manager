@@ -19,7 +19,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const file = formData.get('file')
         if (!(file instanceof File)) return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, 'PDFファイルが指定されていません。', '請求書画面からもう一度ダウンロードしてください。', requestId)
         if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, 'PDF形式のファイルを指定してください。', '請求書画面からもう一度ダウンロードしてください。', requestId)
-        if (file.size > MAX_PDF_SIZE) return apiErrorResponse(413, API_ERROR_CODES.INVALID_REQUEST, 'PDFファイルは10MB以下にしてください。', '請求書の項目数を減らすか、時間をおいて再試行してください。', requestId)
+        if (file.size > MAX_PDF_SIZE) return apiErrorResponse(413, API_ERROR_CODES.INVALID_REQUEST, '生成されたPDFが10MBを超えています。', '請求書の項目や画像を減らして、もう一度お試しください。', requestId)
 
         const invoice = await prisma.invoice.findUnique({
             where: { id },
