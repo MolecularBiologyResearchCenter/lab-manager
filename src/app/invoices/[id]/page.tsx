@@ -67,6 +67,11 @@ function sanitizeFilenamePart(value: string) {
     return value.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim() || '利用者'
 }
 
+async function sha256Hex(blob: Blob) {
+    const digest = await window.crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params)
     const router = useRouter()
@@ -245,11 +250,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 return
             }
 
-            const formData = new FormData()
-            formData.append('file', pdfBlob, filename)
             let downloadResponse: Response
             try {
-                downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, { method: 'POST', body: formData, cache: 'no-store' })
+                downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileSize: pdfBlob.size, pdfSha256: await sha256Hex(pdfBlob) }),
+                    cache: 'no-store',
+                })
             } catch (error) {
                 console.error('押印済みPDF確認APIへの接続に失敗しました。', error)
                 toast.error('エラー：押印済みPDFを取得できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
@@ -261,8 +269,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 return
             }
 
-            const approvedBlob = await downloadResponse.blob()
-            const url = window.URL.createObjectURL(approvedBlob)
+            await downloadResponse.json()
+            const url = window.URL.createObjectURL(pdfBlob)
             const a = document.createElement('a')
             a.href = url
             a.download = filename
