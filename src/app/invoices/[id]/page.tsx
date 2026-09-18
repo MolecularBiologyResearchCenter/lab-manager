@@ -542,9 +542,23 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                                 </div>
                             </div>
                             <div className={`${isMobile ? 'border-b border-gray-400' : ''}`} style={{ padding: '8px' }}>
-                                <div className="flex justify-between items-center">
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        width: '100%',
+                                    }}
+                                >
                                     <span className="font-medium">所属長</span>
-                                    <span>印<span style={{ color: 'red' }}>（必須）</span></span>
+                                    <span
+                                        style={{
+                                            marginLeft: 'auto',
+                                            textAlign: 'right',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        印<span style={{ color: 'red' }}>（必須）</span>
+                                    </span>
                                 </div>
                             </div>
                             <div className={`${isMobile ? 'border-b' : 'border-r'} border-t border-gray-400`} style={{ padding: '8px' }}>
