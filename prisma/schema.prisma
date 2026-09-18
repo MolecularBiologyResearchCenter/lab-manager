@@ -60,6 +60,20 @@ model AuditLog {
   @@index([action, createdAt])
 }
 
+model AuthThrottle {
+  id              String   @id @default(cuid())
+  kind            String
+  key             String
+  attemptCount    Int      @default(0)
+  windowStartedAt DateTime @default(now())
+  lockedUntil     DateTime?
+  updatedAt       DateTime @updatedAt
+
+  @@unique([kind, key])
+  @@index([lockedUntil])
+  @@index([updatedAt])
+}
+
 model Equipment {
   id          String   @id @default(cuid())
   name        String

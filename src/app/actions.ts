@@ -7,6 +7,13 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { recordAuditLog } from '@/lib/audit'
 import {
+    checkAuthThrottle,
+    getAuthThrottleKeys,
+    registerLoginFailure,
+    registerPasswordResetRequest,
+    resetLoginFailures,
+} from '@/lib/auth-rate-limit'
+import {
     clearSessionCookie,
     credentialUserSelect,
     getAuthenticatedUser,
@@ -19,6 +26,7 @@ import {
     createPasswordResetToken,
     consumePasswordResetToken,
     hashPassword,
+    hashPasswordResetToken,
     isPasswordHash,
     validatePassword,
     verifyPassword,
@@ -71,6 +79,9 @@ const concurrentReservationError = '同時に別の予約が登録されまし�
 const reservationFailedError = '予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。'
 type ReservationActionResult = { success: true } | { success: false; error: string }
 type LoginActionResult = { success: true } | { success: false; error: string }
+
+const authAuditActor = { name: '認証システム', role: 'SYSTEM' }
+const genericLoginError = 'アカウントまたはパスワードが正しくありません。'
 
 function isTransactionConflict(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
@@ -390,13 +401,42 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
     }
 
     try {
+        const throttleKeys = await getAuthThrottleKeys(email, 'LOGIN')
+        const throttleStatus = await checkAuthThrottle(throttleKeys)
+        if (throttleStatus.released) {
+            await recordAuditLog({
+                actor: authAuditActor,
+                action: 'LOGIN_THROTTLE_UNLOCK',
+                targetType: 'Authentication',
+                summary: 'ログイン試行制限を解除しました。',
+            })
+        }
+        if (throttleStatus.blocked) {
+            return { success: false, error: genericLoginError }
+        }
+
         const user = await prisma.user.findUnique({
             where: { email },
             select: credentialUserSelect,
         })
 
         if (!user || !(await verifyPassword(password, user.password))) {
-            return { success: false, error: 'メールアドレスまたはパスワードが間違っています。' }
+            const locked = await registerLoginFailure(throttleKeys)
+            await recordAuditLog({
+                actor: authAuditActor,
+                action: 'LOGIN_FAILURE',
+                targetType: 'Authentication',
+                summary: 'ログインに失敗しました。',
+            })
+            if (locked) {
+                await recordAuditLog({
+                    actor: authAuditActor,
+                    action: 'LOGIN_THROTTLE_LOCK',
+                    targetType: 'Authentication',
+                    summary: 'ログイン試行制限により一時ロックしました。',
+                })
+            }
+            return { success: false, error: genericLoginError }
         }
 
         if (!isPasswordHash(user.password)) {
@@ -407,8 +447,17 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
         }
 
         await setSessionCookie(user.id, rememberMe)
-    } catch (error) {
-        console.error('Failed to log in', error)
+        const wasLimited = await resetLoginFailures(throttleKeys)
+        if (wasLimited) {
+            await recordAuditLog({
+                actor: authAuditActor,
+                action: 'LOGIN_THROTTLE_UNLOCK',
+                targetType: 'Authentication',
+                summary: 'ログイン成功により試行制限を解除しました。',
+            })
+        }
+    } catch {
+        console.error('ログイン処理に失敗しました。')
         return { success: false, error: 'ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。' }
     }
 
@@ -475,41 +524,71 @@ export async function register(formData: FormData) {
 }
 
 export async function remindPassword(formData: FormData) {
-    const email = formData.get('email') as string
-    const employeeId = formData.get('employeeId') as string
+    const email = String(formData.get('email') || '').trim()
+    const employeeId = String(formData.get('employeeId') || '').trim()
 
     const genericMessage = '入力内容が登録情報と一致する場合、パスワード再設定メールを送信しました。'
     if (!email || !employeeId) return { message: genericMessage }
 
-    const user = await prisma.user.findFirst({
-        where: {
-            email,
-            employeeId,
-        },
-        select: { id: true, name: true, email: true },
-    })
-
-    if (!user) return { message: genericMessage }
-
-    const { token, tokenHash, expiresAt } = createPasswordResetToken()
-    await prisma.user.update({
-        where: { id: user.id },
-        data: {
-            passwordResetTokenHash: tokenHash,
-            passwordResetTokenExpiresAt: expiresAt,
-        },
-    })
-
-    const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${encodeURIComponent(token)}`
-
     try {
+        const throttleKeys = await getAuthThrottleKeys(email, 'PASSWORD_RESET')
+        const throttle = await registerPasswordResetRequest(throttleKeys)
+        if (throttle.released) {
+            await recordAuditLog({
+                actor: authAuditActor,
+                action: 'PASSWORD_RESET_THROTTLE_UNLOCK',
+                targetType: 'Authentication',
+                summary: 'パスワード再設定要求の制限を解除しました。',
+            })
+        }
+        if (!throttle.allowed) {
+            if (throttle.newlyLocked) {
+                await recordAuditLog({
+                    actor: authAuditActor,
+                    action: 'PASSWORD_RESET_THROTTLE_LOCK',
+                    targetType: 'Authentication',
+                    summary: 'パスワード再設定要求を一時制限しました。',
+                })
+            }
+            return { message: genericMessage }
+        }
+
+        const user = await prisma.user.findFirst({
+            where: { email, employeeId },
+            select: { id: true, name: true, email: true },
+        })
+
+        if (!user) {
+            await recordAuditLog({
+                actor: authAuditActor,
+                action: 'PASSWORD_RESET_REQUEST',
+                targetType: 'Authentication',
+                summary: 'パスワード再設定要求を受け付けました。',
+            })
+            return { message: genericMessage }
+        }
+
+        const { token, tokenHash, expiresAt } = createPasswordResetToken()
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { passwordResetTokenHash: tokenHash, passwordResetTokenExpiresAt: expiresAt },
+        })
+
+        const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${encodeURIComponent(token)}`
         await sendEmail({
             to: email,
             subject: '【分子生物実験センター】パスワード再設定',
             text: `${user.name} 様\n\nパスワード再設定の申請を受け付けました。\n次のURLは30分間、一度だけ有効です。\n\n${resetUrl}\n\n申請に心当たりがない場合は、このメールを破棄してください。`,
         })
+        await recordAuditLog({
+            actor: authAuditActor,
+            action: 'PASSWORD_RESET_REQUEST',
+            targetType: 'User',
+            targetId: user.id,
+            summary: 'パスワード再設定要求を受け付けました。',
+        })
     } catch {
-        console.error('Failed to send credential reset email')
+        console.error('パスワード再設定メールの処理に失敗しました。')
     }
 
     return { message: genericMessage }
@@ -520,11 +599,31 @@ export async function resetPassword(token: string, newPassword: string) {
         throw new Error('再設定リンクが無効か期限切れです。')
     }
 
-    await consumePasswordResetToken(
-        token,
-        newPassword,
-        (update) => prisma.user.updateMany(update),
-    )
+    const tokenHash = hashPasswordResetToken(token)
+    const targetUser = await prisma.user.findFirst({
+        where: { passwordResetTokenHash: tokenHash },
+        select: { id: true },
+    })
+
+    try {
+        await consumePasswordResetToken(token, newPassword, (update) => prisma.user.updateMany(update))
+    } catch (error) {
+        await recordAuditLog({
+            actor: authAuditActor,
+            action: 'PASSWORD_RESET_FAILURE',
+            targetType: 'Authentication',
+            summary: 'パスワード再設定に失敗しました。',
+        })
+        throw error
+    }
+
+    await recordAuditLog({
+        actor: authAuditActor,
+        action: 'PASSWORD_RESET_SUCCESS',
+        targetType: 'User',
+        targetId: targetUser?.id ?? null,
+        summary: 'パスワードを再設定しました。',
+    })
 }
 
 export async function deleteUser(userId: string) {
