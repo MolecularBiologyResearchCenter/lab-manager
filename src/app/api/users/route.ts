@@ -21,6 +21,7 @@ export async function GET() {
                 name: true,
                 email: true,
                 employeeId: true,
+                mailingList: true,
                 role: true,
                 department: true,
                 laboratory: true,

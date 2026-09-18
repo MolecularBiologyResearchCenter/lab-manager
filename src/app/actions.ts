@@ -811,6 +811,99 @@ export async function updateUserRole(userId: string, role: string) {
     revalidatePath('/admin/users')
 }
 
+export async function updateUserProfileByAdmin(
+    userId: string,
+    data: {
+        role?: string
+        employeeId?: string | null
+        mailingList?: boolean
+    },
+) {
+    const currentUser = await requireAdmin()
+
+    const targetUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, role: true, employeeId: true, mailingList: true },
+    })
+    if (!targetUser) throw new Error('ユーザーが見つかりません。')
+
+    if (data.role !== undefined && !['USER', 'ADMIN', 'CENTER_DIRECTOR'].includes(data.role)) {
+        throw new Error('無効な権限です。')
+    }
+    if (currentUser.id === userId && data.role !== undefined && data.role !== 'ADMIN') {
+        throw new Error('自分自身の管理者権限を外すことはできません。')
+    }
+    if (data.employeeId !== undefined && data.employeeId !== null && typeof data.employeeId !== 'string') {
+        throw new Error('職員番号が不正です。')
+    }
+    if (data.mailingList !== undefined && typeof data.mailingList !== 'boolean') {
+        throw new Error('メーリングリスト設定が不正です。')
+    }
+
+    const normalizedEmployeeId = data.employeeId === undefined
+        ? undefined
+        : (data.employeeId?.trim() || null)
+    if (normalizedEmployeeId !== undefined && normalizedEmployeeId !== null && normalizedEmployeeId.length > 100) {
+        throw new Error('職員番号は100文字以内で入力してください。')
+    }
+
+    const nextRole = data.role ?? targetUser.role
+    const roleChanged = nextRole !== targetUser.role
+    const employeeIdChanged = normalizedEmployeeId !== undefined && normalizedEmployeeId !== targetUser.employeeId
+    const mailingListChanged = data.mailingList !== undefined && data.mailingList !== targetUser.mailingList
+
+    if (!roleChanged && !employeeIdChanged && !mailingListChanged) return
+
+    const updateData: { role?: string; employeeId?: string | null; mailingList?: boolean } = {}
+    if (roleChanged) updateData.role = nextRole
+    if (employeeIdChanged) updateData.employeeId = normalizedEmployeeId
+    if (mailingListChanged) updateData.mailingList = data.mailingList
+
+    await prisma.$transaction(async (tx) => {
+        await tx.user.update({ where: { id: userId }, data: updateData })
+
+        if (roleChanged) {
+            await tx.auditLog.create({
+                data: {
+                    actorId: currentUser.id,
+                    actorName: currentUser.name,
+                    actorRole: currentUser.role,
+                    action: 'USER_ROLE_UPDATE',
+                    targetType: 'User',
+                    targetId: userId,
+                    targetLabel: targetUser.name,
+                    summary: 'ユーザー権限を変更しました。',
+                    metadata: { previousRole: targetUser.role, newRole: nextRole },
+                },
+            })
+        }
+
+        if (employeeIdChanged || mailingListChanged) {
+            await tx.auditLog.create({
+                data: {
+                    actorId: currentUser.id,
+                    actorName: currentUser.name,
+                    actorRole: currentUser.role,
+                    action: 'USER_PROFILE_UPDATE',
+                    targetType: 'User',
+                    targetId: userId,
+                    targetLabel: targetUser.name,
+                    summary: '管理者がユーザープロフィールを変更しました。',
+                    metadata: {
+                        ...(employeeIdChanged ? { changedFields: ['employeeId'] } : {}),
+                        ...(mailingListChanged
+                            ? { mailingList: { previous: targetUser.mailingList, next: data.mailingList } }
+                            : {}),
+                    },
+                },
+            })
+        }
+    })
+
+    revalidatePath('/admin/users')
+    revalidatePath('/mypage')
+}
+
 export async function adminSetUserPassword(userId: string, newPassword: string) {
     await requireAdmin()
     if (!validatePassword(newPassword)) {
