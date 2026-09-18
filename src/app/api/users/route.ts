@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getAuthenticatedUser } from '@/lib/auth'
+import { adminUserSelect, getAuthenticatedUser } from '@/lib/auth'
 import { authorizationStatus } from '@/lib/authorization'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
 
@@ -16,17 +16,7 @@ export async function GET() {
         }
 
         const users = await prisma.user.findMany({
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                employeeId: true,
-                role: true,
-                department: true,
-                laboratory: true,
-                extension: true,
-                createdAt: true,
-            },
+            select: adminUserSelect,
             orderBy: {
                 createdAt: 'desc',
             },

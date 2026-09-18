@@ -12,7 +12,22 @@ export const currentUserSelect = {
     department: true,
     laboratory: true,
     extension: true,
+    employeeId: true,
+    mailingList: true,
     role: true,
+} as const
+
+export const adminUserSelect = {
+    id: true,
+    name: true,
+    email: true,
+    employeeId: true,
+    mailingList: true,
+    role: true,
+    department: true,
+    laboratory: true,
+    extension: true,
+    createdAt: true,
 } as const
 
 export const credentialUserSelect = {

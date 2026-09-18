@@ -20,7 +20,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
-import { deleteUser, updateUserRole } from '@/app/actions'
+import { deleteUser, updateUserProfileByAdmin } from '@/app/actions'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
@@ -33,7 +33,8 @@ interface User {
     id: string
     name: string
     email: string
-    employeeId: string
+    employeeId: string | null
+    mailingList: boolean
     role: string
     department: string | null
     laboratory: string | null
@@ -61,6 +62,8 @@ export default function UsersPage() {
     const [editDialogOpen, setEditDialogOpen] = useState(false)
     const [userToEdit, setUserToEdit] = useState<User | null>(null)
     const [selectedRole, setSelectedRole] = useState<string>('USER')
+    const [employeeId, setEmployeeId] = useState('')
+    const [mailingList, setMailingList] = useState(false)
 
     useEffect(() => {
         fetchUsers()
@@ -103,6 +106,8 @@ export default function UsersPage() {
         e.stopPropagation()
         setUserToEdit(user)
         setSelectedRole(user.role)
+        setEmployeeId(user.employeeId || '')
+        setMailingList(user.mailingList)
         setEditDialogOpen(true)
     }
 
@@ -129,8 +134,8 @@ export default function UsersPage() {
         if (!userToEdit) return
 
         try {
-            await updateUserRole(userToEdit.id, selectedRole)
-            toast.success('権限を更新しました')
+            await updateUserProfileByAdmin(userToEdit.id, { role: selectedRole, employeeId, mailingList })
+            toast.success('利用者情報を更新しました')
             router.refresh()
             fetchUsers()
         } catch (error) {
@@ -139,6 +144,8 @@ export default function UsersPage() {
 
         setEditDialogOpen(false)
         setUserToEdit(null)
+        setEmployeeId('')
+        setMailingList(false)
     }
 
     const cancelDelete = () => {
@@ -211,6 +218,7 @@ export default function UsersPage() {
                                     <TableHead>名前</TableHead>
                                     <TableHead>メールアドレス</TableHead>
                                     <TableHead>職員番号</TableHead>
+                                    <TableHead>メーリングリスト</TableHead>
                                     <TableHead>権限</TableHead>
                                     <TableHead>所属</TableHead>
                                     <TableHead>研究室</TableHead>
@@ -224,7 +232,8 @@ export default function UsersPage() {
                                     <TableRow key={user.id} style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : { backgroundColor: '#ffffff' }}>
                                         <TableCell className="font-medium">{user.name}</TableCell>
                                         <TableCell>{user.email}</TableCell>
-                                        <TableCell>{user.employeeId}</TableCell>
+                                        <TableCell>{user.employeeId || '未登録'}</TableCell>
+                                        <TableCell>{user.mailingList ? '参加する' : '参加しない'}</TableCell>
                                         <TableCell>
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-red-100 text-red-800' :
                                                     user.role === 'CENTER_DIRECTOR' ? 'bg-purple-100 text-purple-800' :
@@ -275,15 +284,39 @@ export default function UsersPage() {
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                 <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white">
                     <DialogHeader>
-                        <DialogTitle>権限の変更</DialogTitle>
+                        <DialogTitle>利用者情報の変更</DialogTitle>
                         <DialogDescription>
-                            {userToEdit?.name} さんの権限を変更します。
+                            {userToEdit?.name} さんの職員番号、メーリングリスト、権限を変更します。
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-4">
                         <div className="rounded-xl bg-slate-50 p-4 text-sm">
                             <p className="font-medium text-slate-800">変更前 → 変更後</p>
                             <p className="mt-1 text-slate-600">{userToEdit && roleLabels[userToEdit.role]} → {roleLabels[selectedRole]}</p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="admin-employee-id">職員番号</Label>
+                            <input
+                                id="admin-employee-id"
+                                value={employeeId}
+                                onChange={(event) => setEmployeeId(event.target.value)}
+                                placeholder="未登録"
+                                maxLength={100}
+                                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                            />
+                        </div>
+                        <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-3">
+                            <Label htmlFor="admin-mailing-list">メーリングリスト</Label>
+                            <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                                <input
+                                    id="admin-mailing-list"
+                                    type="checkbox"
+                                    checked={mailingList}
+                                    onChange={(event) => setMailingList(event.target.checked)}
+                                    className="h-4 w-4 accent-blue-700"
+                                />
+                                参加する
+                            </label>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="role">権限</Label>
@@ -306,7 +339,15 @@ export default function UsersPage() {
                         <Button variant="outline" onClick={cancelEdit}>
                             キャンセル
                         </Button>
-                        <Button onClick={confirmUpdate} disabled={!userToEdit || selectedRole === userToEdit.role} className="bg-blue-600 text-white hover:bg-blue-700">
+                        <Button
+                            onClick={confirmUpdate}
+                            disabled={!userToEdit || (
+                                selectedRole === userToEdit.role &&
+                                employeeId === (userToEdit.employeeId || '') &&
+                                mailingList === userToEdit.mailingList
+                            )}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
                             保存
                         </Button>
                     </DialogFooter>
