@@ -224,6 +224,7 @@ export default function UsersPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead>No.</TableHead>
                                     <TableHead>名前</TableHead>
                                     <TableHead>メールアドレス</TableHead>
                                     <TableHead>職員番号</TableHead>
@@ -239,6 +240,7 @@ export default function UsersPage() {
                             <TableBody>
                                 {users.map((user, index) => (
                                     <TableRow key={user.id} style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : { backgroundColor: '#ffffff' }}>
+                                        <TableCell>{index + 1}</TableCell>
                                         <TableCell className="font-medium">{user.name}</TableCell>
                                         <TableCell>{user.email}</TableCell>
                                         <TableCell>{user.employeeId || '未登録'}</TableCell>
