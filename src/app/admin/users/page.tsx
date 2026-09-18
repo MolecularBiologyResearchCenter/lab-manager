@@ -11,7 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { ArrowLeft, Download, Trash2 } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
@@ -207,14 +207,24 @@ export default function UsersPage() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <CardTitle>登録ユーザー ({users.length}名)</CardTitle>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => { window.location.href = '/api/admin/users/export' }}
+                        className="shrink-0"
+                    >
+                        <Download className="mr-2 h-4 w-4" />
+                        職員番号CSVをダウンロード
+                    </Button>
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead>No.</TableHead>
                                     <TableHead>名前</TableHead>
                                     <TableHead>メールアドレス</TableHead>
                                     <TableHead>職員番号</TableHead>
@@ -230,6 +240,7 @@ export default function UsersPage() {
                             <TableBody>
                                 {users.map((user, index) => (
                                     <TableRow key={user.id} style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : { backgroundColor: '#ffffff' }}>
+                                        <TableCell>{index + 1}</TableCell>
                                         <TableCell className="font-medium">{user.name}</TableCell>
                                         <TableCell>{user.email}</TableCell>
                                         <TableCell>{user.employeeId || '未登録'}</TableCell>

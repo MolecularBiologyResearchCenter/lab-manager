@@ -17,9 +17,10 @@ export async function GET() {
 
         const users = await prisma.user.findMany({
             select: adminUserSelect,
-            orderBy: {
-                createdAt: 'desc',
-            },
+            orderBy: [
+                { createdAt: 'asc' },
+                { id: 'asc' },
+            ],
         })
 
         return apiSuccessResponse(users, requestId)
