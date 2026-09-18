@@ -440,7 +440,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     ].map(([label, value], index) => (
                         <div key={label} style={{ padding: '8px', minHeight: '34px', borderTop: index > 1 ? '1px solid #94a3b8' : undefined, borderLeft: index % 2 === 1 ? '1px solid #94a3b8' : undefined }}>
                             <span style={{ display: 'inline-block', width: '80px', fontWeight: 600 }}>{label}</span>
-                            <span style={{ color: label === '所属長' ? '#0f172a' : undefined }}>{value}</span>
+                            <span style={{ color: label === '所属長' ? '#0f172a' : undefined }}>
+                                {label === '所属長' ? (
+                                    <>
+                                        印<span style={{ color: '#dc2626' }}>（必須）</span>
+                                    </>
+                                ) : value}
+                            </span>
                         </div>
                     ))}
                 </div>
