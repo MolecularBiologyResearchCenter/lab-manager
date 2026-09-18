@@ -332,11 +332,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                                     <Download className="h-4 w-4" />
                                     {downloading ? 'ダウンロード中...' : 'PDFダウンロード'}
                                 </Button>
-                                {!canDownload && (
-                                    <p className="mt-2 text-sm text-slate-600">
-                                        案内：センター長の押印をお待ちください
-                                    </p>
-                                )}
                             </div>
                         )
                     })()}
@@ -355,7 +350,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {/* Print Instructions */}
             <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4 print:hidden">
                 <p className="text-sm text-blue-800">
-                    <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、{getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください
+                    {invoice.sealedAt && invoice.sealedBy ? (
+                        <>
+                            <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、{getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください
+                        </>
+                    ) : (
+                        <>
+                            <strong>案内:</strong> センター長の押印をお待ちください
+                        </>
+                    )}
                 </p>
             </div>
 
