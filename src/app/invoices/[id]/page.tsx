@@ -67,86 +67,9 @@ function sanitizeFilenamePart(value: string) {
     return value.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim() || '利用者'
 }
 
-function drawInvoiceFallback(invoice: Invoice) {
-    const canvas = document.createElement('canvas')
-    canvas.width = 794
-    canvas.height = 1123
-    const context = canvas.getContext('2d')
-    if (!context) throw new Error('PDF用キャンバスを作成できませんでした')
-
-    const left = 56
-    const right = 738
-    const width = right - left
-    context.fillStyle = '#ffffff'
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    context.fillStyle = '#111827'
-    context.strokeStyle = '#94a3b8'
-    context.lineWidth = 1
-    context.textAlign = 'left'
-    context.font = 'bold 20px "Hiragino Sans", "Meiryo", sans-serif'
-    context.textAlign = 'center'
-    context.fillText(`${invoice.fiscalYear}年 ${getQuarterLabelStatic(invoice.quarter)} 分子生物実験センター利用料`, canvas.width / 2, 54)
-    context.font = '16px "Hiragino Sans", "Meiryo", sans-serif'
-    context.fillText('個人別請求書（研究用）', canvas.width / 2, 82)
-    context.textAlign = 'left'
-
-    const drawRow = (y: number, label: string, value: string) => {
-        context.strokeRect(left, y, width, 34)
-        context.font = 'bold 13px "Hiragino Sans", "Meiryo", sans-serif'
-        context.fillText(label, left + 10, y + 22)
-        context.font = '13px "Hiragino Sans", "Meiryo", sans-serif'
-        context.fillText(value, left + 130, y + 22)
-    }
-    drawRow(112, '学部', invoice.user.department ?? '')
-    drawRow(146, '所属', invoice.user.laboratory ?? '')
-    drawRow(180, '利用者', invoice.user.name)
-
-    const tableTop = 238
-    const columns = [left, 150, 280, 520, 600, right]
-    const headers = ['日付', '利用者', '利用項目', '単価', '個数', '合計']
-    context.font = 'bold 11px "Hiragino Sans", "Meiryo", sans-serif'
-    headers.forEach((header, index) => {
-        context.fillStyle = '#eff6ff'
-        context.fillRect(columns[index], tableTop, columns[index + 1] - columns[index], 28)
-        context.strokeRect(columns[index], tableTop, columns[index + 1] - columns[index], 28)
-        context.fillStyle = '#111827'
-        context.fillText(header, columns[index] + 7, tableTop + 19)
-    })
-    context.font = '10px "Hiragino Sans", "Meiryo", sans-serif'
-    invoice.items.forEach((item, index) => {
-        const y = tableTop + 28 + index * 26
-        const values = [new Intl.DateTimeFormat('ja-JP').format(new Date(item.date)), invoice.user.name, item.itemName, `¥${item.unitPrice.toLocaleString()}`, String(item.quantity), `¥${item.amount.toLocaleString()}`]
-        values.forEach((value, valueIndex) => {
-            context.strokeRect(columns[valueIndex], y, columns[valueIndex + 1] - columns[valueIndex], 26)
-            context.fillText(value, columns[valueIndex] + 7, y + 17)
-        })
-    })
-    const totalY = tableTop + 50 + invoice.items.length * 26
-    context.font = 'bold 14px "Hiragino Sans", "Meiryo", sans-serif'
-    context.strokeRect(left, totalY, width, 42)
-    context.fillText('利用料金合計', left + 10, totalY + 27)
-    context.textAlign = 'right'
-    context.font = 'bold 20px "Hiragino Sans", "Meiryo", sans-serif'
-    context.fillText(`¥${invoice.totalAmount.toLocaleString()}`, right - 10, totalY + 29)
-    context.textAlign = 'left'
-    context.font = '12px "Hiragino Sans", "Meiryo", sans-serif'
-    context.strokeRect(left, totalY + 70, width, 150)
-    context.fillText('支出予算（記載必須）', left + 12, totalY + 96)
-    context.fillText('●予算支出部門　________________ 学部', left + 12, totalY + 124)
-    context.fillText('●予算科目　①一般研究費　②実習費　③受託　④助成', left + 12, totalY + 152)
-    context.fillText('●配分先コード　________________', left + 12, totalY + 180)
-    context.fillText(`振込先　分子生物実験センター　　受注 No`, left + 12, totalY + 208)
-    context.textAlign = 'right'
-    context.font = 'bold 14px "Hiragino Sans", "Meiryo", sans-serif'
-    context.fillText('分子生物実験センター長', right - 12, 1014)
-    context.font = '16px "Hiragino Sans", "Meiryo", sans-serif'
-    context.fillText(invoice.sealer?.name ?? '', right - 12, 1042)
-    context.textAlign = 'left'
-    return canvas
-}
-
-function getQuarterLabelStatic(quarter: number) {
-    return quarter === 1 ? '1～4月' : quarter === 2 ? '5～8月' : quarter === 3 ? '9～12月' : `${quarter}期`
+async function sha256Hex(blob: Blob) {
+    const digest = await window.crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -155,6 +78,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     const searchParams = useSearchParams()
     const backHref = searchParams.get('from') === 'admin' ? '/admin/invoices' : '/invoices'
     const invoiceRef = useRef<HTMLDivElement>(null)
+    const pdfRootRef = useRef<HTMLDivElement>(null)
     const [invoice, setInvoice] = useState<Invoice | null>(null)
     const [loading, setLoading] = useState(true)
     const [downloading, setDownloading] = useState(false)
@@ -191,7 +115,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 const apiError = new ApiClientError({
                     error: '請求書を取得できませんでした。',
                     guidance: 'ネットワーク接続を確認して、もう一度お試しください。',
-                    requestId: '取得できませんでした',
+                    requestId: '問い合わせ番号を取得できませんでした',
                 })
                 toast.error(formatApiError(apiError))
                 router.push(backHref)
@@ -216,78 +140,56 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
 
     const handleDownloadPDF = async () => {
-        if (!invoiceRef.current || !invoice) return
+        if (!pdfRootRef.current || !invoice) return
 
         setDownloading(true)
 
-        // Temporarily disable mobile mode for PDF generation
-        const wasMobile = isMobile
-        if (wasMobile) {
-            setIsMobile(false)
-            // Wait for re-render with desktop layout
-            await new Promise(resolve => setTimeout(resolve, 500))
-        }
-
         try {
-            const captureOptions = {
-                // Keep the generated upload below the signing endpoint's
-                // 10 MB limit without introducing JPEG transparency artifacts.
-                scale: 1,
-                useCORS: true,
-                logging: false,
+            const pdfRoot = pdfRootRef.current
+            const waitForNextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+            await waitForNextFrame()
+            await waitForNextFrame()
+            if (document.fonts?.ready) await document.fonts.ready
+            await Promise.all(Array.from(pdfRoot.querySelectorAll('img')).map(image => image.decode().catch(() => undefined)))
+
+            const canvas = await html2canvas(pdfRoot, {
+                scale: 2,
                 backgroundColor: '#ffffff',
-                // Tailwind v4 emits modern color functions such as oklch().
-                // foreignObjectRendering lets the browser render those styles
-                // instead of making html2canvas parse them itself.
-                foreignObjectRendering: true,
-                imageTimeout: 0,
-                windowWidth: 1280, // Force desktop width
-                windowHeight: 720
-            }
-
-            // Safari and some embedded browsers can return an all-white canvas
-            // when foreignObjectRendering is used. Retry with html2canvas's
-            // normal renderer before creating or signing the PDF.
-            let canvas = await html2canvas(invoiceRef.current, captureOptions)
-            const context = canvas.getContext('2d', { willReadFrequently: true })
-            const pixels = context?.getImageData(0, 0, canvas.width, canvas.height).data
-            let hasVisibleContent = false
+                useCORS: true,
+                allowTaint: false,
+                logging: false,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: 794,
+                windowHeight: 1123,
+                foreignObjectRendering: false,
+                width: 794,
+                height: 1123,
+            })
+            const context = canvas.width > 0 && canvas.height > 0
+                ? canvas.getContext('2d', { willReadFrequently: true })
+                : null
+            const pixels = context ? context.getImageData(0, 0, canvas.width, canvas.height).data : undefined
+            let nonWhitePixels = 0
             if (pixels) {
-                for (let index = 0; index < pixels.length; index += 4 * 64) {
-                    // Ignore the pale card border. A real invoice contains
-                    // dark text; otherwise the foreign-object renderer may
-                    // have captured only the surrounding frame.
-                    if (pixels[index] < 100 || pixels[index + 1] < 100 || pixels[index + 2] < 100) {
-                        hasVisibleContent = true
-                        break
-                    }
+                for (let index = 0; index < pixels.length; index += 4) {
+                    const alpha = pixels[index + 3]
+                    const isWhite = pixels[index] > 248 && pixels[index + 1] > 248 && pixels[index + 2] > 248
+                    if (alpha > 0 && !isWhite) nonWhitePixels++
                 }
             }
-
-            if (!hasVisibleContent) {
-                canvas = await html2canvas(invoiceRef.current, {
-                    ...captureOptions,
-                    foreignObjectRendering: false,
+            const rootRect = pdfRoot.getBoundingClientRect()
+            if (canvas.width === 0 || canvas.height === 0 || nonWhitePixels < 100) {
+                console.error('請求書PDFの描画結果が白紙です。', {
+                    invoiceId: invoice.id,
+                    canvasWidth: canvas.width,
+                    canvasHeight: canvas.height,
+                    elementWidth: rootRect.width,
+                    elementHeight: rootRect.height,
+                    nonWhitePixels,
                 })
-            }
-
-            const finalContext = canvas.getContext('2d', { willReadFrequently: true })
-            const finalPixels = finalContext?.getImageData(0, 0, canvas.width, canvas.height).data
-            let hasFinalContent = false
-            if (finalPixels) {
-                for (let index = 0; index < finalPixels.length; index += 4 * 64) {
-                    if (finalPixels[index] < 100 || finalPixels[index + 1] < 100 || finalPixels[index + 2] < 100) {
-                        hasFinalContent = true
-                        break
-                    }
-                }
-            }
-
-            if (!hasFinalContent) {
-                // The DOM capture can fail in embedded browsers even though
-                // the invoice is visible. Draw the same invoice data directly
-                // so the downloaded PDF remains usable in embedded browsers.
-                canvas = drawInvoiceFallback(invoice)
+                toast.error('請求書の描画に失敗しました。画面を再読み込みして、もう一度お試しください。')
+                return
             }
 
             // A4 dimensions in mm
@@ -304,6 +206,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             // PNG preserves the white invoice background and Japanese text
             // without the black transparent-area artifacts seen with JPEG.
             const imgData = canvas.toDataURL('image/png')
+            if (!imgData || imgData === 'data:,') {
+                console.error('請求書PDFの画像データを作成できませんでした。', { invoiceId: invoice.id, canvasWidth: canvas.width, canvasHeight: canvas.height })
+                toast.error('請求書の描画に失敗しました。画面を再読み込みして、もう一度お試しください。')
+                return
+            }
 
             // Calculate height to maintain aspect ratio
             const imgHeight = (canvas.height * a4Width) / canvas.width
@@ -331,6 +238,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
             // Get Blob from jsPDF
             const pdfBlob = pdf.output('blob')
+            if (pdfBlob.size < 1000) {
+                console.error('請求書PDFのファイルサイズが小さすぎます。', { invoiceId: invoice.id, fileSize: pdfBlob.size, canvasWidth: canvas.width, canvasHeight: canvas.height })
+                toast.error('請求書の描画に失敗しました。画面を再読み込みして、もう一度お試しください。')
+                return
+            }
 
             if (!isSealed) {
                 pdf.save(filename)
@@ -338,14 +250,17 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 return
             }
 
-            const formData = new FormData()
-            formData.append('file', pdfBlob, filename)
             let downloadResponse: Response
             try {
-                downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, { method: 'POST', body: formData, cache: 'no-store' })
+                downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileSize: pdfBlob.size, pdfSha256: await sha256Hex(pdfBlob) }),
+                    cache: 'no-store',
+                })
             } catch (error) {
                 console.error('押印済みPDF確認APIへの接続に失敗しました。', error)
-                toast.error('エラー：押印済みPDFを取得できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
+                toast.error('エラー：押印済みPDFを取得できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
                 return
             }
             if (!downloadResponse.ok) {
@@ -354,8 +269,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 return
             }
 
-            const approvedBlob = await downloadResponse.blob()
-            const url = window.URL.createObjectURL(approvedBlob)
+            await downloadResponse.json()
+            const url = window.URL.createObjectURL(pdfBlob)
             const a = document.createElement('a')
             a.href = url
             a.download = filename
@@ -366,12 +281,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             toast.success('押印済みPDFをダウンロードしました')
         } catch (error) {
             console.error('Failed to generate PDF:', error)
-            toast.error('エラー：PDFの生成に失敗しました。\n次の操作：画面を更新して、もう一度お試しください。\n問い合わせ番号：取得できませんでした')
+            toast.error('エラー：PDFの生成に失敗しました。\n次の操作：画面を更新して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
         } finally {
-            // Restore mobile mode if it was enabled
-            if (wasMobile) {
-                setIsMobile(true)
-            }
             setDownloading(false)
         }
     }
@@ -500,6 +411,117 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* PDF専用の固定レイアウト。表示中のレスポンシブカードとは分離する。 */}
+            <div
+                ref={pdfRootRef}
+                data-pdf-root="invoice"
+                aria-hidden="true"
+                style={{
+                    position: 'fixed',
+                    left: '-10000px',
+                    top: 0,
+                    width: '794px',
+                    height: '1123px',
+                    overflow: 'visible',
+                    opacity: 1,
+                    visibility: 'visible',
+                    display: 'block',
+                    boxSizing: 'border-box',
+                    padding: '38px 56px',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    fontFamily: '"Hiragino Sans", "Meiryo", sans-serif',
+                    fontSize: '12px',
+                }}
+            >
+                <div style={{ textAlign: 'center', marginBottom: '26px' }}>
+                    <h1 style={{ margin: 0, fontSize: '20px', lineHeight: 1.3, fontWeight: 700 }}>
+                        {invoice.fiscalYear}年 {getQuarterLabel(invoice.quarter)} 分子生物実験センター利用料
+                    </h1>
+                    <p style={{ margin: '8px 0 0', fontSize: '16px' }}>個人別請求書（研究用）</p>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #94a3b8', marginBottom: '26px' }}>
+                    {[
+                        ['学部', invoice.user.department || '一般教育学部'],
+                        ['所属長', '印（必須）'],
+                        ['所属', invoice.user.laboratory || '生物学'],
+                        ['利用者', invoice.user.name],
+                    ].map(([label, value], index) => (
+                        <div key={label} style={{ padding: '8px', minHeight: '34px', borderTop: index > 1 ? '1px solid #94a3b8' : undefined, borderLeft: index % 2 === 1 ? '1px solid #94a3b8' : undefined }}>
+                            <span style={{ display: 'inline-block', width: '80px', fontWeight: 600 }}>{label}</span>
+                            <span style={{ color: label === '所属長' ? '#0f172a' : undefined }}>{value}</span>
+                        </div>
+                    ))}
+                </div>
+
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #94a3b8', fontSize: '10px', marginBottom: '26px' }}>
+                    <thead>
+                        <tr style={{ backgroundColor: '#eff6ff' }}>
+                            {[
+                                ['日付', '15%', 'left'],
+                                ['利用者', '15%', 'left'],
+                                ['利用項目', '30%', 'left'],
+                                ['単価', '15%', 'right'],
+                                ['個数', '10%', 'right'],
+                                ['合計', '15%', 'right'],
+                            ].map(([label, width, align]) => (
+                                <th key={label} style={{ width, border: '1px solid #94a3b8', padding: '4px 6px', textAlign: align as 'left' | 'right', fontWeight: 600 }}>{label}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {invoice.items.map(item => (
+                            <tr key={item.id}>
+                                <td style={{ border: '1px solid #94a3b8', padding: '4px 6px' }}>{new Date(item.date).toLocaleDateString('ja-JP')}</td>
+                                <td style={{ border: '1px solid #94a3b8', padding: '4px 6px' }}>{invoice.user.name}</td>
+                                <td style={{ border: '1px solid #94a3b8', padding: '4px 6px' }}>{item.itemName}</td>
+                                <td style={{ border: '1px solid #94a3b8', padding: '4px 6px', textAlign: 'right' }}>¥{item.unitPrice.toLocaleString()}</td>
+                                <td style={{ border: '1px solid #94a3b8', padding: '4px 6px', textAlign: 'right' }}>{item.quantity}</td>
+                                <td style={{ border: '1px solid #94a3b8', padding: '4px 6px', textAlign: 'right' }}>¥{item.amount.toLocaleString()}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #cbd5e1', marginBottom: '26px', fontSize: '16px' }}>
+                    <tbody><tr>
+                        <td style={{ width: '50%', border: '1px solid #cbd5e1', padding: '10px', fontWeight: 600 }}>利用料合計</td>
+                        <td style={{ border: '1px solid #cbd5e1', padding: '10px', textAlign: 'right', fontSize: '21px', fontWeight: 700 }}>¥{invoice.totalAmount.toLocaleString()}</td>
+                    </tr></tbody>
+                </table>
+
+                <div style={{ border: '1px solid #94a3b8', padding: '12px', marginBottom: '26px', fontSize: '10px', lineHeight: 1.55 }}>
+                    <p style={{ margin: '0 0 5px', fontWeight: 600 }}>支出予算 <span style={{ color: '#ef4444' }}>（記載必須）</span></p>
+                    <p style={{ margin: '0 0 3px' }}>●予算支出部門</p>
+                    <p style={{ margin: '0 0 3px', paddingLeft: '16px' }}>{invoice.budgetDepartment || '_______________'}学部</p>
+                    <p style={{ margin: '0 0 3px' }}>●予算科目（○で囲む）</p>
+                    <p style={{ margin: '0 0 3px', paddingLeft: '16px' }}>① 一般研究費　②実習費　③受託　④助成</p>
+                    <p style={{ margin: '0 0 3px', paddingLeft: '16px' }}>⑤その他（{invoice.budgetCategory || '　　　　　　　　　'}）具体的に記載</p>
+                    <p style={{ margin: 0 }}>●配分先コード（ACOffice で用いるコード）</p>
+                    <p style={{ margin: 0, paddingLeft: '16px' }}>{invoice.budgetCode || '_______________'}</p>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #94a3b8', fontSize: '11px' }}>
+                    <div style={{ borderRight: '1px solid #94a3b8', padding: '5px 8px' }}>振込先　分子生物実験センター</div>
+                    <div style={{ padding: '5px 8px' }}>受注 No</div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '38px', fontSize: '12px' }}>
+                    <p style={{ margin: 0 }}>{new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <div style={{ textAlign: 'right' }}>
+                        <p style={{ margin: '0 0 12px' }}>分子生物実験センター長</p>
+                        <div style={{ position: 'relative', minWidth: '170px', minHeight: '64px' }}>
+                            <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: '16px' }}>{invoice.sealer?.name || '藤岡　正人'}　印</p>
+                            {invoice.sealedAt && <div style={{ position: 'absolute', right: 0, top: '-20px', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <img src={invoice.sealer?.sealImage || DEFAULT_SEAL_IMAGE} alt="電子印" style={{ width: '64px', height: '64px', objectFit: 'contain', opacity: 0.8 }} onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = DEFAULT_SEAL_IMAGE }} />
+                                <span style={{ position: 'absolute', color: '#ef4444', fontSize: '8px', fontWeight: 700, whiteSpace: 'nowrap', fontFamily: 'Arial, sans-serif' }}>{formatSealDate(invoice.sealedAt)}</span>
+                            </div>}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {/* Invoice Document - Fixed A4 Width */}
             <div className="app-surface flex justify-center overflow-auto p-3 md:p-8 print:border-0 print:p-0 print:shadow-none">
