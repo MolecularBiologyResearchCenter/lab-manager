@@ -503,20 +503,46 @@ export async function register(formData: FormData) {
         throw new Error('このメールアドレスは既に登録されています。')
     }
 
-    const user = await prisma.user.create({
-        data: {
-            name,
-            nameKana,
-            employeeId,
-            mailingList,
-            email,
-            password: await hashPassword(password),
-            department,
-            laboratory,
-            extension,
-        },
-        select: { id: true },
-    })
+    let user: { id: string }
+    try {
+        const passwordHash = await hashPassword(password)
+        user = await prisma.$transaction(async (tx) => {
+            const createdUser = await tx.user.create({
+                data: {
+                    name,
+                    nameKana,
+                    employeeId,
+                    mailingList,
+                    email,
+                    password: passwordHash,
+                    department,
+                    laboratory,
+                    extension,
+                },
+                select: { id: true },
+            })
+
+            await tx.adminNotification.create({
+                data: {
+                    type: 'NEW_USER_REGISTRATION',
+                    targetUserId: createdUser.id,
+                    name,
+                    department,
+                    laboratory,
+                    employeeId,
+                },
+            })
+
+            return createdUser
+        })
+    } catch (error) {
+        await recordAuditLog({
+            action: 'ADMIN_NOTIFICATION_CREATE_FAILURE',
+            targetType: 'AdminNotification',
+            summary: '新規利用者登録時の管理者通知作成に失敗しました。',
+        })
+        throw error
+    }
 
     await setSessionCookie(user.id)
 
