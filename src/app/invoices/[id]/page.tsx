@@ -6,8 +6,6 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
 import { sealInvoice } from '@/app/actions'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -73,7 +71,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     const searchParams = useSearchParams()
     const backHref = searchParams.get('from') === 'admin' ? '/admin/invoices' : '/invoices'
     const invoiceRef = useRef<HTMLDivElement>(null)
-    const pdfRootRef = useRef<HTMLDivElement>(null)
     const [invoice, setInvoice] = useState<Invoice | null>(null)
     const [loading, setLoading] = useState(true)
     const [downloading, setDownloading] = useState(false)
@@ -140,105 +137,19 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             toast.info('案内：センター長の押印をお待ちください')
             return
         }
-        if (!pdfRootRef.current) return
-
         setDownloading(true)
 
         try {
-            const pdfRoot = pdfRootRef.current
-            const waitForNextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-
-            const createPdf = async (scale: number, jpegQuality: number) => {
-                await waitForNextFrame()
-                await waitForNextFrame()
-                if (document.fonts?.ready) await document.fonts.ready
-                await Promise.all(Array.from(pdfRoot.querySelectorAll('img')).map(image => image.decode().catch(() => undefined)))
-
-                const canvas = await html2canvas(pdfRoot, {
-                    scale,
-                    backgroundColor: '#ffffff',
-                    useCORS: true,
-                    allowTaint: false,
-                    logging: false,
-                    scrollX: 0,
-                    scrollY: 0,
-                    windowWidth: 794,
-                    windowHeight: 1123,
-                    foreignObjectRendering: false,
-                    width: 794,
-                    height: 1123,
-                })
-                const context = canvas.width > 0 && canvas.height > 0
-                    ? canvas.getContext('2d', { willReadFrequently: true })
-                    : null
-                const pixels = context ? context.getImageData(0, 0, canvas.width, canvas.height).data : undefined
-                let nonWhitePixels = 0
-                if (pixels) {
-                    for (let index = 0; index < pixels.length; index += 4) {
-                        const alpha = pixels[index + 3]
-                        const isWhite = pixels[index] > 248 && pixels[index + 1] > 248 && pixels[index + 2] > 248
-                        if (alpha > 0 && !isWhite) nonWhitePixels++
-                    }
-                }
-                const rootRect = pdfRoot.getBoundingClientRect()
-                if (canvas.width === 0 || canvas.height === 0 || nonWhitePixels < 100) {
-                    console.error('請求書PDFの描画結果が白紙です。', {
-                        invoiceId: invoice.id,
-                        canvasWidth: canvas.width,
-                        canvasHeight: canvas.height,
-                        elementWidth: rootRect.width,
-                        elementHeight: rootRect.height,
-                        nonWhitePixels,
-                        scale,
-                    })
-                    throw new Error('請求書の描画に失敗しました')
-                }
-
-                const imgData = canvas.toDataURL('image/jpeg', jpegQuality)
-                if (!imgData || imgData === 'data:,') throw new Error('請求書PDFの画像データを作成できませんでした')
-
-                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true })
-                const a4Width = 210
-                const a4Height = 297
-                const imgHeight = (canvas.height * a4Width) / canvas.width
-                let heightLeft = imgHeight
-                let position = 0
-                pdf.addImage(imgData, 'JPEG', 0, position, a4Width, imgHeight)
-                heightLeft -= a4Height
-                while (heightLeft > 1) {
-                    position = heightLeft - imgHeight
-                    pdf.addPage()
-                    pdf.addImage(imgData, 'JPEG', 0, position, a4Width, imgHeight)
-                    heightLeft -= a4Height
-                }
-                return pdf
-            }
-
-            let pdf = await createPdf(2, 0.88)
-            let pdfBlob = pdf.output('blob')
-            if (pdfBlob.size > 9.5 * 1024 * 1024) {
-                pdf = await createPdf(1.5, 0.80)
-                pdfBlob = pdf.output('blob')
-            }
-
             const safeUserName = sanitizeFilenamePart(invoice.user.name)
             const filename = `請求書_${invoice.fiscalYear}年_${invoice.quarter}期_${safeUserName}.pdf`
-
-            if (pdfBlob.size < 1000) {
-                console.error('請求書PDFのファイルサイズが小さすぎます。', { invoiceId: invoice.id, fileSize: pdfBlob.size })
-                toast.error('請求書の描画に失敗しました。画面を再読み込みして、もう一度お試しください。')
-                return
-            }
-            if (pdfBlob.size > 10 * 1024 * 1024) {
-                toast.error('PDFの容量が10MBを超えています。明細や画像を減らしてください。')
-                return
-            }
-
-            const formData = new FormData()
-            formData.append('file', pdfBlob, filename)
             let downloadResponse: Response
             try {
-                downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, { method: 'POST', body: formData, cache: 'no-store' })
+                downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ invoiceId: invoice.id }),
+                    cache: 'no-store',
+                })
             } catch (error) {
                 console.error('押印済みPDF確認APIへの接続に失敗しました。', error)
                 toast.error('エラー：押印済みPDFを取得できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
@@ -251,6 +162,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             }
 
             const approvedBlob = await downloadResponse.blob()
+            if (approvedBlob.size === 0) {
+                toast.error('エラー：押印済みPDFを取得できませんでした。')
+                return
+            }
             const url = window.URL.createObjectURL(approvedBlob)
             const a = document.createElement('a')
             a.href = url
@@ -396,7 +311,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
             {/* PDF専用の固定レイアウト。表示中のレスポンシブカードとは分離する。 */}
             <div
-                ref={pdfRootRef}
                 data-pdf-root="invoice"
                 aria-hidden="true"
                 style={{
