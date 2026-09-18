@@ -12,6 +12,15 @@ function csvCell(value: string | null | undefined): string {
     return `"${safeValue.replace(/"/g, '""')}"`
 }
 
+function dateOnly(value: Date): string {
+    return new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(value)
+}
+
 export async function GET() {
     const requestId = createRequestId()
 
@@ -27,17 +36,18 @@ export async function GET() {
 
         const users = await prisma.user.findMany({
             select: adminUserSelect,
-            orderBy: { createdAt: 'desc' },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         })
 
         const rows = [
-            ['氏名', '学部', '所属・研究室', '職員番号', '登録日時'].map(csvCell).join(','),
-            ...users.map((user) => [
+            ['No.', '氏名', '学部', '所属・研究室', '職員番号', '登録日'].map(csvCell).join(','),
+            ...users.map((user, index) => [
+                String(index + 1),
                 user.name,
                 user.department || '',
                 user.laboratory || '',
                 user.employeeId || '',
-                user.createdAt.toISOString(),
+                dateOnly(user.createdAt),
             ].map(csvCell).join(',')),
         ]
         const csv = `\uFEFF${rows.join('\r\n')}\r\n`
