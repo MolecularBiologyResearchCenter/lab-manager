@@ -35,6 +35,8 @@ model User {
   sealedInvoices Invoice[] @relation("Sealer")
   sealImage    String? // 印鑑画像のパス
   auditLogs    AuditLog[]
+  adminNotificationsTarget AdminNotification[] @relation("AdminNotificationTarget")
+  adminNotificationReads   AdminNotificationRead[] @relation("AdminNotificationReader")
 
   @@index([passwordResetTokenHash])
 }
@@ -58,6 +60,36 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([targetType, targetId])
   @@index([action, createdAt])
+}
+
+model AdminNotification {
+  id           String   @id @default(cuid())
+  type         String
+  targetUserId String
+  name         String
+  department   String?
+  laboratory   String?
+  employeeId   String?
+  createdAt    DateTime @default(now())
+
+  targetUser User                   @relation("AdminNotificationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  reads      AdminNotificationRead[]
+
+  @@index([createdAt])
+  @@index([targetUserId, createdAt])
+}
+
+model AdminNotificationRead {
+  id             String   @id @default(cuid())
+  notificationId String
+  adminId        String
+  readAt         DateTime @default(now())
+
+  notification AdminNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  admin        User              @relation("AdminNotificationReader", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, adminId])
+  @@index([adminId, readAt])
 }
 
 model AuthThrottle {
