@@ -8,6 +8,7 @@ import {
     verifyPassword,
 } from '../src/lib/password'
 import { createSignedSessionValue, verifySignedSessionValue } from '../src/lib/auth'
+import { MAX_INVOICE_PDF_SIZE, sha256Pdf, validateGeneratedInvoicePdf } from '../src/lib/invoice-pdf-security'
 
 async function main() {
     const password = 'secure123'
@@ -44,6 +45,12 @@ async function main() {
 
     const expiredUpdater = async () => ({ count: 0 })
     await assert.rejects(() => consumePasswordResetToken(reset.token, 'replacement123', expiredUpdater, reset.expiresAt), /無効か期限切れ/)
+
+    const validPdf = Buffer.from('%PDF-1.7\nsecure invoice')
+    validateGeneratedInvoicePdf(validPdf)
+    assert.equal(sha256Pdf(validPdf).length, 64)
+    assert.throws(() => validateGeneratedInvoicePdf(Buffer.from('not a pdf')), /INVALID_PDF/)
+    assert.throws(() => validateGeneratedInvoicePdf(new Uint8Array(MAX_INVOICE_PDF_SIZE + 1)), /PDF_TOO_LARGE/)
 
     console.log('Security self-test passed.')
 }

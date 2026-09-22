@@ -145,9 +145,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             let downloadResponse: Response
             try {
                 downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ invoiceId: invoice.id }),
+                    method: 'GET',
                     cache: 'no-store',
                 })
             } catch (error) {
