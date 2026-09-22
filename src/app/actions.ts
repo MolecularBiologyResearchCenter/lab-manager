@@ -773,32 +773,52 @@ export async function sealInvoice(invoiceId: string) {
 
     const invoice = await prisma.invoice.findUnique({
         where: { id: invoiceId },
-        select: { id: true },
+        select: { id: true, status: true },
     })
 
     if (!invoice) {
         throw new Error('請求書が見つかりません。')
     }
 
-    const result = await prisma.invoice.updateMany({
-        where: { id: invoiceId, sealedAt: null },
-        data: {
-            sealedBy: currentUser.id,
-            sealedAt: new Date(),
-        },
-    })
-
-    if (result.count === 0) {
-        throw new Error('この請求書はすでに押印済みです。')
+    if (invoice.status === 'rejected') {
+        throw new Error('却下済みの請求書には押印できません。')
     }
 
-    await recordAuditLog({
-        actor: currentUser,
-        action: 'INVOICE_SEAL',
-        targetType: 'Invoice',
-        targetId: invoiceId,
-        summary: '請求書に電子印を押しました。',
+    const sealedAt = new Date()
+    const result = await prisma.$transaction(async (transaction) => {
+        const updated = await transaction.invoice.updateMany({
+            where: { id: invoiceId, sealedAt: null, sealedBy: null },
+            data: {
+                sealedBy: currentUser.id,
+                sealedAt,
+            },
+        })
+
+        if (updated.count === 0) return 0
+
+        await transaction.auditLog.create({
+            data: {
+                actorId: currentUser.id,
+                actorName: currentUser.name,
+                actorRole: currentUser.role,
+                action: 'INVOICE_SEAL',
+                targetType: 'Invoice',
+                targetId: invoiceId,
+                summary: '請求書に電子印を押しました。',
+                metadata: {
+                    invoiceId,
+                    sealedAt: sealedAt.toISOString(),
+                    result: 'success',
+                },
+            },
+        })
+
+        return updated.count
     })
+
+    if (result === 0) {
+        throw new Error('この請求書はすでに押印済みです。')
+    }
 
     revalidatePath(`/invoices/${invoiceId}`)
     revalidatePath('/invoices')
