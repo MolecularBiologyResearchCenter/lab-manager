@@ -65,14 +65,18 @@ model AuditLog {
 model AdminNotification {
   id           String   @id @default(cuid())
   type         String
-  targetUserId String
+  targetUserId String?
   name         String
   department   String?
   laboratory   String?
   employeeId   String?
+  fiscalYear   Int?
+  quarter      Int?
+  dedupeKey    String?  @unique
+  resolvedAt   DateTime?
   createdAt    DateTime @default(now())
 
-  targetUser User                   @relation("AdminNotificationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetUser User?                  @relation("AdminNotificationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   reads      AdminNotificationRead[]
 
   @@index([createdAt])
