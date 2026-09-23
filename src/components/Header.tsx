@@ -1,13 +1,35 @@
 import Link from 'next/link'
 import { getCurrentUser, logout } from '@/app/actions'
 import { Button } from '@/components/ui/button'
-import { CalendarDays, CircleUserRound, FileText, FlaskConical, Home, LogOut } from 'lucide-react'
+import {
+    CalendarDays,
+    CircleUserRound,
+    ClipboardList,
+    DollarSign,
+    FileText,
+    FlaskConical,
+    Gauge,
+    Home,
+    LogOut,
+    Users,
+    Wrench,
+} from 'lucide-react'
 
 const navigation = [
     { href: '/', label: 'ホーム', icon: Home },
     { href: '/reservations', label: '機器予約', icon: CalendarDays },
     { href: '/reagents', label: '有料サービス', icon: FlaskConical },
     { href: '/invoices', label: '請求書', icon: FileText },
+]
+
+const adminNavigation = [
+    { href: '/admin', label: '概要', icon: Gauge },
+    { href: '/admin/invoices', label: '請求書', icon: FileText },
+    { href: '/admin/usage-logs', label: '利用料金', icon: DollarSign },
+    { href: '/admin/reagents', label: 'サービス', icon: FlaskConical },
+    { href: '/admin/equipment', label: '機器', icon: Wrench },
+    { href: '/admin/users', label: '利用者', icon: Users },
+    { href: '/admin/audit-logs', label: '監査ログ', icon: ClipboardList },
 ]
 
 export default async function Header() {
@@ -30,8 +52,13 @@ export default async function Header() {
                         </div>
                     </Link>
 
-                    <nav className="hidden items-center gap-1 lg:flex" aria-label="メインナビゲーション">
-                        {navigation.map(({ href, label, icon: Icon }) => (
+                    <nav
+                        className={user.role === 'ADMIN'
+                            ? 'admin-header-nav'
+                            : 'hidden items-center gap-1 lg:flex'}
+                        aria-label={user.role === 'ADMIN' ? '管理者メニュー' : 'メインナビゲーション'}
+                    >
+                        {(user.role === 'ADMIN' ? adminNavigation : navigation).map(({ href, label, icon: Icon }) => (
                             <Link
                                 key={href}
                                 href={href}
