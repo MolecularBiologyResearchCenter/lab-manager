@@ -14,6 +14,7 @@ import AdminYearSelect from '@/components/AdminYearSelect'
 import { FileText, DollarSign, FlaskConical, Wrench, Users } from 'lucide-react'
 import { getAuthenticatedUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import AdminNotifications from '@/components/AdminNotifications'
 
 export default async function AdminPage(props: { searchParams: Promise<{ month?: string; year?: string }> }) {
     const currentUser = await getAuthenticatedUser()
@@ -109,6 +110,8 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
                 <h1>管理者ダッシュボード</h1>
                 <p className="mt-2 text-sm text-slate-500">センターの利用状況と各種設定を確認できます</p>
             </div>
+
+            <AdminNotifications />
 
             <div className="space-y-3">
                 {/* Year Selector */}
