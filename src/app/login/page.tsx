@@ -1,6 +1,6 @@
 'use client'
 
-import { login } from '@/app/actions'
+import { getCurrentUser, login } from '@/app/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,7 +19,8 @@ export default function LoginPage() {
                 toast.error(result.error)
                 return
             }
-            router.push('/')
+            const currentUser = await getCurrentUser()
+            router.replace(currentUser?.role === 'ADMIN' ? '/admin' : '/')
         } catch {
             toast.error('ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
         }
