@@ -5,7 +5,8 @@ import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId 
 import { getActiveInvoiceReminderPeriod, getInvoiceReminderDedupeKey, INVOICE_ISSUE_REMINDER_TYPE } from '@/lib/invoice-reminders'
 
 const NEW_USER_NOTIFICATION_TYPE = 'NEW_USER_REGISTRATION'
-const RECENT_REGISTRATION_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000
+// 通知機能の切り替え時に取りこぼした登録を救済できる期間。
+const RECENT_REGISTRATION_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000
 
 /**
  * 登録処理と通知作成が別リクエストになった場合に備え、直近の登録だけを補完する。
