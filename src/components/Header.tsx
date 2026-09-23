@@ -37,17 +37,17 @@ export default async function Header() {
     if (!user) return null
 
     return (
-        <header className="sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden">
+        <header className={`sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden ${user.role === 'ADMIN' ? 'admin-header' : ''}`}>
             <div className="content-wrapper">
                 <div className="flex min-h-16 items-center justify-between gap-4 py-2">
-                    <Link href="/" className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90">
+                    <Link href="/" className="flex flex-shrink-0 items-center gap-3 transition-opacity hover:opacity-90">
                         <img
                             src="/images/kitasato-logo.png"
                             alt="北里大学"
                             className="h-10 w-10 flex-shrink-0 object-contain md:h-11 md:w-11"
                         />
                         <div className="min-w-0 leading-tight">
-                            <div className="truncate text-sm font-medium md:text-base">分子生物実験センター</div>
+                            <div className="whitespace-nowrap text-sm font-medium md:text-base">分子生物実験センター</div>
                             <div className="mt-0.5 text-[10px] tracking-[0.18em] text-blue-100">LAB MANAGER</div>
                         </div>
                     </Link>

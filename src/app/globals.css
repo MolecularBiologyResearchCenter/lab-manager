@@ -301,12 +301,16 @@
     flex: 1 1 auto;
     align-items: center;
     gap: 0.125rem;
-    overflow-x: auto;
+    overflow: visible;
     scrollbar-width: none;
   }
 
   .admin-header-nav::-webkit-scrollbar {
     display: none;
+  }
+
+  .admin-header-nav {
+    flex-wrap: wrap;
   }
 
   .admin-header-nav a {
@@ -327,6 +331,19 @@
   .admin-header-nav a:hover {
     background: rgb(255 255 255 / 0.12);
     color: white;
+  }
+
+  @media (max-width: 1023px) {
+    .admin-header > .content-wrapper > div {
+      flex-wrap: wrap;
+      row-gap: 0.25rem;
+    }
+
+    .admin-header .admin-header-nav {
+      order: 3;
+      flex-basis: 100%;
+      flex-shrink: 0;
+    }
   }
 
   .admin-nav-row {
