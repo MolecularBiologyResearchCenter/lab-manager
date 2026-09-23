@@ -41,6 +41,10 @@ export default function HomePage() {
                     router.push('/login')
                     return
                 }
+                if (currentUser.role === 'ADMIN') {
+                    router.replace('/admin')
+                    return
+                }
                 setUser(currentUser)
                 if (currentUser.role === 'CENTER_DIRECTOR') {
                     const sealImage = await getCurrentUserSealImage()
