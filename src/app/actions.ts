@@ -82,6 +82,7 @@ const concurrentReservationError = '同時に別の予約が登録されまし�
 const reservationFailedError = '予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。'
 type ReservationActionResult = { success: true } | { success: false; error: string }
 type LoginActionResult = { success: true } | { success: false; error: string }
+type RegisterActionResult = { success: true } | { success: false; error: string }
 
 const authAuditActor = { name: '認証システム', role: 'SYSTEM' }
 const genericLoginError = 'アカウントまたはパスワードが正しくありません。'
@@ -472,26 +473,26 @@ export async function logout() {
     redirect('/login')
 }
 
-export async function register(formData: FormData) {
-    const lastName = formData.get('lastName') as string
-    const firstName = formData.get('firstName') as string
-    const lastNameKana = formData.get('lastNameKana') as string
-    const firstNameKana = formData.get('firstNameKana') as string
-    const employeeId = formData.get('employeeId') as string
+export async function register(formData: FormData): Promise<RegisterActionResult> {
+    const lastName = String(formData.get('lastName') || '').trim()
+    const firstName = String(formData.get('firstName') || '').trim()
+    const lastNameKana = String(formData.get('lastNameKana') || '').trim()
+    const firstNameKana = String(formData.get('firstNameKana') || '').trim()
+    const employeeId = String(formData.get('employeeId') || '').trim()
     const mailingList = formData.get('mailingList') === 'true' // Convert string to boolean
-    const email = formData.get('email') as string
-    const password = formData.get('password') as string
-    const department = formData.get('department') as string
-    const laboratory = formData.get('laboratory') as string
-    const extension = formData.get('extension') as string
+    const email = String(formData.get('email') || '').trim().toLowerCase()
+    const password = String(formData.get('password') || '')
+    const department = String(formData.get('department') || '').trim()
+    const laboratory = String(formData.get('laboratory') || '').trim()
+    const extension = String(formData.get('extension') || '').trim()
 
     if (!lastName || !firstName || !lastNameKana || !firstNameKana || !employeeId || !email || !password || !department || !laboratory) {
-        throw new Error('必須項目を入力してください。')
+        return { success: false, error: '必須項目を入力してください。' }
     }
 
     // Password validation: at least 8 characters, alphanumeric
     if (!validatePassword(password)) {
-        throw new Error('パスワードは英小文字と数字を含む8文字以上で入力してください。')
+        return { success: false, error: 'パスワードは英小文字と数字を含む8文字以上で入力してください。' }
     }
 
     const name = `${lastName} ${firstName}`
@@ -503,24 +504,32 @@ export async function register(formData: FormData) {
     })
 
     if (existingUser) {
-        throw new Error('このメールアドレスは既に登録されています。')
+        return { success: false, error: 'このメールアドレスは既に登録されています。ログイン画面からお試しください。' }
     }
 
     const passwordHash = await hashPassword(password)
-    const user = await prisma.user.create({
-        data: {
-            name,
-            nameKana,
-            employeeId,
-            mailingList,
-            email,
-            password: passwordHash,
-            department,
-            laboratory,
-            extension,
-        },
-        select: { id: true },
-    })
+    let user: { id: string }
+    try {
+        user = await prisma.user.create({
+            data: {
+                name,
+                nameKana,
+                employeeId,
+                mailingList,
+                email,
+                password: passwordHash,
+                department,
+                laboratory,
+                extension,
+            },
+            select: { id: true },
+        })
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+            return { success: false, error: 'このメールアドレスは既に登録されています。ログイン画面からお試しください。' }
+        }
+        throw error
+    }
 
     // 通知の作成失敗で、利用者登録そのものをロールバックしない。
     // 通知テーブルのマイグレーション未反映や一時的なDB障害があっても、
