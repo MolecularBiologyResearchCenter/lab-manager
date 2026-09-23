@@ -489,7 +489,11 @@ export default function UsersPage() {
                         <Button variant="outline" onClick={cancelDelete}>
                             キャンセル
                         </Button>
-                        <Button variant="destructive" onClick={confirmDelete} disabled={!userToDelete || deleteNameConfirmation !== userToDelete.name}>
+                        <Button
+                            onClick={confirmDelete}
+                            disabled={!userToDelete || deleteNameConfirmation !== userToDelete.name}
+                            className="border border-red-200 bg-white text-red-600 hover:bg-red-50 hover:text-red-700"
+                        >
                             削除
                         </Button>
                     </DialogFooter>

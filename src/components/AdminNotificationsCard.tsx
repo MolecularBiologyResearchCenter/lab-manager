@@ -119,7 +119,9 @@ export default function AdminNotificationsCard() {
                                         ) : (
                                             <>
                                                 <p className="font-medium text-slate-800">
-                                                    {notification.isRead ? '新規登録を確認済み' : '新規登録があります'}：{notification.name}
+                                                    <Link href="/admin/users" className="hover:text-blue-700 hover:underline">
+                                                        {notification.isRead ? '新規登録を確認済み' : '新規登録があります'}：{notification.name}
+                                                    </Link>
                                                 </p>
                                                 <p className="mt-1 text-sm text-slate-600">
                                                     {notification.department || '学部未登録'} / {notification.laboratory || '所属・研究室未登録'}
@@ -147,9 +149,6 @@ export default function AdminNotificationsCard() {
                         ))}
                     </div>
                 )}
-                <Link href="/admin/users" className="mt-4 inline-block text-sm font-medium text-blue-700 hover:underline">
-                    利用者管理を開く
-                </Link>
             </CardContent>
         </Card>
     )
