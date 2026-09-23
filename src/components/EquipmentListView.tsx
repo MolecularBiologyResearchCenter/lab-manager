@@ -21,6 +21,7 @@ import CustomDateTimePicker from '@/components/CustomDateTimePicker'
 import { createReservation } from '@/app/actions'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 interface Equipment {
     id: string
@@ -50,6 +51,7 @@ interface EquipmentListViewProps {
 
 export default function EquipmentListView({ equipmentList, currentUser, reservations }: EquipmentListViewProps) {
     const router = useRouter()
+    const { t } = useUserLanguage()
     const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [startTime, setStartTime] = useState<Date | null>(null)
@@ -160,7 +162,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                                     onClick={() => handleOpenDialog(equipment.id)}
                                     className="h-10 w-full rounded-xl bg-blue-700 text-sm font-semibold text-white hover:bg-blue-800"
                                 >
-                                    予約
+                                    {t('booking')}
                                 </Button>
                             </div>
                         </div>
@@ -171,21 +173,21 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="max-w-sm rounded-2xl border border-slate-200 bg-white shadow-xl">
                     <DialogHeader>
-                        <DialogTitle>新規予約</DialogTitle>
+                        <DialogTitle>{t('newReservation')}</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label>予約者</Label>
+                            <Label>{t('booker')}</Label>
                             <div className="p-2 bg-gray-50 rounded border border-gray-200 text-gray-700">
                                 {currentUser.name}
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label>機器</Label>
+                            <Label>{t('equipmentList')}</Label>
                             <Select onValueChange={setSelectedEquipment} value={selectedEquipment || undefined} required>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="機器を選択" />
+                                    <SelectValue placeholder={t('chooseEquipment')} />
                                 </SelectTrigger>
                                 <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} style={{ maxHeight: '400px', backgroundColor: 'white' }}>
                                     {equipmentList.map((eq) => (
@@ -224,7 +226,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
 
                         <div className="flex gap-2">
                             <Button type="submit" className="h-11 flex-1 rounded-xl bg-blue-700 font-semibold text-white hover:bg-blue-800">
-                                予約する
+                                {t('book')}
                             </Button>
                         </div>
                     </form>

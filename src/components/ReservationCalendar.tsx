@@ -27,6 +27,7 @@ import { createReservation, updateReservation, deleteReservation } from '@/app/a
 import CustomDateTimePicker from '@/components/CustomDateTimePicker'
 import { useRouter } from 'next/navigation'
 import { formatTokyoDateTimeLocal, fromTokyoWallClock, parseTokyoDateTimeLocal, toTokyoWallClock } from '@/lib/date-format'
+import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 const locales = {
     'ja': ja,
@@ -77,6 +78,7 @@ interface Props {
 
 export default function ReservationCalendar({ reservations, equipmentList, currentUser }: Props) {
     const router = useRouter()
+    const { t } = useUserLanguage()
     const [view, setView] = useState<View>('week')
     const [date, setDate] = useState(() => toTokyoWallClock(new Date()))
     const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -446,7 +448,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
                 {sortedDates.length === 0 && (
                     <div className="text-center text-gray-500 py-8">
-                        予約がありません
+                        {t('noReservations')}
                     </div>
                 )}
             </div>
@@ -459,14 +461,14 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             {!isMobile && (
                 <div className="app-surface w-40 flex-shrink-0 overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 100px)' }}>
                     <div className="mb-2">
-                        <h3 className="font-bold text-gray-700">表示機器</h3>
+                        <h3 className="font-bold text-gray-700">{t('displayedEquipment')}</h3>
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={toggleAllEquipment}
                             className="mt-1 h-7 justify-start rounded-lg px-0 text-xs text-blue-700 hover:bg-transparent hover:text-blue-800"
                         >
-                            {visibleEquipmentIds.length === equipmentList.length ? '全解除' : '全選択'}
+                            {visibleEquipmentIds.length === equipmentList.length ? t('clearAll') : t('selectAll')}
                         </Button>
                     </div>
                     <div className="space-y-2">
@@ -506,7 +508,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                 className="rounded-xl"
                                 onClick={() => setView('month')}
                             >
-                                月
+                                {t('calendar')}
                             </Button>
                             <Button
                                 variant={view === 'week' ? 'default' : 'outline'}
@@ -527,7 +529,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                     {isMobile && <div></div>} {/* Spacer for mobile */}
                     <div className="flex items-center gap-4">
                         <Button variant="outline" onClick={() => setDate(toTokyoWallClock(new Date()))} className="rounded-xl border-slate-300 bg-white">
-                            今日
+                            {t('today')}
                         </Button>
                         <span className="text-lg font-bold">
                             {date.getFullYear()}年 {date.getMonth() + 1}月
@@ -561,14 +563,14 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                             messages={{
                                 next: "次へ",
                                 previous: "前へ",
-                                today: "今日",
-                                month: "月",
-                                week: "週",
-                                day: "日",
-                                date: "日付",
-                                time: "時間",
-                                event: "イベント",
-                                noEventsInRange: "この期間に予約はありません。",
+                                today: t('today'),
+                                month: t('month'),
+                                week: t('week'),
+                                day: t('day'),
+                                date: t('date'),
+                                time: t('time'),
+                                event: t('event'),
+                                noEventsInRange: t('noBookingsInRange'),
                             }}
                             formats={{
                                 timeGutterFormat: (date: Date) =>
@@ -591,21 +593,21 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="max-w-sm rounded-2xl border border-slate-200 bg-white shadow-xl">
                     <DialogHeader>
-                        <DialogTitle>{editingReservation ? '予約の編集' : '新規予約'}</DialogTitle>
+                        <DialogTitle>{editingReservation ? t('editReservation') : t('newReservation')}</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label>予約者</Label>
+                            <Label>{t('booker')}</Label>
                             <div className="p-2 bg-gray-50 rounded border border-gray-200 text-gray-700">
                                 {editingReservation ? editingReservation.userName || '不明' : currentUser.name}
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label>機器</Label>
+                            <Label>{t('equipmentList')}</Label>
                             <Select onValueChange={setSelectedEquipment} value={selectedEquipment} required>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="機器を選択" />
+                                    <SelectValue placeholder={t('chooseEquipment')} />
                                 </SelectTrigger>
                                 <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} style={{ maxHeight: '400px', backgroundColor: 'white' }}>
                                     {equipmentList.map((eq) => (
@@ -644,7 +646,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
                         <div className="flex gap-2">
                             <Button type="submit" className="h-11 flex-1 rounded-xl bg-blue-700 font-semibold text-white hover:bg-blue-800">
-                                {editingReservation ? '更新する' : '予約する'}
+                                {editingReservation ? t('update') : t('book')}
                             </Button>
                             {editingReservation && (
                                 <Button
@@ -653,7 +655,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                     className="h-11 flex-1 rounded-xl font-semibold"
                                     onClick={handleDelete}
                                 >
-                                    削除する
+                                    {t('delete')}
                                 </Button>
                             )}
                         </div>
