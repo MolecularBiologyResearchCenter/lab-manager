@@ -24,6 +24,7 @@ const navigation = [
 
 const adminNavigation = [
     { href: '/admin', label: '概要', icon: Gauge },
+    { href: '/reservations?view=calendar', label: 'カレンダー', icon: CalendarDays },
     { href: '/admin/invoices', label: '請求書', icon: FileText },
     { href: '/admin/usage-logs', label: '利用料金', icon: DollarSign },
     { href: '/admin/reagents', label: 'サービス', icon: FlaskConical },
