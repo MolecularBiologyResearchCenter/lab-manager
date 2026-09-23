@@ -333,13 +333,33 @@
     color: white;
   }
 
+  .user-header-nav {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+  }
+
+  .user-header-nav a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
   @media (max-width: 1023px) {
-    .admin-header > .content-wrapper > div {
+    .site-header > .content-wrapper > div {
       flex-wrap: wrap;
       row-gap: 0.25rem;
     }
 
     .admin-header .admin-header-nav {
+      order: 3;
+      flex-basis: 100%;
+      flex-shrink: 0;
+    }
+
+    .user-header-nav {
       order: 3;
       flex-basis: 100%;
       flex-shrink: 0;

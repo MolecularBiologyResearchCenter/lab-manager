@@ -37,7 +37,7 @@ export default async function Header() {
     if (!user) return null
 
     return (
-        <header className={`sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden ${user.role === 'ADMIN' ? 'admin-header' : ''}`}>
+        <header className={`site-header sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden ${user.role === 'ADMIN' ? 'admin-header' : ''}`}>
             <div className="content-wrapper">
                 <div className="flex min-h-16 items-center justify-between gap-4 py-2">
                     <Link href="/" className="flex flex-shrink-0 items-center gap-3 transition-opacity hover:opacity-90">
@@ -55,7 +55,7 @@ export default async function Header() {
                     <nav
                         className={user.role === 'ADMIN'
                             ? 'admin-header-nav'
-                            : 'hidden items-center gap-1 lg:flex'}
+                            : 'user-header-nav'}
                         aria-label={user.role === 'ADMIN' ? '管理者メニュー' : 'メインナビゲーション'}
                     >
                         {(user.role === 'ADMIN' ? adminNavigation : navigation).map(({ href, label, icon: Icon }) => (
