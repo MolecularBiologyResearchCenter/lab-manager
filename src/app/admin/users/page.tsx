@@ -79,6 +79,10 @@ export default function UsersPage() {
     const [selectedRole, setSelectedRole] = useState<string>('USER')
     const [employeeId, setEmployeeId] = useState('')
     const [mailingList, setMailingList] = useState(false)
+    const [csvDialogOpen, setCsvDialogOpen] = useState(false)
+    const [csvStartNo, setCsvStartNo] = useState('1')
+    const [csvEndNo, setCsvEndNo] = useState('')
+    const [csvError, setCsvError] = useState('')
 
     useEffect(() => {
         fetchUsers()
@@ -222,6 +226,60 @@ export default function UsersPage() {
         setUserToEdit(null)
     }
 
+    const openCsvDialog = () => {
+        setCsvStartNo('1')
+        setCsvEndNo(String(Math.min(10, users.length)))
+        setCsvError('')
+        setCsvDialogOpen(true)
+    }
+
+    const downloadCsv = async () => {
+        const start = Number(csvStartNo)
+        const end = Number(csvEndNo)
+        if (!/^\d+$/.test(csvStartNo) || !/^\d+$/.test(csvEndNo) || !Number.isSafeInteger(start) || !Number.isSafeInteger(end)) {
+            setCsvError('開始Noと終了Noを整数で入力してください。')
+            return
+        }
+        if (start < 1 || end < 1) {
+            setCsvError('Noは1以上で入力してください。')
+            return
+        }
+        if (start > end) {
+            setCsvError('開始Noは終了No以下で入力してください。')
+            return
+        }
+        if (end > users.length) {
+            setCsvError(`指定したNoは存在しません。登録ユーザーは${users.length}人です。`)
+            return
+        }
+        if (end - start + 1 > 500) {
+            setCsvError('一度にダウンロードできるのは500人までです。')
+            return
+        }
+
+        try {
+            const response = await fetch(`/api/admin/users/export?startNo=${start}&endNo=${end}`, { cache: 'no-store' })
+            if (!response.ok) {
+                const apiError = await readApiError(response, '利用者情報CSVを作成できませんでした。')
+                setCsvError(formatApiError(apiError))
+                return
+            }
+            const blob = await response.blob()
+            const objectUrl = URL.createObjectURL(blob)
+            const anchor = document.createElement('a')
+            anchor.href = objectUrl
+            anchor.download = `user-employee-list-${start}-${end}.csv`
+            document.body.appendChild(anchor)
+            anchor.click()
+            anchor.remove()
+            URL.revokeObjectURL(objectUrl)
+            setCsvDialogOpen(false)
+        } catch (error) {
+            console.error('利用者情報CSVのダウンロードに失敗しました。', error)
+            setCsvError('CSVをダウンロードできませんでした。時間をおいて、もう一度お試しください。')
+        }
+    }
+
     if (loading) {
         return (
             <div className="content-wrapper space-y-8 py-8">
@@ -340,7 +398,7 @@ export default function UsersPage() {
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => { window.location.href = '/api/admin/users/export' }}
+                        onClick={openCsvDialog}
                         className="shrink-0"
                     >
                         <Download className="mr-2 h-4 w-4" />
@@ -348,9 +406,9 @@ export default function UsersPage() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <div className="overflow-x-auto">
+                    <div className="max-h-[38rem] overflow-auto">
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="sticky top-0 z-10 bg-white">
                                 <TableRow>
                                     <TableHead>No.</TableHead>
                                     <TableHead>名前</TableHead>
@@ -418,6 +476,45 @@ export default function UsersPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <Dialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen}>
+                <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white">
+                    <DialogHeader>
+                        <DialogTitle>職員番号CSVをダウンロード</DialogTitle>
+                        <DialogDescription>
+                            現在の登録ユーザー一覧のNo番号を基準に範囲を指定してください。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="flex items-center gap-2 text-base font-medium text-slate-800">
+                            <span>No（</span>
+                            <input
+                                aria-label="開始No"
+                                inputMode="numeric"
+                                value={csvStartNo}
+                                onChange={(event) => setCsvStartNo(event.target.value)}
+                                className="h-10 w-24 rounded-md border border-slate-300 px-3 text-center outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                            />
+                            <span>）〜（</span>
+                            <input
+                                aria-label="終了No"
+                                inputMode="numeric"
+                                value={csvEndNo}
+                                onChange={(event) => setCsvEndNo(event.target.value)}
+                                className="h-10 w-24 rounded-md border border-slate-300 px-3 text-center outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                            />
+                            <span>）をダウンロードする</span>
+                        </div>
+                        {csvError && (
+                            <p className="whitespace-pre-line rounded-lg bg-red-50 p-3 text-sm text-red-700">{csvError}</p>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCsvDialogOpen(false)}>キャンセル</Button>
+                        <Button onClick={downloadCsv} className="bg-blue-600 text-white hover:bg-blue-700">ダウンロード</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Edit User Dialog */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
