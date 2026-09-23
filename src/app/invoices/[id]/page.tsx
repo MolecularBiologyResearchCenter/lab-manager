@@ -236,11 +236,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
                         return (
                             <div>
-                                {isCenterDirector && isSealed ? (
-                                    <p className="rounded-xl border border-green-200 bg-green-50 px-4 py-2 text-sm font-medium text-green-800">
-                                        案内：押印が完了しました
-                                    </p>
-                                ) : (
+                                {(!isCenterDirector || !isSealed) && (
                                     <Button
                                         onClick={handleDownloadPDF}
                                         disabled={!canDownload || downloading}
