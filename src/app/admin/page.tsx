@@ -11,10 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import AdminYearSelect from '@/components/AdminYearSelect'
-import { FileText, DollarSign, FlaskConical, Wrench, Users } from 'lucide-react'
+import { CalendarDays, FileText, DollarSign, FlaskConical, Wrench, Users } from 'lucide-react'
 import { getAuthenticatedUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { formatTokyoDate, formatTokyoTime } from '@/lib/date-format'
+import AdminNotificationsCard from '@/components/AdminNotificationsCard'
 
 export default async function AdminPage(props: { searchParams: Promise<{ month?: string; year?: string }> }) {
     const currentUser = await getAuthenticatedUser()
@@ -95,6 +96,35 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
         orderBy: {
             startTime: 'desc',
         },
+    })
+
+    const tokyoDateParts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+    }).formatToParts(now)
+    const getTokyoPart = (type: Intl.DateTimeFormatPartTypes) => Number(tokyoDateParts.find((part) => part.type === type)?.value)
+    const dashboardReservationsStart = new Date(Date.UTC(
+        getTokyoPart('year'),
+        getTokyoPart('month') - 1,
+        getTokyoPart('day'),
+        -9,
+    ))
+    const dashboardReservationsEnd = new Date(dashboardReservationsStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const dashboardReservations = await prisma.reservation.findMany({
+        where: {
+            startTime: {
+                gte: dashboardReservationsStart,
+                lt: dashboardReservationsEnd,
+            },
+        },
+        include: {
+            user: { select: { name: true } },
+            equipment: { select: { name: true } },
+        },
+        orderBy: { startTime: 'asc' },
+        take: 5,
     })
 
     // Calculate billing per user
@@ -190,6 +220,43 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
                         <span className="admin-management-title">利用者管理</span>
                     </div>
                 </Link>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+                <AdminNotificationsCard />
+
+                <Card className="h-full">
+                    <CardHeader className="flex flex-row items-center justify-between gap-4">
+                        <CardTitle className="flex items-center gap-2">
+                            <CalendarDays className="h-5 w-5 text-blue-700" />
+                            予約状況
+                        </CardTitle>
+                        <Link href="/reservations?view=calendar">
+                            <Button type="button" variant="outline" size="sm">予約カレンダーを開く</Button>
+                        </Link>
+                    </CardHeader>
+                    <CardContent>
+                        {dashboardReservations.length === 0 ? (
+                            <p className="text-sm text-slate-500">本日から7日間の予約はありません。</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {dashboardReservations.map((reservation) => (
+                                    <div key={reservation.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
+                                            <span className="font-medium text-slate-800">{formatTokyoDate(reservation.startTime)}</span>
+                                            <span className="text-slate-600">
+                                                {formatTokyoTime(reservation.startTime)} - {formatTokyoTime(reservation.endTime)}
+                                            </span>
+                                        </div>
+                                        <p className="mt-1 text-sm text-slate-600">
+                                            {reservation.equipment.name} / {reservation.user.name}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Monthly Billing Summary */}
