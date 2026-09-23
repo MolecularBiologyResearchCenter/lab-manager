@@ -145,9 +145,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             let downloadResponse: Response
             try {
                 downloadResponse = await fetch(`/api/invoices/${invoice.id}/pdf`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ invoiceId: invoice.id }),
+                    method: 'GET',
                     cache: 'no-store',
                 })
             } catch (error) {
@@ -233,20 +231,23 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     {/* Download Button Logic */}
                     {(() => {
                         const isSealed = Boolean(invoice.sealedAt && invoice.sealedBy)
-                        const canDownload = isSealed
+                        const isCenterDirector = invoice.viewerRole === 'CENTER_DIRECTOR'
+                        const canDownload = isSealed && !isCenterDirector
 
                         return (
                             <div>
-                                <Button
-                                    onClick={handleDownloadPDF}
-                                    disabled={!canDownload || downloading}
-                                    className={canDownload
-                                        ? 'rounded-xl bg-blue-700 text-white hover:bg-blue-800'
-                                        : 'cursor-not-allowed rounded-xl bg-slate-200 text-slate-500'}
-                                >
-                                    <Download className="h-4 w-4" />
-                                    {downloading ? 'ダウンロード中...' : 'PDFダウンロード'}
-                                </Button>
+                                {(!isCenterDirector || !isSealed) && (
+                                    <Button
+                                        onClick={handleDownloadPDF}
+                                        disabled={!canDownload || downloading}
+                                        className={canDownload
+                                            ? 'rounded-xl bg-blue-700 text-white hover:bg-blue-800'
+                                            : 'cursor-not-allowed rounded-xl bg-slate-200 text-slate-500'}
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        {downloading ? 'ダウンロード中...' : 'PDFダウンロード'}
+                                    </Button>
+                                )}
                             </div>
                         )
                     })()}
@@ -265,7 +266,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             {/* Print Instructions */}
             <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 p-4 print:hidden">
                 <p className="text-sm text-blue-800">
-                    {invoice.sealedAt && invoice.sealedBy ? (
+                    {invoice.viewerRole === 'CENTER_DIRECTOR' && invoice.sealedAt && invoice.sealedBy ? (
+                        <>
+                            <strong>案内:</strong> 押印が完了しました
+                        </>
+                    ) : invoice.sealedAt && invoice.sealedBy ? (
                         <>
                             <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、{getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください
                         </>

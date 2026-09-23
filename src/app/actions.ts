@@ -6,6 +6,8 @@ import { sendEmail } from '@/lib/mail'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { recordAuditLog } from '@/lib/audit'
+import { generateInvoicePdf } from '@/lib/invoice-pdf'
+import { sha256Pdf, validateGeneratedInvoicePdf } from '@/lib/invoice-pdf-security'
 import {
     checkAuthThrottle,
     getAuthThrottleKeys,
@@ -763,42 +765,136 @@ export async function updateProfile(
 export async function sealInvoice(invoiceId: string) {
     const currentUser = await requireCenterDirector()
 
+    const recordSealFailure = async (reason: string, message: string): Promise<never> => {
+        await recordAuditLog({
+            actor: currentUser,
+            action: 'INVOICE_SEAL',
+            targetType: 'Invoice',
+            targetId: typeof invoiceId === 'string' && invoiceId.length <= 64 ? invoiceId : null,
+            summary: '請求書の押印に失敗しました。',
+            metadata: {
+                invoiceId: typeof invoiceId === 'string' && invoiceId.length <= 64 ? invoiceId : null,
+                result: 'failure',
+                reason,
+            },
+        })
+        throw new Error(message)
+    }
+
+    if (typeof invoiceId !== 'string' || invoiceId.length === 0 || invoiceId.length > 64) {
+        return recordSealFailure('INVALID_INVOICE_ID', '請求書IDが正しくありません。')
+    }
+
     const director = await prisma.user.findUnique({
         where: { id: currentUser.id },
         select: { sealImage: true },
     })
     if (!director?.sealImage) {
-        throw new Error('センター長の電子印が登録されていないため、押印できません。管理者に電子印の登録を依頼してください。')
+        return recordSealFailure('SEAL_IMAGE_NOT_REGISTERED', 'センター長の電子印が登録されていないため、押印できません。管理者に電子印の登録を依頼してください。')
     }
 
     const invoice = await prisma.invoice.findUnique({
         where: { id: invoiceId },
-        select: { id: true },
-    })
-
-    if (!invoice) {
-        throw new Error('請求書が見つかりません。')
-    }
-
-    const result = await prisma.invoice.updateMany({
-        where: { id: invoiceId, sealedAt: null },
-        data: {
-            sealedBy: currentUser.id,
-            sealedAt: new Date(),
+        select: {
+            id: true,
+            status: true,
+            sealedAt: true,
+            sealedBy: true,
+            invoiceNumber: true,
+            fiscalYear: true,
+            quarter: true,
+            totalAmount: true,
+            budgetDepartment: true,
+            budgetCategory: true,
+            budgetCode: true,
+            user: { select: { name: true, department: true, laboratory: true } },
+            items: {
+                select: { date: true, itemName: true, unitPrice: true, quantity: true, amount: true },
+                orderBy: { date: 'asc' },
+            },
         },
     })
 
-    if (result.count === 0) {
-        throw new Error('この請求書はすでに押印済みです。')
+    if (!invoice) {
+        return recordSealFailure('INVOICE_NOT_FOUND', '請求書が見つかりません。')
     }
 
-    await recordAuditLog({
-        actor: currentUser,
-        action: 'INVOICE_SEAL',
-        targetType: 'Invoice',
-        targetId: invoiceId,
-        summary: '請求書に電子印を押しました。',
-    })
+    if (invoice.status === 'rejected') {
+        return recordSealFailure('INVOICE_REJECTED', '却下済みの請求書には押印できません。')
+    }
+
+    if (invoice.sealedAt || invoice.sealedBy) {
+        return recordSealFailure('INVOICE_ALREADY_SEALED', 'この請求書はすでに押印済みです。')
+    }
+
+    const sealedAt = new Date()
+    let canonicalPdf: Buffer
+    try {
+        canonicalPdf = await generateInvoicePdf({
+            invoiceNumber: invoice.invoiceNumber,
+            fiscalYear: invoice.fiscalYear,
+            quarter: invoice.quarter,
+            totalAmount: invoice.totalAmount,
+            budgetDepartment: invoice.budgetDepartment,
+            budgetCategory: invoice.budgetCategory,
+            budgetCode: invoice.budgetCode,
+            user: invoice.user,
+            items: invoice.items,
+            sealedAt,
+            sealer: { name: currentUser.name, sealImage: director.sealImage },
+        })
+        validateGeneratedInvoicePdf(canonicalPdf)
+    } catch (error) {
+        const isTooLarge = error instanceof Error && error.message === 'PDF_TOO_LARGE'
+        return recordSealFailure(
+            isTooLarge ? 'PDF_TOO_LARGE' : 'PDF_GENERATION_FAILED',
+            isTooLarge ? '生成されたPDFが10MBを超えています。' : '押印対象PDFを生成できませんでした。時間をおいて、もう一度お試しください。',
+        )
+    }
+
+    const pdfSha256 = sha256Pdf(canonicalPdf)
+    try {
+        const result = await prisma.$transaction(async (transaction) => {
+            const updated = await transaction.invoice.updateMany({
+                where: { id: invoiceId, sealedAt: null, sealedBy: null },
+                data: {
+                    sealedBy: currentUser.id,
+                    sealedAt,
+                },
+            })
+
+            if (updated.count === 0) return 0
+
+            await transaction.auditLog.create({
+                data: {
+                    actorId: currentUser.id,
+                    actorName: currentUser.name,
+                    actorRole: currentUser.role,
+                    action: 'INVOICE_SEAL',
+                    targetType: 'Invoice',
+                    targetId: invoiceId,
+                    summary: '請求書に電子印を押しました。',
+                    metadata: {
+                        invoiceId,
+                        sealedAt: sealedAt.toISOString(),
+                        executedAt: new Date().toISOString(),
+                        fileSize: canonicalPdf.length,
+                        pdfSha256,
+                        result: 'success',
+                    },
+                },
+            })
+
+            return updated.count
+        })
+
+        if (result === 0) {
+            return recordSealFailure('INVOICE_ALREADY_SEALED', 'この請求書はすでに押印済みです。')
+        }
+    } catch {
+        console.error('請求書の押印処理に失敗しました。')
+        return recordSealFailure('TRANSACTION_FAILED', '押印処理に失敗しました。時間をおいて、もう一度お試しください。')
+    }
 
     revalidatePath(`/invoices/${invoiceId}`)
     revalidatePath('/invoices')
