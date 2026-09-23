@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label'
 import { createReservation, updateReservation, deleteReservation } from '@/app/actions'
 import CustomDateTimePicker from '@/components/CustomDateTimePicker'
 import { useRouter } from 'next/navigation'
+import { formatTokyoDateTimeLocal, fromTokyoWallClock, parseTokyoDateTimeLocal, toTokyoWallClock } from '@/lib/date-format'
 
 const locales = {
     'ja': ja,
@@ -64,6 +65,8 @@ interface Reservation {
     userId: string
     userName?: string
     userLaboratory?: string
+    calendarStart?: Date
+    calendarEnd?: Date
 }
 
 interface Props {
@@ -75,7 +78,7 @@ interface Props {
 export default function ReservationCalendar({ reservations, equipmentList, currentUser }: Props) {
     const router = useRouter()
     const [view, setView] = useState<View>('week')
-    const [date, setDate] = useState(new Date())
+    const [date, setDate] = useState(() => toTokyoWallClock(new Date()))
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
     const [editingReservation, setEditingReservation] = useState<Reservation | null>(null)
@@ -88,7 +91,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
     // Mobile detection
     const [isMobile, setIsMobile] = useState(false)
-    const [selectedMonth, setSelectedMonth] = useState<Date>(new Date()) // For mobile month filter
+    const [selectedMonth, setSelectedMonth] = useState<Date>(() => toTokyoWallClock(new Date())) // For mobile month filter
 
     useEffect(() => {
         const checkMobile = () => {
@@ -136,11 +139,20 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         return true
     })
 
+    // react-big-calendar uses the browser's Date methods for positioning. Convert
+    // only the calendar copy to Tokyo wall-clock fields; the original UTC instant
+    // remains on the event for persistence and overlap checks.
+    const calendarReservations = filteredReservations.map(reservation => ({
+        ...reservation,
+        calendarStart: toTokyoWallClock(reservation.start),
+        calendarEnd: toTokyoWallClock(reservation.end),
+    }))
+
     const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
         setEditingReservation(null)
         setSelectedSlot(slotInfo)
-        setStartTime(slotInfo.start)
-        setEndTime(slotInfo.end)
+        setStartTime(fromTokyoWallClock(slotInfo.start))
+        setEndTime(fromTokyoWallClock(slotInfo.end))
         setSelectedEquipment('')
         // Auto-fill phone number from current user
         setPhoneNumber(currentUser.extension || '')
@@ -315,9 +327,9 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     // Mobile List View Component
     const MobileReservationList = () => {
         // Filter reservations by selected month
-        const monthFilteredReservations = filteredReservations.filter(reservation => {
-            const reservationMonth = reservation.start.getMonth()
-            const reservationYear = reservation.start.getFullYear()
+        const monthFilteredReservations = calendarReservations.filter(reservation => {
+            const reservationMonth = reservation.calendarStart?.getMonth()
+            const reservationYear = reservation.calendarStart?.getFullYear()
             const selectedMonthValue = selectedMonth.getMonth()
             const selectedYear = selectedMonth.getFullYear()
             return reservationMonth === selectedMonthValue && reservationYear === selectedYear
@@ -327,7 +339,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         const groupedReservations: { [key: string]: Reservation[] } = {}
 
         monthFilteredReservations.forEach(reservation => {
-            const dateKey = format(reservation.start, 'yyyy-MM-dd')
+            const dateKey = format(reservation.calendarStart!, 'yyyy-MM-dd')
             if (!groupedReservations[dateKey]) {
                 groupedReservations[dateKey] = []
             }
@@ -401,7 +413,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                                     {equipment?.name || '不明'}
                                                 </div>
                                                 <div className="text-sm text-gray-600">
-                                                    {format(reservation.start, 'HH:mm')} - {format(reservation.end, 'HH:mm')}
+                                                    {format(reservation.calendarStart!, 'HH:mm')} - {format(reservation.calendarEnd!, 'HH:mm')}
                                                 </div>
                                             </div>
 
@@ -514,7 +526,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                     )}
                     {isMobile && <div></div>} {/* Spacer for mobile */}
                     <div className="flex items-center gap-4">
-                        <Button variant="outline" onClick={() => setDate(new Date())} className="rounded-xl border-slate-300 bg-white">
+                        <Button variant="outline" onClick={() => setDate(toTokyoWallClock(new Date()))} className="rounded-xl border-slate-300 bg-white">
                             今日
                         </Button>
                         <span className="text-lg font-bold">
@@ -530,9 +542,9 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                     <div className="app-surface flex-1 overflow-hidden px-4 pb-4 pt-3">
                         <Calendar
                             localizer={localizer}
-                            events={filteredReservations}
-                            startAccessor="start"
-                            endAccessor="end"
+                            events={calendarReservations}
+                            startAccessor="calendarStart"
+                            endAccessor="calendarEnd"
                             style={{ height: 'calc(100vh - 150px)', backgroundColor: 'white' }}
                             view={view}
                             onView={setView}
@@ -559,14 +571,14 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                 noEventsInRange: "この期間に予約はありません。",
                             }}
                             formats={{
-                                timeGutterFormat: (date: Date, culture?: string, localizer?: any) =>
-                                    localizer.format(date, 'HH:mm', culture),
-                                eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }, culture?: string, localizer?: any) =>
-                                    `${localizer.format(start, 'HH:mm', culture)} - ${localizer.format(end, 'HH:mm', culture)}`,
-                                eventTimeRangeStartFormat: ({ start }: { start: Date; end: Date }, culture?: string, localizer?: any) =>
-                                    `${localizer.format(start, 'HH:mm', culture)} -`,
-                                eventTimeRangeEndFormat: ({ end }: { start: Date; end: Date }, culture?: string, localizer?: any) =>
-                                    `- ${localizer.format(end, 'HH:mm', culture)}`,
+                                timeGutterFormat: (date: Date) =>
+                                    format(date, 'HH:mm'),
+                                eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+                                    `${format(start, 'HH:mm')} - ${format(end, 'HH:mm')}`,
+                                eventTimeRangeStartFormat: ({ start }: { start: Date; end: Date }) =>
+                                    `${format(start, 'HH:mm')} -`,
+                                eventTimeRangeEndFormat: ({ end }: { start: Date; end: Date }) =>
+                                    `- ${format(end, 'HH:mm')}`,
                             }}
                             tooltipAccessor={(event: Reservation) => {
                                 return `${event.title}${event.phoneNumber ? ` Tel: ${event.phoneNumber}` : ''}`
@@ -610,8 +622,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                 <Label className="text-base">開始日時</Label>
                                 <input
                                     type="datetime-local"
-                                    value={startTime ? new Date(startTime.getTime() - startTime.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
-                                    onChange={(e) => setStartTime(e.target.value ? new Date(e.target.value) : null)}
+                                    value={startTime ? formatTokyoDateTimeLocal(startTime) : ''}
+                                    onChange={(e) => setStartTime(e.target.value ? parseTokyoDateTimeLocal(e.target.value) : null)}
                                     className="w-full p-2 border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                     style={{ fontSize: '1rem', height: '2.5rem' }}
                                     required
@@ -621,8 +633,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                 <Label className="text-base">終了日時</Label>
                                 <input
                                     type="datetime-local"
-                                    value={endTime ? new Date(endTime.getTime() - endTime.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
-                                    onChange={(e) => setEndTime(e.target.value ? new Date(e.target.value) : null)}
+                                    value={endTime ? formatTokyoDateTimeLocal(endTime) : ''}
+                                    onChange={(e) => setEndTime(e.target.value ? parseTokyoDateTimeLocal(e.target.value) : null)}
                                     className="w-full p-2 border border-gray-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                     style={{ fontSize: '1rem', height: '2.5rem' }}
                                     required

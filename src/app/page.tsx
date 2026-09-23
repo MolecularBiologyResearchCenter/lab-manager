@@ -108,15 +108,18 @@ export default function HomePage() {
             ? 'こんにちは'
             : 'こんばんは'
 
-    const formatTime = (date: string | Date) => new Date(date).toLocaleTimeString('ja-JP', {
+    const formatTime = (date: string | Date) => new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
         hour: '2-digit',
         minute: '2-digit',
-    })
+        hourCycle: 'h23',
+    }).format(new Date(date))
 
-    const formatDate = (date: string | Date) => new Date(date).toLocaleDateString('ja-JP', {
+    const formatDate = (date: string | Date) => new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
         month: 'numeric',
         day: 'numeric',
-    })
+    }).format(new Date(date))
 
     async function handleSealUpload(file?: File) {
         if (!file) return

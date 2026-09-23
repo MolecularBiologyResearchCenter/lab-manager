@@ -14,6 +14,7 @@ import AdminYearSelect from '@/components/AdminYearSelect'
 import { FileText, DollarSign, FlaskConical, Wrench, Users } from 'lucide-react'
 import { getAuthenticatedUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { formatTokyoDate, formatTokyoTime } from '@/lib/date-format'
 
 export default async function AdminPage(props: { searchParams: Promise<{ month?: string; year?: string }> }) {
     const currentUser = await getAuthenticatedUser()
@@ -269,11 +270,11 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
                             <TableBody>
                                 {reservations.map((res, index) => (
                                     <TableRow key={res.id} style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : {}}>
-                                        <TableCell>{res.startTime.toLocaleDateString('ja-JP')}</TableCell>
+                                        <TableCell>{formatTokyoDate(res.startTime)}</TableCell>
                                         <TableCell>{res.user.name}</TableCell>
                                         <TableCell>{res.equipment.name}</TableCell>
                                         <TableCell>
-                                            {res.startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - {res.endTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                                            {formatTokyoTime(res.startTime)} - {formatTokyoTime(res.endTime)}
                                         </TableCell>
                                     </TableRow>
                                 ))}

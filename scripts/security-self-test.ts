@@ -11,6 +11,7 @@ import { createSignedSessionValue, verifySignedSessionValue } from '../src/lib/a
 import { MAX_INVOICE_PDF_SIZE, sha256Pdf, validateGeneratedInvoicePdf } from '../src/lib/invoice-pdf-security'
 import { getActiveInvoiceReminderPeriod, getInvoiceReminderDedupeKey } from '../src/lib/invoice-reminders'
 import { apiHeaders } from '../src/lib/api-response'
+import { formatTokyoDateTime, formatTokyoTime, parseTokyoDateTimeLocal } from '../src/lib/date-format'
 
 async function main() {
     const password = 'secure123'
@@ -54,6 +55,9 @@ async function main() {
     assert.throws(() => validateGeneratedInvoicePdf(Buffer.from('not a pdf')), /INVALID_PDF/)
     assert.throws(() => validateGeneratedInvoicePdf(new Uint8Array(MAX_INVOICE_PDF_SIZE + 1)), /PDF_TOO_LARGE/)
     assert.equal(apiHeaders('request-id')['Cache-Control'], 'no-store')
+    assert.equal(formatTokyoDateTime('2026-09-23T05:51:42Z'), '2026/9/23 14:51:42')
+    assert.equal(formatTokyoTime('2026-09-23T09:00:00Z'), '18:00')
+    assert.equal(parseTokyoDateTimeLocal('2026-09-23T14:51')?.toISOString(), '2026-09-23T05:51:00.000Z')
 
     const tokyo = (value: string) => new Date(`${value}T00:00:00+09:00`)
     assert.equal(getActiveInvoiceReminderPeriod(tokyo('2026-04-30')), null)
