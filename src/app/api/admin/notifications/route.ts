@@ -34,18 +34,39 @@ async function syncRecentRegistrationNotifications(currentUser: { id: string; na
 
     for (const user of users) {
         try {
-            const notification = await prisma.adminNotification.create({
-                data: {
-                    type: NEW_USER_NOTIFICATION_TYPE,
-                    targetUserId: user.id,
-                    name: user.name,
-                    department: user.department,
-                    laboratory: user.laboratory,
-                    employeeId: user.employeeId,
-                    dedupeKey: `${NEW_USER_NOTIFICATION_TYPE}:${user.id}`,
-                },
-                select: { id: true },
-            })
+            let notification: { id: string }
+            try {
+                notification = await prisma.adminNotification.create({
+                    data: {
+                        type: NEW_USER_NOTIFICATION_TYPE,
+                        targetUserId: user.id,
+                        name: user.name,
+                        department: user.department,
+                        laboratory: user.laboratory,
+                        employeeId: user.employeeId,
+                        dedupeKey: `${NEW_USER_NOTIFICATION_TYPE}:${user.id}`,
+                    },
+                    select: { id: true },
+                })
+            } catch (error) {
+                // Preview DBへdedupeKeyマイグレーションが未適用でも通知を表示できるようにする。
+                if (!(error && typeof error === 'object' && 'code' in error && error.code === 'P2022')) throw error
+                const existing = await prisma.adminNotification.findFirst({
+                    where: { type: NEW_USER_NOTIFICATION_TYPE, targetUserId: user.id },
+                    select: { id: true },
+                })
+                notification = existing ?? await prisma.adminNotification.create({
+                    data: {
+                        type: NEW_USER_NOTIFICATION_TYPE,
+                        targetUserId: user.id,
+                        name: user.name,
+                        department: user.department,
+                        laboratory: user.laboratory,
+                        employeeId: user.employeeId,
+                    },
+                    select: { id: true },
+                })
+            }
             await recordAuditLog({
                 actor: currentUser,
                 action: 'ADMIN_NOTIFICATION_CREATE',

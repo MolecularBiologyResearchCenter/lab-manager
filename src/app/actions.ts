@@ -526,20 +526,34 @@ export async function register(formData: FormData) {
     // 通知テーブルのマイグレーション未反映や一時的なDB障害があっても、
     // 登録済み利用者がログインできなくなることを防ぐ。
     try {
-        const notification = await prisma.adminNotification.upsert({
-            where: { dedupeKey: `NEW_USER_REGISTRATION:${user.id}` },
-            create: {
-                type: 'NEW_USER_REGISTRATION',
-                targetUserId: user.id,
-                name,
-                department,
-                laboratory,
-                employeeId,
-                dedupeKey: `NEW_USER_REGISTRATION:${user.id}`,
-            },
-            update: {},
-            select: { id: true },
-        })
+        let notification: { id: string }
+        try {
+            notification = await prisma.adminNotification.upsert({
+                where: { dedupeKey: `NEW_USER_REGISTRATION:${user.id}` },
+                create: {
+                    type: 'NEW_USER_REGISTRATION',
+                    targetUserId: user.id,
+                    name,
+                    department,
+                    laboratory,
+                    employeeId,
+                    dedupeKey: `NEW_USER_REGISTRATION:${user.id}`,
+                },
+                update: {},
+                select: { id: true },
+            })
+        } catch (error) {
+            // Preview DBへdedupeKeyマイグレーションが未適用でも通知を止めない。
+            if (!(error && typeof error === 'object' && 'code' in error && error.code === 'P2022')) throw error
+            const existing = await prisma.adminNotification.findFirst({
+                where: { type: 'NEW_USER_REGISTRATION', targetUserId: user.id },
+                select: { id: true },
+            })
+            notification = existing ?? await prisma.adminNotification.create({
+                data: { type: 'NEW_USER_REGISTRATION', targetUserId: user.id, name, department, laboratory, employeeId },
+                select: { id: true },
+            })
+        }
         await recordAuditLog({
             action: 'ADMIN_NOTIFICATION_CREATE',
             targetType: 'AdminNotification',

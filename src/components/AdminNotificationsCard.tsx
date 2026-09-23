@@ -25,13 +25,18 @@ export default function AdminNotificationsCard() {
     const [notifications, setNotifications] = useState<AdminNotification[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
     const [showAll, setShowAll] = useState(false)
+    const [loadError, setLoadError] = useState(false)
     const faviconUpdateId = useRef(0)
 
     const fetchNotifications = useCallback(async () => {
         try {
             const response = await fetch('/api/admin/notifications', { cache: 'no-store' })
-            if (!response.ok) return
+            if (!response.ok) {
+                setLoadError(true)
+                return
+            }
             const data = await response.json() as { unreadCount: number; notifications: AdminNotification[] }
+            setLoadError(false)
             setUnreadCount(data.unreadCount)
             setNotifications(data.notifications)
         } catch (error) {
@@ -133,7 +138,9 @@ export default function AdminNotificationsCard() {
                 )}
             </CardHeader>
             <CardContent>
-                {notifications.length === 0 ? (
+                {loadError ? (
+                    <p className="text-sm text-amber-700">通知を取得できませんでした。時間をおいて再試行します。</p>
+                ) : notifications.length === 0 ? (
                     <p className="text-sm text-slate-500">通知はありません。</p>
                 ) : (
                     <div className="max-h-[23rem] space-y-3 overflow-y-auto pr-1">
