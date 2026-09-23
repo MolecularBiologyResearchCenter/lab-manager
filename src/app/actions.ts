@@ -526,16 +526,25 @@ export async function register(formData: FormData) {
     // 通知テーブルのマイグレーション未反映や一時的なDB障害があっても、
     // 登録済み利用者がログインできなくなることを防ぐ。
     try {
-        await prisma.adminNotification.create({
-            data: {
+        const notification = await prisma.adminNotification.upsert({
+            where: { dedupeKey: `NEW_USER_REGISTRATION:${user.id}` },
+            create: {
                 type: 'NEW_USER_REGISTRATION',
                 targetUserId: user.id,
                 name,
                 department,
                 laboratory,
                 employeeId,
+                dedupeKey: `NEW_USER_REGISTRATION:${user.id}`,
             },
+            update: {},
             select: { id: true },
+        })
+        await recordAuditLog({
+            action: 'ADMIN_NOTIFICATION_CREATE',
+            targetType: 'AdminNotification',
+            targetId: notification.id,
+            summary: '新規利用者登録の管理者通知を作成しました。',
         })
     } catch {
         await recordAuditLog({

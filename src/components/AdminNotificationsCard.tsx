@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Bell, Check } from 'lucide-react'
 import { toast } from 'sonner'
@@ -25,22 +25,35 @@ export default function AdminNotificationsCard() {
     const [notifications, setNotifications] = useState<AdminNotification[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
     const [showAll, setShowAll] = useState(false)
+    const faviconUpdateId = useRef(0)
+
+    const fetchNotifications = useCallback(async () => {
+        try {
+            const response = await fetch('/api/admin/notifications', { cache: 'no-store' })
+            if (!response.ok) return
+            const data = await response.json() as { unreadCount: number; notifications: AdminNotification[] }
+            setUnreadCount(data.unreadCount)
+            setNotifications(data.notifications)
+        } catch (error) {
+            console.error('管理者通知の取得に失敗しました。', error)
+        }
+    }, [])
 
     useEffect(() => {
-        const fetchNotifications = async () => {
-            try {
-                const response = await fetch('/api/admin/notifications', { cache: 'no-store' })
-                if (!response.ok) return
-                const data = await response.json() as { unreadCount: number; notifications: AdminNotification[] }
-                setUnreadCount(data.unreadCount)
-                setNotifications(data.notifications)
-            } catch (error) {
-                console.error('管理者通知の取得に失敗しました。', error)
-            }
-        }
-
         void fetchNotifications()
-    }, [])
+        const intervalId = window.setInterval(() => void fetchNotifications(), 12000)
+        const refreshOnFocus = () => void fetchNotifications()
+        const refreshOnVisibility = () => {
+            if (document.visibilityState === 'visible') void fetchNotifications()
+        }
+        window.addEventListener('focus', refreshOnFocus)
+        document.addEventListener('visibilitychange', refreshOnVisibility)
+        return () => {
+            window.clearInterval(intervalId)
+            window.removeEventListener('focus', refreshOnFocus)
+            document.removeEventListener('visibilitychange', refreshOnVisibility)
+        }
+    }, [fetchNotifications])
 
     useEffect(() => {
         let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
@@ -51,12 +64,34 @@ export default function AdminNotificationsCard() {
             document.head.appendChild(link)
         }
         if (!link.dataset.originalHref) link.dataset.originalHref = link.href || '/favicon.ico'
-        if (unreadCount > 0) {
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#1d4ed8"/><circle cx="25" cy="7" r="7" fill="#dc2626"/></svg>`
-            link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`
-        } else {
+        const originalHref = link.dataset.originalHref
+        const updateId = ++faviconUpdateId.current
+        if (unreadCount === 0) {
             link.href = link.dataset.originalHref
+            return
         }
+
+        const image = new Image()
+        image.onload = () => {
+            if (updateId !== faviconUpdateId.current) return
+            const canvas = document.createElement('canvas')
+            canvas.width = 32
+            canvas.height = 32
+            const context = canvas.getContext('2d')
+            if (!context) return
+            context.drawImage(image, 0, 0, 32, 32)
+            context.fillStyle = '#dc2626'
+            context.beginPath()
+            context.arc(25, 7, 6, 0, Math.PI * 2)
+            context.fill()
+            link.href = canvas.toDataURL('image/png')
+        }
+        image.onerror = () => {
+            if (updateId !== faviconUpdateId.current) return
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#1d4ed8"/><circle cx="25" cy="7" r="6" fill="#dc2626"/></svg>`
+            link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`
+        }
+        image.src = originalHref
     }, [unreadCount])
 
     const markNotificationRead = async (notificationId: string) => {
