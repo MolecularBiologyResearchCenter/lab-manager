@@ -91,6 +91,22 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         }
 
         const pdfSha256 = sha256Pdf(buffer)
+        const sealAudit = await prisma.auditLog.findFirst({
+            where: {
+                action: 'INVOICE_SEAL',
+                targetType: 'Invoice',
+                targetId: invoice.id,
+            },
+            orderBy: { createdAt: 'desc' },
+            select: { metadata: true },
+        })
+        const sealMetadata = sealAudit?.metadata && typeof sealAudit.metadata === 'object' && !Array.isArray(sealAudit.metadata)
+            ? sealAudit.metadata as Record<string, unknown>
+            : null
+        if (sealMetadata?.result !== 'success' || sealMetadata.pdfSha256 !== pdfSha256 || sealMetadata.fileSize !== buffer.length) {
+            return failure(409, API_ERROR_CODES.CONFLICT, '押印対象と請求書の内容が一致しません。', '請求書を再読み込みして、もう一度お試しください。')
+        }
+
         const executedAt = new Date()
         await prisma.auditLog.create({
             data: {

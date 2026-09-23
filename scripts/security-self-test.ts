@@ -10,6 +10,7 @@ import {
 import { createSignedSessionValue, verifySignedSessionValue } from '../src/lib/auth'
 import { MAX_INVOICE_PDF_SIZE, sha256Pdf, validateGeneratedInvoicePdf } from '../src/lib/invoice-pdf-security'
 import { getActiveInvoiceReminderPeriod, getInvoiceReminderDedupeKey } from '../src/lib/invoice-reminders'
+import { apiHeaders } from '../src/lib/api-response'
 
 async function main() {
     const password = 'secure123'
@@ -52,6 +53,7 @@ async function main() {
     assert.equal(sha256Pdf(validPdf).length, 64)
     assert.throws(() => validateGeneratedInvoicePdf(Buffer.from('not a pdf')), /INVALID_PDF/)
     assert.throws(() => validateGeneratedInvoicePdf(new Uint8Array(MAX_INVOICE_PDF_SIZE + 1)), /PDF_TOO_LARGE/)
+    assert.equal(apiHeaders('request-id')['Cache-Control'], 'no-store')
 
     const tokyo = (value: string) => new Date(`${value}T00:00:00+09:00`)
     assert.equal(getActiveInvoiceReminderPeriod(tokyo('2026-04-30')), null)

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { sealInvoice } from '@/app/actions'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ApiClientError, formatApiError, readApiError } from '@/lib/api-client'
@@ -194,7 +193,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         if (!sealConfirmed) return
         setSealing(true)
         try {
-            await sealInvoice(id)
+            const response = await fetch(`/api/invoices/${id}/seal`, {
+                method: 'POST',
+                cache: 'no-store',
+            })
+            if (!response.ok) {
+                const apiError = await readApiError(response, '押印処理に失敗しました。')
+                throw new Error(formatApiError(apiError))
+            }
             setInvoice(prev => prev ? { ...prev, sealedAt: new Date(), sealedBy: 'current-user' } : null)
             toast.success('電子印を押しました')
             setSealDialogOpen(false)

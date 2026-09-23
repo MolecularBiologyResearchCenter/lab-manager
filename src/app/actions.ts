@@ -762,7 +762,7 @@ export async function updateProfile(
     revalidatePath('/mypage')
 }
 
-export async function sealInvoice(invoiceId: string) {
+export async function sealInvoice(invoiceId: string, requestId?: string) {
     const currentUser = await requireCenterDirector()
 
     const recordSealFailure = async (reason: string, message: string): Promise<never> => {
@@ -774,6 +774,7 @@ export async function sealInvoice(invoiceId: string) {
             summary: '請求書の押印に失敗しました。',
             metadata: {
                 invoiceId: typeof invoiceId === 'string' && invoiceId.length <= 64 ? invoiceId : null,
+                ...(requestId ? { requestId } : {}),
                 result: 'failure',
                 reason,
             },
@@ -821,6 +822,10 @@ export async function sealInvoice(invoiceId: string) {
 
     if (invoice.status === 'rejected') {
         return recordSealFailure('INVOICE_REJECTED', '却下済みの請求書には押印できません。')
+    }
+
+    if (invoice.status !== 'issued') {
+        return recordSealFailure('INVALID_INVOICE_STATUS', '発行済みの請求書以外には押印できません。')
     }
 
     if (invoice.sealedAt || invoice.sealedBy) {
@@ -876,6 +881,7 @@ export async function sealInvoice(invoiceId: string) {
                     summary: '請求書に電子印を押しました。',
                     metadata: {
                         invoiceId,
+                        ...(requestId ? { requestId } : {}),
                         sealedAt: sealedAt.toISOString(),
                         executedAt: new Date().toISOString(),
                         fileSize: canonicalPdf.length,
