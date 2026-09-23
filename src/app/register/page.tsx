@@ -15,9 +15,13 @@ export default function RegisterPage() {
 
     async function handleSubmit(formData: FormData) {
         try {
-            await register(formData)
+            const result = await register(formData)
+            if (!result.success) {
+                toast.error(result.error)
+            }
         } catch (error) {
-            toast.error((error as Error).message)
+            console.error('利用者登録に失敗しました。', error)
+            toast.error('登録処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
         }
     }
 
