@@ -506,45 +506,45 @@ export async function register(formData: FormData) {
         throw new Error('このメールアドレスは既に登録されています。')
     }
 
-    let user: { id: string }
+    const passwordHash = await hashPassword(password)
+    const user = await prisma.user.create({
+        data: {
+            name,
+            nameKana,
+            employeeId,
+            mailingList,
+            email,
+            password: passwordHash,
+            department,
+            laboratory,
+            extension,
+        },
+        select: { id: true },
+    })
+
+    // 通知の作成失敗で、利用者登録そのものをロールバックしない。
+    // 通知テーブルのマイグレーション未反映や一時的なDB障害があっても、
+    // 登録済み利用者がログインできなくなることを防ぐ。
     try {
-        const passwordHash = await hashPassword(password)
-        user = await prisma.$transaction(async (tx) => {
-            const createdUser = await tx.user.create({
-                data: {
-                    name,
-                    nameKana,
-                    employeeId,
-                    mailingList,
-                    email,
-                    password: passwordHash,
-                    department,
-                    laboratory,
-                    extension,
-                },
-                select: { id: true },
-            })
-
-            await tx.adminNotification.create({
-                data: {
-                    type: 'NEW_USER_REGISTRATION',
-                    targetUserId: createdUser.id,
-                    name,
-                    department,
-                    laboratory,
-                    employeeId,
-                },
-            })
-
-            return createdUser
+        await prisma.adminNotification.create({
+            data: {
+                type: 'NEW_USER_REGISTRATION',
+                targetUserId: user.id,
+                name,
+                department,
+                laboratory,
+                employeeId,
+            },
+            select: { id: true },
         })
-    } catch (error) {
+    } catch {
         await recordAuditLog({
             action: 'ADMIN_NOTIFICATION_CREATE_FAILURE',
             targetType: 'AdminNotification',
+            targetId: user.id,
             summary: '新規利用者登録時の管理者通知作成に失敗しました。',
         })
-        throw error
+        console.error('新規利用者登録通知の作成に失敗しました。登録処理は完了しています。')
     }
 
     await setSessionCookie(user.id)
