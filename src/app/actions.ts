@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation'
 import { recordAuditLog } from '@/lib/audit'
 import { generateInvoicePdf } from '@/lib/invoice-pdf'
 import { sha256Pdf, validateGeneratedInvoicePdf } from '@/lib/invoice-pdf-security'
+import { formatTokyoDateTime } from '@/lib/date-format'
 import {
     checkAuthThrottle,
     getAuthThrottleKeys,
@@ -217,7 +218,7 @@ export async function createReservation(equipmentId: string, userId: string, sta
             action: 'RESERVATION_CREATE',
             targetType: 'Reservation',
             targetId: created,
-            targetLabel: `${startTime.toLocaleString('ja-JP')}～${endTime.toLocaleString('ja-JP')}`,
+            targetLabel: `${formatTokyoDateTime(startTime)}～${formatTokyoDateTime(endTime)}`,
             summary: '機器予約を作成しました。',
             metadata: { equipmentId, userId },
         })
@@ -336,7 +337,7 @@ export async function updateReservation(
             action: 'RESERVATION_UPDATE',
             targetType: 'Reservation',
             targetId: updated,
-            targetLabel: `${startTime.toLocaleString('ja-JP')}～${endTime.toLocaleString('ja-JP')}`,
+            targetLabel: `${formatTokyoDateTime(startTime)}～${formatTokyoDateTime(endTime)}`,
             summary: '機器予約を更新しました。',
             metadata: { equipmentId, userId },
         })

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatTokyoDateTime } from '@/lib/date-format'
 
 const roleLabels: Record<string, string> = {
     ADMIN: '管理者',
@@ -72,7 +73,7 @@ export default async function AuditLogsPage({
                                 <tbody>
                                     {logs.map((log) => (
                                         <tr key={log.id} className="border-b last:border-0">
-                                            <td className="whitespace-nowrap px-3 py-3">{log.createdAt.toLocaleString('ja-JP')}</td>
+                                            <td className="whitespace-nowrap px-3 py-3">{formatTokyoDateTime(log.createdAt)}</td>
                                             <td className="px-3 py-3">{log.actorName}</td>
                                             <td className="px-3 py-3">{roleLabels[log.actorRole] ?? log.actorRole}</td>
                                             <td className="px-3 py-3">{actionLabels[log.action] ?? log.action}</td>
