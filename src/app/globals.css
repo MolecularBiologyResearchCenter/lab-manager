@@ -474,8 +474,8 @@
   .admin-month-picker {
     display: grid;
     width: 100%;
-    max-width: 48rem;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    max-width: 72rem;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 0.5rem;
     margin-left: auto;
     margin-right: auto;
@@ -490,6 +490,9 @@
     width: 100%;
     min-width: 0;
     min-height: 2.75rem;
+    white-space: nowrap;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
     border-color: rgb(226 232 240) !important;
     background: rgb(248 250 252) !important;
     color: rgb(51 65 85) !important;
@@ -512,6 +515,12 @@
   .admin-month-button-active:hover {
     background: rgb(29 78 216) !important;
     color: white !important;
+  }
+}
+
+@media (max-width: 1199px) {
+  .admin-month-picker {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 
@@ -574,6 +583,12 @@
     min-height: 2.5rem;
     padding-left: 0.25rem;
     padding-right: 0.25rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .admin-month-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
