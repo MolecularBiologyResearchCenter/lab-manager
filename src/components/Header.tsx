@@ -1,7 +1,19 @@
 import Link from 'next/link'
 import { getCurrentUser, logout } from '@/app/actions'
 import { Button } from '@/components/ui/button'
-import { CalendarDays, CircleUserRound, FileText, FlaskConical, Home, LogOut } from 'lucide-react'
+import {
+    CalendarDays,
+    CircleUserRound,
+    ClipboardList,
+    DollarSign,
+    FileText,
+    FlaskConical,
+    Gauge,
+    Home,
+    LogOut,
+    Users,
+    Wrench,
+} from 'lucide-react'
 
 const navigation = [
     { href: '/', label: 'ホーム', icon: Home },
@@ -10,28 +22,43 @@ const navigation = [
     { href: '/invoices', label: '請求書', icon: FileText },
 ]
 
+const adminNavigation = [
+    { href: '/admin', label: '概要', icon: Gauge },
+    { href: '/admin/invoices', label: '請求書', icon: FileText },
+    { href: '/admin/usage-logs', label: '利用料金', icon: DollarSign },
+    { href: '/admin/reagents', label: 'サービス', icon: FlaskConical },
+    { href: '/admin/equipment', label: '機器', icon: Wrench },
+    { href: '/admin/users', label: '利用者', icon: Users },
+    { href: '/admin/audit-logs', label: '監査ログ', icon: ClipboardList },
+]
+
 export default async function Header() {
     const user = await getCurrentUser()
     if (!user) return null
 
     return (
-        <header className="sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden">
+        <header className={`sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden ${user.role === 'ADMIN' ? 'admin-header' : ''}`}>
             <div className="content-wrapper">
                 <div className="flex min-h-16 items-center justify-between gap-4 py-2">
-                    <Link href="/" className="flex min-w-0 items-center gap-3 transition-opacity hover:opacity-90">
+                    <Link href="/" className="flex flex-shrink-0 items-center gap-3 transition-opacity hover:opacity-90">
                         <img
                             src="/images/kitasato-logo.png"
                             alt="北里大学"
                             className="h-10 w-10 flex-shrink-0 object-contain md:h-11 md:w-11"
                         />
                         <div className="min-w-0 leading-tight">
-                            <div className="truncate text-sm font-medium md:text-base">分子生物実験センター</div>
+                            <div className="whitespace-nowrap text-sm font-medium md:text-base">分子生物実験センター</div>
                             <div className="mt-0.5 text-[10px] tracking-[0.18em] text-blue-100">LAB MANAGER</div>
                         </div>
                     </Link>
 
-                    <nav className="hidden items-center gap-1 lg:flex" aria-label="メインナビゲーション">
-                        {navigation.map(({ href, label, icon: Icon }) => (
+                    <nav
+                        className={user.role === 'ADMIN'
+                            ? 'admin-header-nav'
+                            : 'hidden items-center gap-1 lg:flex'}
+                        aria-label={user.role === 'ADMIN' ? '管理者メニュー' : 'メインナビゲーション'}
+                    >
+                        {(user.role === 'ADMIN' ? adminNavigation : navigation).map(({ href, label, icon: Icon }) => (
                             <Link
                                 key={href}
                                 href={href}

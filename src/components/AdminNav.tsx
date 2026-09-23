@@ -24,6 +24,8 @@ const adminNavigation = [
 
 export default function AdminNav({ role }: { role: string }) {
     const pathname = usePathname()
+    if (role === 'ADMIN') return null
+
     const navigation = role === 'CENTER_DIRECTOR'
         ? adminNavigation.filter(item => item.href === '/admin/invoices')
         : adminNavigation

@@ -295,6 +295,57 @@
     backdrop-filter: blur(12px);
   }
 
+  .admin-header-nav {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 0.125rem;
+    overflow: visible;
+    scrollbar-width: none;
+  }
+
+  .admin-header-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-header-nav {
+    flex-wrap: wrap;
+  }
+
+  .admin-header-nav a {
+    display: inline-flex;
+    min-height: 2.5rem;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 0.5rem;
+    padding: 0 0.55rem;
+    color: rgb(239 246 255);
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color 0.2s, color 0.2s;
+  }
+
+  .admin-header-nav a:hover {
+    background: rgb(255 255 255 / 0.12);
+    color: white;
+  }
+
+  @media (max-width: 1023px) {
+    .admin-header > .content-wrapper > div {
+      flex-wrap: wrap;
+      row-gap: 0.25rem;
+    }
+
+    .admin-header .admin-header-nav {
+      order: 3;
+      flex-basis: 100%;
+      flex-shrink: 0;
+    }
+  }
+
   .admin-nav-row {
     display: flex;
     min-height: 3.5rem;
@@ -545,6 +596,15 @@
 
   .admin-nav-shell {
     top: 4rem;
+  }
+
+  .admin-header-nav {
+    gap: 0;
+  }
+
+  .admin-header-nav a {
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
   }
 
   .admin-nav-row {
