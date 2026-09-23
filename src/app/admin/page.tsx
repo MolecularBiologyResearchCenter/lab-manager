@@ -166,7 +166,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
                         <div className="admin-management-icon">
                             <FlaskConical />
                         </div>
-                        <span className="admin-management-title">有料サービス管理</span>
+                        <span className="admin-management-title">サービス管理</span>
                     </div>
                 </Link>
 
