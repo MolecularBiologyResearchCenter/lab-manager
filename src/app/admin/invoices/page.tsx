@@ -18,6 +18,8 @@ export default async function AdminInvoicesPage() {
             invoiceNumber: true,
             totalAmount: true,
             status: true,
+            sealedAt: true,
+            sealedBy: true,
             user: { select: { name: true, department: true, laboratory: true } },
         },
         orderBy: [

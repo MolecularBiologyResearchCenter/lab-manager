@@ -18,6 +18,8 @@ export default async function InvoicesPage() {
             invoiceNumber: true,
             totalAmount: true,
             status: true,
+            sealedAt: true,
+            sealedBy: true,
         },
         orderBy: [{ fiscalYear: 'desc' }, { quarter: 'desc' }],
     })
@@ -31,7 +33,8 @@ export default async function InvoicesPage() {
         }
     }
 
-    const getStatusLabel = (status: string) => {
+    const getStatusLabel = (status: string, isSealed: boolean) => {
+        if (isSealed) return '押印済み'
         switch (status) {
             case 'draft': return '下書き'
             case 'issued': return '発行済み'
@@ -40,7 +43,8 @@ export default async function InvoicesPage() {
         }
     }
 
-    const getStatusClass = (status: string) => {
+    const getStatusClass = (status: string, isSealed: boolean) => {
+        if (isSealed) return 'bg-red-50 text-red-700'
         switch (status) {
             case 'issued': return 'bg-blue-50 text-blue-700'
             case 'paid': return 'bg-emerald-50 text-emerald-700'
@@ -78,8 +82,8 @@ export default async function InvoicesPage() {
                                     <p className="mt-1 text-[11px] text-slate-500 md:hidden">{invoice.invoiceNumber}</p>
                                 </div>
                                 <p className="text-sm font-semibold text-slate-800 md:font-medium">¥{invoice.totalAmount.toLocaleString()}</p>
-                                <span className={`w-fit rounded-full px-2.5 py-1 text-[11px] font-medium ${getStatusClass(invoice.status)}`}>
-                                    {getStatusLabel(invoice.status)}
+                                <span className={`w-fit rounded-full px-2.5 py-1 text-[11px] font-medium ${getStatusClass(invoice.status, Boolean(invoice.sealedAt && invoice.sealedBy))}`}>
+                                    {getStatusLabel(invoice.status, Boolean(invoice.sealedAt && invoice.sealedBy))}
                                 </span>
                                 <Link href={`/invoices/${invoice.id}`} className="col-start-2 row-span-2 row-start-1 md:col-auto md:row-auto">
                                     <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-300 px-3 text-slate-700">

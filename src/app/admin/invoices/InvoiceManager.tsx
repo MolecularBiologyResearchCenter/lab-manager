@@ -19,6 +19,8 @@ type Invoice = {
     quarter: number
     totalAmount: number
     status: string
+    sealedAt: Date | string | null
+    sealedBy: string | null
     invoiceNumber: string
     user: User
 }
@@ -43,7 +45,8 @@ export default function InvoiceManager({ invoices, canGenerate }: Props) {
         }
     }
 
-    const getStatusLabel = (status: string) => {
+    const getStatusLabel = (status: string, isSealed: boolean) => {
+        if (isSealed) return '押印済み'
         switch (status) {
             case 'draft':
                 return '下書き'
@@ -56,7 +59,8 @@ export default function InvoiceManager({ invoices, canGenerate }: Props) {
         }
     }
 
-    const getStatusColor = (status: string) => {
+    const getStatusColor = (status: string, isSealed: boolean) => {
+        if (isSealed) return 'text-red-600 bg-red-100'
         switch (status) {
             case 'draft':
                 return 'text-gray-600 bg-gray-100'
@@ -207,10 +211,11 @@ export default function InvoiceManager({ invoices, canGenerate }: Props) {
                                     </div>
                                     <span
                                         className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                                            invoice.status
+                                            invoice.status,
+                                            Boolean(invoice.sealedAt && invoice.sealedBy),
                                         )}`}
                                     >
-                                        {getStatusLabel(invoice.status)}
+                                        {getStatusLabel(invoice.status, Boolean(invoice.sealedAt && invoice.sealedBy))}
                                     </span>
                                 </div>
                             </CardHeader>
