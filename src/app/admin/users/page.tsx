@@ -49,6 +49,8 @@ interface AdminNotification {
     department: string | null
     laboratory: string | null
     employeeId: string | null
+    fiscalYear: number | null
+    quarter: number | null
     createdAt: string
     isRead: boolean
 }
@@ -82,6 +84,23 @@ export default function UsersPage() {
         fetchUsers()
         fetchNotifications()
     }, [])
+
+    useEffect(() => {
+        let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+        if (!link) {
+            link = document.createElement('link')
+            link.rel = 'icon'
+            link.href = '/favicon.ico'
+            document.head.appendChild(link)
+        }
+        if (!link.dataset.originalHref) link.dataset.originalHref = link.href || '/favicon.ico'
+        if (unreadCount > 0) {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#1d4ed8"/><circle cx="25" cy="7" r="7" fill="#dc2626"/></svg>`
+            link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`
+        } else {
+            link.href = link.dataset.originalHref
+        }
+    }, [unreadCount])
 
     const fetchNotifications = async () => {
         try {
@@ -274,15 +293,26 @@ export default function UsersPage() {
                                 >
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                         <div>
-                                            <p className="font-medium text-slate-800">
-                                                {notification.isRead ? '新規登録を確認済み' : '新規登録があります'}：{notification.name}
-                                            </p>
-                                            <p className="mt-1 text-sm text-slate-600">
-                                                {notification.department || '学部未登録'} / {notification.laboratory || '所属・研究室未登録'}
-                                            </p>
-                                            <p className="mt-1 text-sm text-slate-600">
-                                                職員番号：{notification.employeeId || '未登録'} ・ 登録日時：{new Date(notification.createdAt).toLocaleString('ja-JP')}
-                                            </p>
+                                            {notification.type === 'INVOICE_ISSUE_REMINDER' ? (
+                                                <>
+                                                    <p className="font-medium text-slate-800">請求書を発行してください</p>
+                                                    <p className="mt-1 text-sm text-slate-600">
+                                                        {notification.fiscalYear}年 第{notification.quarter}期の請求書が未発行です。
+                                                    </p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <p className="font-medium text-slate-800">
+                                                        {notification.isRead ? '新規登録を確認済み' : '新規登録があります'}：{notification.name}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-slate-600">
+                                                        {notification.department || '学部未登録'} / {notification.laboratory || '所属・研究室未登録'}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-slate-600">
+                                                        職員番号：{notification.employeeId || '未登録'} ・ 登録日時：{new Date(notification.createdAt).toLocaleString('ja-JP')}
+                                                    </p>
+                                                </>
+                                            )}
                                         </div>
                                         {!notification.isRead && (
                                             <Button

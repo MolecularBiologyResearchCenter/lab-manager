@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma'
-import { authorizationStatus } from '@/lib/authorization'
 import { getAuthenticatedUser } from '@/lib/auth'
 import { recordAuditLog } from '@/lib/audit'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
@@ -9,12 +8,16 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
 
     try {
         const currentUser = await getAuthenticatedUser()
-        const status = authorizationStatus(currentUser, 'ADMIN')
+        const status = !currentUser
+            ? 401
+            : currentUser.role === 'ADMIN' || currentUser.role === 'CENTER_DIRECTOR'
+                ? null
+                : 403
         if (status === 401) {
             return apiErrorResponse(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。', requestId)
         }
         if (status === 403) {
-            return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この操作を行う権限がありません。', '管理者権限でログインしてください。', requestId)
+            return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この操作を行う権限がありません。', '管理者またはセンター長権限でログインしてください。', requestId)
         }
 
         const { id } = await context.params

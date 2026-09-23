@@ -9,6 +9,7 @@ import {
 } from '../src/lib/password'
 import { createSignedSessionValue, verifySignedSessionValue } from '../src/lib/auth'
 import { MAX_INVOICE_PDF_SIZE, sha256Pdf, validateGeneratedInvoicePdf } from '../src/lib/invoice-pdf-security'
+import { getActiveInvoiceReminderPeriod, getInvoiceReminderDedupeKey } from '../src/lib/invoice-reminders'
 
 async function main() {
     const password = 'secure123'
@@ -51,6 +52,15 @@ async function main() {
     assert.equal(sha256Pdf(validPdf).length, 64)
     assert.throws(() => validateGeneratedInvoicePdf(Buffer.from('not a pdf')), /INVALID_PDF/)
     assert.throws(() => validateGeneratedInvoicePdf(new Uint8Array(MAX_INVOICE_PDF_SIZE + 1)), /PDF_TOO_LARGE/)
+
+    const tokyo = (value: string) => new Date(`${value}T00:00:00+09:00`)
+    assert.equal(getActiveInvoiceReminderPeriod(tokyo('2026-04-30')), null)
+    assert.deepEqual(getActiveInvoiceReminderPeriod(tokyo('2026-05-01')), { fiscalYear: 2026, quarter: 1 })
+    assert.deepEqual(getActiveInvoiceReminderPeriod(tokyo('2026-08-31')), { fiscalYear: 2026, quarter: 1 })
+    assert.deepEqual(getActiveInvoiceReminderPeriod(tokyo('2026-09-01')), { fiscalYear: 2026, quarter: 2 })
+    assert.deepEqual(getActiveInvoiceReminderPeriod(tokyo('2026-12-31')), { fiscalYear: 2026, quarter: 2 })
+    assert.deepEqual(getActiveInvoiceReminderPeriod(tokyo('2027-01-01')), { fiscalYear: 2026, quarter: 3 })
+    assert.equal(getInvoiceReminderDedupeKey({ fiscalYear: 2026, quarter: 1 }), getInvoiceReminderDedupeKey({ fiscalYear: 2026, quarter: 1 }))
 
     console.log('Security self-test passed.')
 }
