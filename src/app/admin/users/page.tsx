@@ -487,7 +487,7 @@ export default function UsersPage() {
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="flex items-center gap-2 text-base font-medium text-slate-800">
-                            <span>No（</span>
+                            <span>No</span>
                             <input
                                 aria-label="開始No"
                                 inputMode="numeric"
@@ -495,7 +495,7 @@ export default function UsersPage() {
                                 onChange={(event) => setCsvStartNo(event.target.value)}
                                 className="h-10 w-24 rounded-md border border-slate-300 px-3 text-center outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                             />
-                            <span>）〜（</span>
+                            <span>〜</span>
                             <input
                                 aria-label="終了No"
                                 inputMode="numeric"
@@ -503,7 +503,7 @@ export default function UsersPage() {
                                 onChange={(event) => setCsvEndNo(event.target.value)}
                                 className="h-10 w-24 rounded-md border border-slate-300 px-3 text-center outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                             />
-                            <span>）をダウンロードする</span>
+                            <span>をダウンロードする</span>
                         </div>
                         {csvError && (
                             <p className="whitespace-pre-line rounded-lg bg-red-50 p-3 text-sm text-red-700">{csvError}</p>
