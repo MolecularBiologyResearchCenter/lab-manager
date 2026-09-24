@@ -329,8 +329,30 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
     // Mobile List View Component
     const MobileReservationList = () => {
-        // Filter reservations by selected month
-        const monthFilteredReservations = calendarReservations.filter(reservation => {
+        // Split multi-day reservations into Tokyo-calendar-day segments so a booking
+        // crossing midnight appears on every affected day while retaining the
+        // original instants for edit and overlap handling.
+        const displayReservations = calendarReservations.flatMap(reservation => {
+            const start = reservation.calendarStart!
+            const end = reservation.calendarEnd!
+            const segments: Reservation[] = []
+            const day = new Date(start)
+            day.setHours(0, 0, 0, 0)
+            while (day < end) {
+                const nextDay = new Date(day)
+                nextDay.setDate(nextDay.getDate() + 1)
+                segments.push({
+                    ...reservation,
+                    calendarStart: start > day ? start : day,
+                    calendarEnd: end < nextDay ? end : nextDay,
+                })
+                day.setDate(day.getDate() + 1)
+            }
+            return segments
+        })
+
+        // Filter reservations by the selected month
+        const monthFilteredReservations = displayReservations.filter(reservation => {
             const reservationMonth = reservation.calendarStart?.getMonth()
             const reservationYear = reservation.calendarStart?.getFullYear()
             const selectedMonthValue = selectedMonth.getMonth()
@@ -402,7 +424,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
                                     return (
                                         <div
-                                            key={reservation.id}
+                                            key={`${reservation.id}-${dateKey}`}
                                             onClick={() => handleSelectEvent(reservation)}
                                             className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 active:bg-gray-100"
                                             style={{ cursor: 'pointer' }}

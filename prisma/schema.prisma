@@ -127,6 +127,7 @@ model Reservation {
   userId      String
   startTime   DateTime
   endTime     DateTime
+  status      String   @default("active") // active, cancelled, rejected
   phoneNumber String?  // Optional contact number (Added for better communication)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

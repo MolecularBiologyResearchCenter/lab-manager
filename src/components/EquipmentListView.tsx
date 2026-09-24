@@ -102,7 +102,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
         return !equipmentReservations.some(r => {
             const start = new Date(r.startTime)
             const end = new Date(r.endTime)
-            return now >= start && now <= end
+            return now >= start && now < end
         })
     }
 

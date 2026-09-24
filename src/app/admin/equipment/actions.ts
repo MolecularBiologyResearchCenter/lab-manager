@@ -102,7 +102,7 @@ export async function deleteEquipment(id: string) {
     try {
         // Check if equipment is used in any reservations
         const reservationCount = await prisma.reservation.count({
-            where: { equipmentId: id },
+            where: { equipmentId: id, status: { notIn: ['cancelled', 'rejected'] } },
         })
 
         if (reservationCount > 0) {
