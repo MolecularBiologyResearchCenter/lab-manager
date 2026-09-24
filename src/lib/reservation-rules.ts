@@ -1,4 +1,4 @@
-export const reservationStatusFilter = { notIn: ['cancelled', 'rejected'] } as const
+export const reservationStatusFilter = { notIn: ['cancelled', 'rejected'] }
 
 export function validateReservationWindow(equipmentName: string, startTime: Date, endTime: Date): string | null {
     if (!(startTime instanceof Date) || Number.isNaN(startTime.getTime()) || !(endTime instanceof Date) || Number.isNaN(endTime.getTime())) {
