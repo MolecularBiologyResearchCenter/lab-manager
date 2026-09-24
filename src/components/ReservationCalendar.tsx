@@ -79,6 +79,7 @@ interface Props {
 export default function ReservationCalendar({ reservations, equipmentList, currentUser }: Props) {
     const router = useRouter()
     const { t } = useUserLanguage()
+    const displayEquipmentName = (name: string) => t('equipmentList') === 'Equipment List' && name.includes('安キャビ') ? 'Biosafety Cabinet' : name
     const [view, setView] = useState<View>('week')
     const [date, setDate] = useState(() => toTokyoWallClock(new Date()))
     const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -488,9 +489,9 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                 <label
                                     htmlFor={`eq-${eq.id}`}
                                     className="cursor-pointer whitespace-nowrap text-sm text-gray-700"
-                                    title={eq.name}
+                                    title={displayEquipmentName(eq.name)}
                                 >
-                                    {eq.name}
+                                    {displayEquipmentName(eq.name)}
                                 </label>
                             </div>
                         ))}
@@ -508,21 +509,21 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                 className="rounded-xl"
                                 onClick={() => setView('month')}
                             >
-                                {t('calendar')}
+                                {t('month')}
                             </Button>
                             <Button
                                 variant={view === 'week' ? 'default' : 'outline'}
                                 className="rounded-xl"
                                 onClick={() => setView('week')}
                             >
-                                週
+                                {t('week')}
                             </Button>
                             <Button
                                 variant={view === 'day' ? 'default' : 'outline'}
                                 className="rounded-xl"
                                 onClick={() => setView('day')}
                             >
-                                日
+                                {t('day')}
                             </Button>
                         </div>
                     )}
@@ -561,8 +562,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                 event: CustomEvent
                             }}
                             messages={{
-                                next: "次へ",
-                                previous: "前へ",
+                                next: t('next'),
+                                previous: t('previous'),
                                 today: t('today'),
                                 month: t('month'),
                                 week: t('week'),
@@ -612,7 +613,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                 <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} style={{ maxHeight: '400px', backgroundColor: 'white' }}>
                                     {equipmentList.map((eq) => (
                                         <SelectItem key={eq.id} value={eq.id} style={{ padding: '0.625rem 0.75rem', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
-                                            {eq.name}
+                                            {displayEquipmentName(eq.name)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

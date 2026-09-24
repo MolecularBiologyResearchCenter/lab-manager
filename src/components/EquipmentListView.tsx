@@ -52,6 +52,7 @@ interface EquipmentListViewProps {
 export default function EquipmentListView({ equipmentList, currentUser, reservations }: EquipmentListViewProps) {
     const router = useRouter()
     const { t } = useUserLanguage()
+    const displayEquipmentName = (name: string) => t('equipmentList') === 'Equipment List' && name.includes('安キャビ') ? 'Biosafety Cabinet' : name
     const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [startTime, setStartTime] = useState<Date | null>(null)
@@ -131,7 +132,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
 
                                 <div className="min-w-0">
                                     <h3 className="w-full truncate text-sm font-semibold leading-tight text-slate-800 md:text-base">
-                                        {equipment.name}
+                                        {displayEquipmentName(equipment.name)}
                                     </h3>
 
                                     <div className="mt-2 flex min-h-5 items-center">
@@ -141,7 +142,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                                                     className="rounded-full"
                                                     style={{ width: '16px', height: '16px', minWidth: '16px', marginRight: '0.7rem', backgroundColor: '#22c55e' }}
                                                 ></div>
-                                                利用可能
+                                                {t('available')}
                                             </div>
                                         ) : (
                                             <div className="flex items-center whitespace-nowrap text-xs font-medium text-slate-600">
@@ -149,7 +150,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                                                     className="rounded-full"
                                                     style={{ width: '16px', height: '16px', minWidth: '16px', marginRight: '0.7rem', backgroundColor: '#ef4444' }}
                                                 ></div>
-                                                使用中
+                                                {t('inUse')}
                                             </div>
                                         )}
                                     </div>
@@ -192,7 +193,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                                 <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} style={{ maxHeight: '400px', backgroundColor: 'white' }}>
                                     {equipmentList.map((eq) => (
                                         <SelectItem key={eq.id} value={eq.id} style={{ padding: '0.625rem 0.75rem', minHeight: '40px', display: 'flex', alignItems: 'center' }}>
-                                            {eq.name}
+                                            {displayEquipmentName(eq.name)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

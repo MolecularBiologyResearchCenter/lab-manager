@@ -276,15 +276,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <p className="text-sm text-blue-800">
                     {invoice.viewerRole === 'CENTER_DIRECTOR' && invoice.sealedAt && invoice.sealedBy ? (
                         <>
-                            <strong>案内:</strong> 押印が完了しました
+                            <strong>{t('invoiceNotice')}:</strong> {t('sealComplete')}
                         </>
                     ) : invoice.sealedAt && invoice.sealedBy ? (
                         <>
-                            <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、{getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください
+                            <strong>{t('invoiceNotice')}:</strong> {t('languageEnglish') === 'English' ? t('submissionNotice') : `${t('submissionNotice')}${getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください`}
                         </>
                     ) : (
                         <>
-                            <strong>案内:</strong> センター長の押印をお待ちください
+                            <strong>{t('invoiceNotice')}:</strong> {t('waitingSeal')}
                         </>
                     )}
                 </p>

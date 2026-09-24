@@ -39,6 +39,14 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
     const [quantity, setQuantity] = useState<number>(1)
     const router = useRouter()
     const { t } = useUserLanguage()
+    const displayReagentName = (name: string) => {
+        if (t('services') === 'Services') {
+            if (name.includes('Tapestation 消耗品')) return name.replace('Tapestation 消耗品', 'Tapestation Supplies')
+            if (name.includes('シーケンサー')) return name.replace('シーケンサー', 'Sequencer')
+            if (name.includes('外注用')) return name.replace('外注用', 'External use')
+        }
+        return name
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -75,7 +83,7 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
                             <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} className="max-h-[400px] bg-white">
                                 {reagents.map((r) => (
                                     <SelectItem key={r.id} value={r.id} className="min-h-10 px-3 py-2 text-base">
-                                        {r.name} (¥{r.unitPrice})
+                                        {displayReagentName(r.name)} (¥{r.unitPrice})
                                     </SelectItem>
                                 ))}
                             </SelectContent>

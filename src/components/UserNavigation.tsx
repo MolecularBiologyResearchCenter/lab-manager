@@ -15,7 +15,7 @@ export default function UserNavigation() {
     const { t } = useUserLanguage()
 
     return (
-        <nav className="hidden items-center gap-1 lg:flex" aria-label={t('home')}>
+        <nav className="flex min-w-0 items-center justify-center gap-1 overflow-x-auto py-1" aria-label={t('home')}>
             {navigation.map(({ href, key, icon: Icon }) => (
                 <Link
                     key={href}

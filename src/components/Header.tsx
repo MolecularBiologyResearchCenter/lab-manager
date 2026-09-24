@@ -33,7 +33,7 @@ export default async function Header() {
     if (!user) return null
 
     return (
-        <header className={`sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden ${user.role === 'ADMIN' ? 'admin-header' : ''}`}>
+        <header className={`sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden ${user.role === 'ADMIN' ? 'admin-header' : 'user-header'}`}>
             <div className="content-wrapper">
                 <div className="flex min-h-16 items-center justify-between gap-4 py-2">
                     <Link href="/" className="flex flex-shrink-0 items-center gap-3 transition-opacity hover:opacity-90">
@@ -61,7 +61,7 @@ export default async function Header() {
                                 </Link>
                             ))}
                         </nav>
-                    ) : <UserNavigation />}
+                    ) : <div className="flex-1" />}
 
                     <div className="flex flex-shrink-0 items-center gap-1 md:gap-3">
                         {user.role === 'USER' && <LanguageSwitcher />}
@@ -85,6 +85,11 @@ export default async function Header() {
                         </form>
                     </div>
                 </div>
+                {user.role === 'USER' && (
+                    <div className="border-t border-white/15">
+                        <UserNavigation />
+                    </div>
+                )}
             </div>
         </header>
     )
