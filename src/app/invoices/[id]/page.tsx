@@ -7,6 +7,7 @@ import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { useUserLanguage } from '@/components/UserLanguageProvider'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ApiClientError, formatApiError, readApiError } from '@/lib/api-client'
 
@@ -65,6 +66,7 @@ function sanitizeFilenamePart(value: string) {
 }
 
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { t } = useUserLanguage()
     const { id } = use(params)
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -231,7 +233,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     <Link href={backHref}>
                         <Button variant="outline" className="rounded-xl border-slate-300 bg-white">
                             <ArrowLeft className="h-4 w-4" />
-                            請求書一覧に戻る
+                            {t('backToInvoices')}
                         </Button>
                     </Link>
                     {/* Download Button Logic */}
@@ -251,7 +253,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                                             : 'cursor-not-allowed rounded-xl bg-slate-200 text-slate-500'}
                                     >
                                         <Download className="h-4 w-4" />
-                                        {downloading ? 'ダウンロード中...' : 'PDFダウンロード'}
+                                        {downloading ? t('downloading') : t('downloadPdf')}
                                     </Button>
                                 )}
                             </div>
@@ -274,15 +276,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 <p className="text-sm text-blue-800">
                     {invoice.viewerRole === 'CENTER_DIRECTOR' && invoice.sealedAt && invoice.sealedBy ? (
                         <>
-                            <strong>案内:</strong> 押印が完了しました
+                            <strong>{t('invoiceNotice')}:</strong> {t('sealComplete')}
                         </>
                     ) : invoice.sealedAt && invoice.sealedBy ? (
                         <>
-                            <strong>案内:</strong> ダウンロード後に印刷し、必要事項をご記入の上、{getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください
+                            <strong>{t('invoiceNotice')}:</strong> {t('languageEnglish') === 'English' ? t('submissionNotice') : `${t('submissionNotice')}${getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください`}
                         </>
                     ) : (
                         <>
-                            <strong>案内:</strong> センター長の押印をお待ちください
+                            <strong>{t('invoiceNotice')}:</strong> {t('waitingSeal')}
                         </>
                     )}
                 </p>

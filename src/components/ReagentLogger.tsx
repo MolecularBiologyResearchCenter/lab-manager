@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { logReagentUsage } from '@/app/actions'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 interface Reagent {
     id: string
@@ -37,6 +38,15 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
     const [selectedReagent, setSelectedReagent] = useState<string>('')
     const [quantity, setQuantity] = useState<number>(1)
     const router = useRouter()
+    const { t } = useUserLanguage()
+    const displayReagentName = (name: string) => {
+        if (t('services') === 'Services') {
+            if (/tapestation 消耗品/i.test(name)) return name.replace(/tapestation 消耗品/i, 'TapeStation Supplies')
+            if (name.includes('シーケンサー')) return name.replace('シーケンサー', 'Sequencer')
+            if (name.includes('外注用')) return name.replace('外注用', 'External use')
+        }
+        return name
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -44,13 +54,13 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
 
         try {
             await logReagentUsage(currentUser.id, selectedReagent, quantity)
-            toast.success('記録しました')
+            toast.success(t('recorded'))
             router.refresh()
             // Reset form
             setQuantity(1)
             setSelectedReagent('')
         } catch (error) {
-            toast.error('記録に失敗しました: ' + (error as Error).message)
+            toast.error(t('recordFailed') + (error as Error).message)
         }
     }
 
@@ -59,21 +69,21 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
     return (
         <section className="app-surface mx-auto max-w-lg overflow-hidden">
             <div className="border-b border-slate-100 px-5 py-4 md:px-6">
-                <h2 className="font-semibold text-slate-800">新しい利用記録</h2>
-                <p className="mt-1 text-xs text-slate-500">利用者：{currentUser.name}</p>
+                <h2 className="font-semibold text-slate-800">{t('newUsageRecord')}</h2>
+                <p className="mt-1 text-xs text-slate-500">{t('user')}：{currentUser.name}</p>
             </div>
             <form onSubmit={handleSubmit}>
                 <div className="space-y-5 px-5 py-5 md:px-6">
                     <div className="space-y-2">
-                        <Label className="app-label">サービス・試薬</Label>
+                        <Label className="app-label">{t('serviceOrReagent')}</Label>
                         <Select onValueChange={setSelectedReagent} value={selectedReagent} required>
                             <SelectTrigger className="h-11 rounded-xl border-slate-300 bg-white text-base">
-                                <SelectValue placeholder="選択してください" />
+                            <SelectValue placeholder={t('choose')} />
                             </SelectTrigger>
                             <SelectContent side="bottom" sideOffset={5} align="start" avoidCollisions={false} className="max-h-[400px] bg-white">
                                 {reagents.map((r) => (
                                     <SelectItem key={r.id} value={r.id} className="min-h-10 px-3 py-2 text-base">
-                                        {r.name} (¥{r.unitPrice})
+                                        {displayReagentName(r.name)} (¥{r.unitPrice})
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -81,7 +91,7 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="app-label">数量</Label>
+                        <Label className="app-label">{t('quantity')}</Label>
                         <Input
                             type="number"
                             min="1"
@@ -92,12 +102,12 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
                         />
                         {currentReagent && (
                             <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-                                <span className="text-sm text-slate-500">合計</span>
+                                <span className="text-sm text-slate-500">{t('total')}</span>
                                 <strong className="text-xl font-semibold text-slate-800">¥{(currentReagent.unitPrice * quantity).toLocaleString()}</strong>
                             </div>
                         )}
                     </div>
-                    <Button type="submit" className="h-12 w-full rounded-xl bg-blue-700 text-base font-semibold text-white hover:bg-blue-800">記録する</Button>
+                    <Button type="submit" className="h-12 w-full rounded-xl bg-blue-700 text-base font-semibold text-white hover:bg-blue-800">{t('record')}</Button>
                 </div>
             </form>
         </section>

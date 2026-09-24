@@ -1,6 +1,9 @@
 import Link from 'next/link'
 import { getCurrentUser, logout } from '@/app/actions'
 import { Button } from '@/components/ui/button'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
+import UserNavigation from '@/components/UserNavigation'
+import UserLanguageText from '@/components/UserLanguageText'
 import {
     CalendarDays,
     CircleUserRound,
@@ -9,18 +12,10 @@ import {
     FileText,
     FlaskConical,
     Gauge,
-    Home,
     LogOut,
     Users,
     Wrench,
 } from 'lucide-react'
-
-const navigation = [
-    { href: '/', label: 'ホーム', icon: Home },
-    { href: '/reservations', label: '機器予約', icon: CalendarDays },
-    { href: '/reagents', label: '有料サービス', icon: FlaskConical },
-    { href: '/invoices', label: '請求書', icon: FileText },
-]
 
 const adminNavigation = [
     { href: '/admin', label: '概要', icon: Gauge },
@@ -38,7 +33,7 @@ export default async function Header() {
     if (!user) return null
 
     return (
-        <header className={`sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden ${user.role === 'ADMIN' ? 'admin-header' : ''}`}>
+        <header className={`sticky top-0 z-50 border-b border-blue-800/20 bg-blue-700 text-white shadow-sm print:hidden ${user.role === 'ADMIN' ? 'admin-header' : 'user-header'}`}>
             <div className="content-wrapper">
                 <div className="flex min-h-16 items-center justify-between gap-4 py-2">
                     <Link href="/" className="flex flex-shrink-0 items-center gap-3 transition-opacity hover:opacity-90">
@@ -53,25 +48,23 @@ export default async function Header() {
                         </div>
                     </Link>
 
-                    <nav
-                        className={user.role === 'ADMIN'
-                            ? 'admin-header-nav'
-                            : 'hidden items-center gap-1 lg:flex'}
-                        aria-label={user.role === 'ADMIN' ? '管理者メニュー' : 'メインナビゲーション'}
-                    >
-                        {(user.role === 'ADMIN' ? adminNavigation : navigation).map(({ href, label, icon: Icon }) => (
-                            <Link
-                                key={href}
-                                href={href}
-                                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-blue-50 transition-colors hover:bg-white/10 hover:text-white"
-                            >
-                                <Icon className="h-4 w-4" />
-                                {label}
-                            </Link>
-                        ))}
-                    </nav>
+                    {user.role === 'ADMIN' ? (
+                        <nav className="admin-header-nav" aria-label="管理者メニュー">
+                            {adminNavigation.map(({ href, label, icon: Icon }) => (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-blue-50 transition-colors hover:bg-white/10 hover:text-white"
+                                >
+                                    <Icon className="h-4 w-4" />
+                                    {label}
+                                </Link>
+                            ))}
+                        </nav>
+                    ) : <div className="flex-1" />}
 
                     <div className="flex flex-shrink-0 items-center gap-1 md:gap-3">
+                        {user.role === 'USER' && <LanguageSwitcher />}
                         <Link
                             href="/mypage"
                             className="flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-medium text-white transition-colors hover:bg-white/10 md:px-3"
@@ -87,11 +80,16 @@ export default async function Header() {
                                 aria-label="ログアウト"
                             >
                                 <LogOut className="h-4 w-4" />
-                                <span className="hidden md:inline">ログアウト</span>
+                                <span className="hidden md:inline">{user.role === 'USER' ? <UserLanguageText k="logout" /> : 'ログアウト'}</span>
                             </Button>
                         </form>
                     </div>
                 </div>
+                {user.role === 'USER' && (
+                    <div className="border-t border-white/15">
+                        <UserNavigation />
+                    </div>
+                )}
             </div>
         </header>
     )

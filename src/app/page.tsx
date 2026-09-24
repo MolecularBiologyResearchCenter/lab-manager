@@ -19,10 +19,12 @@ import {
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 
 export default function HomePage() {
     const router = useRouter()
+    const { t, language } = useUserLanguage()
     const [user, setUser] = useState<any>(null)
     const [totalCost, setTotalCost] = useState(0)
     const [todayReservations, setTodayReservations] = useState<any[]>([])
@@ -84,10 +86,10 @@ export default function HomePage() {
         return (
             <div className="content-wrapper app-page text-center">
                 <div className="app-surface mx-auto max-w-lg p-8">
-                    <h1 className="text-xl font-bold text-red-600">エラーが発生しました</h1>
+                    <h1 className="text-xl font-bold text-red-600">{t('errorOccurred')}</h1>
                     <p className="mt-2 text-sm text-slate-600">{error}</p>
                     <button onClick={() => window.location.reload()} className="mt-5 rounded-xl bg-blue-700 px-4 py-2 text-sm font-medium text-white">
-                        再読み込み
+                        {t('reload')}
                     </button>
                 </div>
             </div>
@@ -103,19 +105,19 @@ export default function HomePage() {
     }).format(new Date()))
 
     const greeting = hourInJapan >= 5 && hourInJapan < 11
-        ? 'おはようございます'
+        ? t('greetingMorning')
         : hourInJapan >= 11 && hourInJapan < 18
-            ? 'こんにちは'
-            : 'こんばんは'
+            ? t('greetingDay')
+            : t('greetingEvening')
 
-    const formatTime = (date: string | Date) => new Intl.DateTimeFormat('ja-JP', {
+    const formatTime = (date: string | Date) => new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'ja-JP', {
         timeZone: 'Asia/Tokyo',
         hour: '2-digit',
         minute: '2-digit',
         hourCycle: 'h23',
     }).format(new Date(date))
 
-    const formatDate = (date: string | Date) => new Intl.DateTimeFormat('ja-JP', {
+    const formatDate = (date: string | Date) => new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'ja-JP', {
         timeZone: 'Asia/Tokyo',
         month: 'numeric',
         day: 'numeric',
@@ -128,43 +130,43 @@ export default function HomePage() {
         formData.append('file', file)
 
         try {
-            toast.info('アップロード中...')
+            toast.info(t('uploadInProgress'))
             await uploadSeal(formData)
             const currentUser = await getCurrentUser()
             const sealImage = await getCurrentUserSealImage()
             setUser(currentUser ? { ...currentUser, sealImage } : null)
             router.refresh()
-            toast.success('印鑑画像を登録しました')
+            toast.success(t('sealRegistered'))
         } catch (error) {
-            toast.error('アップロードに失敗しました: ' + (error as Error).message)
+            toast.error(t('uploadFailed') + (error as Error).message)
         }
     }
 
     const menuItems = [
-        { href: '/reservations', label: '機器予約', description: '空き状況を確認して予約', icon: CalendarDays },
-        { href: '/reagents', label: '有料サービス', description: '利用内容と数量を記録', icon: FlaskConical },
-        { href: '/invoices', label: '請求書', description: '請求内容を確認', icon: FileText },
+        { href: '/reservations', label: t('equipmentReservation'), description: t('todaySchedule'), icon: CalendarDays },
+        { href: '/reagents', label: t('paidServices'), description: t('recordUsage'), icon: FlaskConical },
+        { href: '/invoices', label: t('invoices'), description: t('checkInvoice'), icon: FileText },
     ]
 
     return (
         <div className="content-wrapper app-page">
             <div className="mb-6">
                 <h1 className="app-page-title">{greeting}、{user.name}さん</h1>
-                <p className="app-page-description">今日の予定と利用状況を確認できます</p>
+                <p className="app-page-description">{t('todaySchedule')}</p>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
                 <section className="app-surface p-5 md:p-6">
                     <div className="mb-3 flex items-center justify-between gap-3">
-                        <h2 className="font-semibold text-slate-800">今日の予約</h2>
+                        <h2 className="font-semibold text-slate-800">{t('todaysReservations')}</h2>
                         <Link href="/reservations?view=calendar" className="text-xs font-medium text-blue-700 hover:underline">
-                            すべて見る
+                            {t('seeAll')}
                         </Link>
                     </div>
 
                     {todayReservations.length === 0 ? (
                         <div className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                            本日の予約はありません
+                            {t('noTodaysReservations')}
                         </div>
                     ) : (
                         <div className="divide-y divide-slate-100">
@@ -188,7 +190,7 @@ export default function HomePage() {
                             className="flex min-h-10 w-full items-center justify-between rounded-lg px-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
                             aria-expanded={showFutureReservations}
                         >
-                            <span>明日以降の予約</span>
+                            <span>{t('futureReservations')}</span>
                             <span className="flex items-center gap-2 text-xs text-slate-500">
                                 {futureReservations.length}件
                                 {showFutureReservations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -197,7 +199,7 @@ export default function HomePage() {
                         {showFutureReservations && (
                             <div className="mt-2 divide-y divide-slate-100">
                                 {futureReservations.length === 0 ? (
-                                    <p className="py-4 text-center text-sm text-slate-500">予約はありません</p>
+                                    <p className="py-4 text-center text-sm text-slate-500">{t('noReservations')}</p>
                                 ) : futureReservations.map((reservation) => (
                                     <div key={reservation.id} className="grid grid-cols-[4rem_1fr_auto] gap-3 px-2 py-3 text-sm">
                                         <span className="text-slate-500">{formatDate(reservation.startTime)}</span>
@@ -213,7 +215,7 @@ export default function HomePage() {
                 <section className="app-surface p-5 md:p-6">
                     <div className="flex items-start justify-between gap-3">
                         <div>
-                            <h2 className="font-semibold text-slate-800">今期の利用料金</h2>
+                            <h2 className="font-semibold text-slate-800">{t('currentPeriodCost')}</h2>
                             <p className="mt-1 text-xs text-slate-500">{periodLabel}</p>
                         </div>
                         <button
@@ -222,7 +224,7 @@ export default function HomePage() {
                             className="flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-medium text-blue-700 hover:bg-blue-50"
                             aria-expanded={showDetails}
                         >
-                            明細
+                            {t('breakdown')}
                             {showDetails ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </button>
                     </div>
@@ -231,7 +233,7 @@ export default function HomePage() {
                     {showDetails && (
                         <div className="mt-5 border-t border-slate-100 pt-3">
                             {usageLogs.length === 0 ? (
-                                <p className="py-3 text-center text-sm text-slate-500">利用履歴はありません</p>
+                                <p className="py-3 text-center text-sm text-slate-500">{t('noUsageHistory')}</p>
                             ) : (
                                 <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-100">
                                     {usageLogs.map((log: any) => (
@@ -265,30 +267,30 @@ export default function HomePage() {
                         <ExternalLink className="h-5 w-5" />
                     </span>
                     <span>
-                        <span className="block text-sm font-semibold text-slate-800">センターHP</span>
-                        <span className="mt-1 block text-xs text-slate-500">公式サイトを開く</span>
+                        <span className="block text-sm font-semibold text-slate-800">{t('centerWebsite')}</span>
+                        <span className="mt-1 block text-xs text-slate-500">{t('openOfficialSite')}</span>
                     </span>
                 </a>
             </div>
 
             {user.role === 'CENTER_DIRECTOR' && (
                 <section className="mt-6">
-                    <h2 className="mb-3 text-sm font-semibold text-slate-800">センター長メニュー</h2>
+                    <h2 className="mb-3 text-sm font-semibold text-slate-800">{t('directorMenu')}</h2>
                     <div className="grid gap-3 md:grid-cols-2">
                         <Link href="/admin/invoices" className="app-surface flex min-h-20 items-center gap-4 p-4 transition hover:shadow-md">
                             <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-blue-700"><FileCheck className="h-5 w-5" /></span>
-                            <span><strong className="block text-sm font-semibold text-slate-800">請求書承認</strong><span className="mt-1 block text-xs text-slate-500">請求書を確認して電子印を押す</span></span>
+                            <span><strong className="block text-sm font-semibold text-slate-800">{t('invoiceApproval')}</strong><span className="mt-1 block text-xs text-slate-500">{t('approveInvoice')}</span></span>
                         </Link>
                         <label className="app-surface flex min-h-20 cursor-pointer items-center gap-4 p-4 transition hover:shadow-md">
                             <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-blue-700"><Upload className="h-5 w-5" /></span>
-                            <span><strong className="block text-sm font-semibold text-slate-800">印鑑画像の登録</strong><span className="mt-1 block text-xs text-slate-500">電子印として使用する画像</span></span>
+                            <span><strong className="block text-sm font-semibold text-slate-800">{t('registerSeal')}</strong><span className="mt-1 block text-xs text-slate-500">{t('sealImageDescription')}</span></span>
                             <input type="file" accept="image/*" className="hidden" onChange={event => handleSealUpload(event.target.files?.[0])} />
                         </label>
                     </div>
                     {user.sealImage && (
                         <div className="app-surface mt-3 flex items-center gap-4 p-4">
                             <img src={user.sealImage} alt="現在の印鑑画像" className="h-14 w-14 object-contain" />
-                            <span className="text-sm text-slate-600">現在の印鑑画像</span>
+                            <span className="text-sm text-slate-600">{t('currentSealImage')}</span>
                         </div>
                     )}
                 </section>
