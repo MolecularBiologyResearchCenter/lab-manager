@@ -68,6 +68,7 @@ interface Reservation {
     userLaboratory?: string
     calendarStart?: Date
     calendarEnd?: Date
+    sourceReservationId?: string
 }
 
 interface Props {
@@ -137,7 +138,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         // Filter by active status if enabled
         if (showActiveOnly) {
             const now = new Date()
-            return res.start <= now && res.end >= now
+            return res.start <= now && res.end > now
         }
         return true
     })
@@ -145,11 +146,30 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     // react-big-calendar uses the browser's Date methods for positioning. Convert
     // only the calendar copy to Tokyo wall-clock fields; the original UTC instant
     // remains on the event for persistence and overlap checks.
-    const calendarReservations = filteredReservations.map(reservation => ({
-        ...reservation,
-        calendarStart: toTokyoWallClock(reservation.start),
-        calendarEnd: toTokyoWallClock(reservation.end),
-    }))
+    const calendarReservations = filteredReservations.flatMap(reservation => {
+        const start = toTokyoWallClock(reservation.start)
+        const end = toTokyoWallClock(reservation.end)
+        const segments: Reservation[] = []
+        const day = new Date(start)
+        day.setHours(0, 0, 0, 0)
+
+        while (day < end) {
+            const nextDay = new Date(day)
+            nextDay.setDate(nextDay.getDate() + 1)
+            const segmentStart = start > day ? start : day
+            const segmentEnd = end < nextDay ? end : nextDay
+            const isSingleDay = segmentStart.getTime() === start.getTime() && segmentEnd.getTime() === end.getTime()
+            segments.push({
+                ...reservation,
+                id: isSingleDay ? reservation.id : `${reservation.id}-${format(day, 'yyyy-MM-dd')}`,
+                sourceReservationId: reservation.id,
+                calendarStart: segmentStart,
+                calendarEnd: segmentEnd,
+            })
+            day.setDate(day.getDate() + 1)
+        }
+        return segments
+    })
 
     const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
         setEditingReservation(null)
@@ -163,11 +183,12 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     }
 
     const handleSelectEvent = (event: Reservation) => {
-        setEditingReservation(event)
-        setStartTime(event.start)
-        setEndTime(event.end)
-        setSelectedEquipment(event.resourceId)
-        setPhoneNumber(event.phoneNumber || '')
+        const original = reservations.find(reservation => reservation.id === (event.sourceReservationId || event.id)) || event
+        setEditingReservation(original)
+        setStartTime(original.start)
+        setEndTime(original.end)
+        setSelectedEquipment(original.resourceId)
+        setPhoneNumber(original.phoneNumber || '')
         setIsDialogOpen(true)
     }
 
@@ -329,30 +350,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
     // Mobile List View Component
     const MobileReservationList = () => {
-        // Split multi-day reservations into Tokyo-calendar-day segments so a booking
-        // crossing midnight appears on every affected day while retaining the
-        // original instants for edit and overlap handling.
-        const displayReservations = calendarReservations.flatMap(reservation => {
-            const start = reservation.calendarStart!
-            const end = reservation.calendarEnd!
-            const segments: Reservation[] = []
-            const day = new Date(start)
-            day.setHours(0, 0, 0, 0)
-            while (day < end) {
-                const nextDay = new Date(day)
-                nextDay.setDate(nextDay.getDate() + 1)
-                segments.push({
-                    ...reservation,
-                    calendarStart: start > day ? start : day,
-                    calendarEnd: end < nextDay ? end : nextDay,
-                })
-                day.setDate(day.getDate() + 1)
-            }
-            return segments
-        })
-
         // Filter reservations by the selected month
-        const monthFilteredReservations = displayReservations.filter(reservation => {
+        const monthFilteredReservations = calendarReservations.filter(reservation => {
             const reservationMonth = reservation.calendarStart?.getMonth()
             const reservationYear = reservation.calendarStart?.getFullYear()
             const selectedMonthValue = selectedMonth.getMonth()
