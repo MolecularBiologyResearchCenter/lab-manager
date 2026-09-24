@@ -41,7 +41,7 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
     const { t } = useUserLanguage()
     const displayReagentName = (name: string) => {
         if (t('services') === 'Services') {
-            if (name.includes('Tapestation 消耗品')) return name.replace('Tapestation 消耗品', 'Tapestation Supplies')
+            if (/tapestation 消耗品/i.test(name)) return name.replace(/tapestation 消耗品/i, 'TapeStation Supplies')
             if (name.includes('シーケンサー')) return name.replace('シーケンサー', 'Sequencer')
             if (name.includes('外注用')) return name.replace('外注用', 'External use')
         }
