@@ -11,6 +11,10 @@ export default function ErrorModal() {
     useEffect(() => {
         const handleError = (event: Event) => {
             const detail = (event as CustomEvent<string>).detail
+            const activeElement = document.activeElement
+            if (activeElement instanceof HTMLElement) {
+                activeElement.blur()
+            }
             setMessage(typeof detail === 'string' ? detail : 'エラーが発生しました。')
         }
         window.addEventListener(ERROR_EVENT, handleError)
@@ -19,7 +23,16 @@ export default function ErrorModal() {
 
     useEffect(() => {
         if (!message) return
-        okButtonRef.current?.focus()
+
+        const focusFrame = window.requestAnimationFrame(() => {
+            const activeElement = document.activeElement
+            if (activeElement instanceof HTMLElement) {
+                activeElement.blur()
+            }
+            okButtonRef.current?.focus()
+        })
+
+        return () => window.cancelAnimationFrame(focusFrame)
     }, [message])
 
     useEffect(() => {
