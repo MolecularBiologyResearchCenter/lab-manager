@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { toast } from 'sonner'
-import { showError } from '@/lib/error-notifier'
+import { showError, showInfo, showSuccess } from '@/lib/error-notifier'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ApiClientError, formatApiError, readApiError } from '@/lib/api-client'
@@ -136,7 +135,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     const handleDownloadPDF = async () => {
         if (!invoice) return
         if (!invoice.sealedAt || !invoice.sealedBy) {
-            toast.info('案内：センター長の押印をお待ちください')
+                showInfo('案内：センター長の押印をお待ちください')
             return
         }
         setDownloading(true)
@@ -174,7 +173,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             a.click()
             window.URL.revokeObjectURL(url)
             document.body.removeChild(a)
-            toast.success('押印済みPDFをダウンロードしました')
+                showSuccess('押印済みPDFをダウンロードしました')
         } catch (error) {
             console.error('Failed to generate PDF:', error)
             if (error instanceof Error && error.message === '請求書の描画に失敗しました') {
@@ -205,7 +204,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 throw new Error(formatApiError(apiError))
             }
             setInvoice(prev => prev ? { ...prev, sealedAt: new Date(), sealedBy: 'current-user' } : null)
-            toast.success('電子印を押しました')
+            showSuccess('電子印を押しました')
             setSealDialogOpen(false)
         } catch (error) {
             showError((error as Error).message)

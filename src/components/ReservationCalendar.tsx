@@ -6,8 +6,7 @@ import { ja } from 'date-fns/locale'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
-import { showError } from '@/lib/error-notifier'
+import { showError, showSuccess } from '@/lib/error-notifier'
 import {
     Dialog,
     DialogContent,
@@ -252,20 +251,18 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                     showReservationError('操作に失敗しました: ' + result.error)
                     return
                 }
-                toast.success('予約を更新しました！')
+                showSuccess('予約を更新しました！')
             } else {
                 const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
                 if (!result.success) {
                     showReservationError('操作に失敗しました: ' + result.error)
                     return
                 }
-                toast.success('予約が完了しました！')
+                showSuccess('予約が完了しました！')
             }
             setIsDialogOpen(false)
             // Refresh data to reflect changes
-            setTimeout(() => {
-                router.refresh()
-            }, 2000)
+            router.refresh()
         } catch (error) {
             console.error('Error:', error)
             showReservationError('操作に失敗しました。画面を更新して、もう一度お試しください。')
@@ -342,11 +339,9 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         try {
             await deleteReservation(editingReservation.id)
             setIsDialogOpen(false)
-            toast.success('予約を削除しました。')
+            showSuccess('予約を削除しました。')
             // Refresh data to reflect changes
-            setTimeout(() => {
-                router.refresh()
-            }, 2000)
+            router.refresh()
         } catch (error) {
             showReservationError('削除に失敗しました: ' + (error as Error).message)
         }

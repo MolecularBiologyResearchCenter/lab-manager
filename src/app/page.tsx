@@ -18,8 +18,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { toast } from 'sonner'
-import { showError } from '@/lib/error-notifier'
+import { showError, showInfo, showSuccess } from '@/lib/error-notifier'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 
@@ -131,13 +130,13 @@ export default function HomePage() {
         formData.append('file', file)
 
         try {
-            toast.info(t('uploadInProgress'))
+            showInfo(t('uploadInProgress'))
             await uploadSeal(formData)
             const currentUser = await getCurrentUser()
             const sealImage = await getCurrentUserSealImage()
             setUser(currentUser ? { ...currentUser, sealImage } : null)
             router.refresh()
-            toast.success(t('sealRegistered'))
+            showSuccess(t('sealRegistered'))
         } catch (error) {
             showError(t('uploadFailed') + (error as Error).message)
         }
