@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 
 function ResetPasswordForm() {
     const searchParams = useSearchParams()
@@ -18,7 +19,7 @@ function ResetPasswordForm() {
         const password = String(formData.get('password') || '')
         const confirmation = String(formData.get('confirmation') || '')
         if (password !== confirmation) {
-            toast.error('新しいパスワードが一致しません。')
+            showError('新しいパスワードが一致しません。')
             return
         }
 
@@ -28,7 +29,7 @@ function ResetPasswordForm() {
             toast.success('パスワードを再設定しました。')
             router.push('/login')
         } catch (error) {
-            toast.error((error as Error).message)
+            showError((error as Error).message)
         } finally {
             setSubmitting(false)
         }

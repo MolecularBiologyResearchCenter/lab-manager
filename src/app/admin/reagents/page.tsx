@@ -21,6 +21,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
+import { showError } from '@/lib/error-notifier'
 
 type Reagent = {
     id: string
@@ -70,7 +71,7 @@ export default function ReagentsPage() {
             setShowAddForm(false)
             loadReagents()
         } else {
-            alert(result.error || '追加に失敗しました')
+            showError(result.error || '追加に失敗しました')
         }
     }
 
@@ -86,7 +87,7 @@ export default function ReagentsPage() {
             setFormUnitPrice('')
             loadReagents()
         } else {
-            alert(result.error || '更新に失敗しました')
+            showError(result.error || '更新に失敗しました')
         }
     }
 
@@ -105,7 +106,7 @@ export default function ReagentsPage() {
         if (result.success) {
             loadReagents()
         } else {
-            alert(result.error || '削除に失敗しました')
+            showError(result.error || '削除に失敗しました')
         }
 
         setDeleteDialogOpen(false)

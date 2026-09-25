@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardFooter } from '@/components/ui/card'
 import Link from 'next/link'
-import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
@@ -16,13 +16,13 @@ export default function LoginPage() {
         try {
             const result = await login(formData)
             if (!result.success) {
-                toast.error(result.error)
+                showError(result.error)
                 return
             }
             const currentUser = await getCurrentUser()
             router.replace(currentUser?.role === 'ADMIN' ? '/admin' : '/')
         } catch {
-            toast.error('ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
+            showError('ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
         }
     }
 

@@ -19,6 +19,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 
@@ -138,7 +139,7 @@ export default function HomePage() {
             router.refresh()
             toast.success(t('sealRegistered'))
         } catch (error) {
-            toast.error(t('uploadFailed') + (error as Error).message)
+            showError(t('uploadFailed') + (error as Error).message)
         }
     }
 

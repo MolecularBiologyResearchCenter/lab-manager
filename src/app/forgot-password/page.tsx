@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardFooter } from '@/components/ui/card'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { useState } from 'react'
 
 export default function ForgotPasswordPage() {
@@ -18,7 +19,7 @@ export default function ForgotPasswordPage() {
             const result = await remindPassword(formData)
             toast.success(result.message)
         } catch (error) {
-            toast.error((error as Error).message)
+            showError((error as Error).message)
         } finally {
             setIsSubmitting(false)
         }

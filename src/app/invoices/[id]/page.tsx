@@ -7,6 +7,7 @@ import { ArrowLeft, Download } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ApiClientError, formatApiError, readApiError } from '@/lib/api-client'
@@ -97,7 +98,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 const response = await fetch(`/api/invoices/${id}`)
                 if (!response.ok) {
                     const apiError = await readApiError(response, '請求書を取得できませんでした。')
-                    toast.error(formatApiError(apiError))
+                    showError(formatApiError(apiError))
                     router.push(backHref)
                     return
                 }
@@ -110,7 +111,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     guidance: 'ネットワーク接続を確認して、もう一度お試しください。',
                     requestId: '問い合わせ番号を取得できませんでした',
                 })
-                toast.error(formatApiError(apiError))
+            showError(formatApiError(apiError))
                 router.push(backHref)
             } finally {
                 setLoading(false)
@@ -151,18 +152,18 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                 })
             } catch (error) {
                 console.error('押印済みPDF確認APIへの接続に失敗しました。', error)
-                toast.error('エラー：押印済みPDFを取得できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
+                showError('エラー：押印済みPDFを取得できませんでした。\n次の操作：ネットワーク接続を確認して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
                 return
             }
             if (!downloadResponse.ok) {
                 const apiError = await readApiError(downloadResponse, '押印済みPDFを取得できませんでした。')
-                toast.error(`${formatApiError(apiError)}\nPDFはダウンロードされませんでした。`)
+                showError(`${formatApiError(apiError)}\nPDFはダウンロードされませんでした。`)
                 return
             }
 
             const approvedBlob = await downloadResponse.blob()
             if (approvedBlob.size === 0) {
-                toast.error('エラー：押印済みPDFを取得できませんでした。')
+            showError('エラー：押印済みPDFを取得できませんでした。')
                 return
             }
             const url = window.URL.createObjectURL(approvedBlob)
@@ -177,9 +178,9 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         } catch (error) {
             console.error('Failed to generate PDF:', error)
             if (error instanceof Error && error.message === '請求書の描画に失敗しました') {
-                toast.error('請求書の描画に失敗しました。画面を再読み込みして、もう一度お試しください。')
+            showError('請求書の描画に失敗しました。画面を再読み込みして、もう一度お試しください。')
             } else {
-                toast.error('エラー：PDFの生成に失敗しました。\n次の操作：画面を更新して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
+            showError('エラー：PDFの生成に失敗しました。\n次の操作：画面を更新して、もう一度お試しください。\n問い合わせ番号：問い合わせ番号を取得できませんでした')
             }
         } finally {
             setDownloading(false)
@@ -207,7 +208,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             toast.success('電子印を押しました')
             setSealDialogOpen(false)
         } catch (error) {
-            toast.error((error as Error).message)
+            showError((error as Error).message)
         } finally {
             setSealing(false)
         }

@@ -10,6 +10,7 @@ import { Building, KeyRound, Mail, Pencil, Phone, Save, UserRound, X } from 'luc
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 type UserData = {
@@ -90,14 +91,14 @@ export default function MyPage() {
             await loadUser()
             router.refresh()
         } catch (error) {
-            toast.error('更新に失敗しました: ' + (error as Error).message)
+            showError('更新に失敗しました: ' + (error as Error).message)
         }
     }
 
     async function handleChangePassword() {
         if (!user) return
         if (newPassword !== confirmPassword) {
-            toast.error(t('confirmPassword') + 'が一致しません')
+            showError(t('confirmPassword') + 'が一致しません')
             return
         }
         try {
@@ -109,7 +110,7 @@ export default function MyPage() {
             setConfirmPassword('')
             await loadUser()
         } catch (error) {
-            toast.error('変更に失敗しました: ' + (error as Error).message)
+            showError('変更に失敗しました: ' + (error as Error).message)
         }
     }
 

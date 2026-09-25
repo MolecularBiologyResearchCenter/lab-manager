@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Link from 'next/link'
-import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { useState } from 'react'
 
 export default function RegisterPage() {
@@ -17,11 +17,11 @@ export default function RegisterPage() {
         try {
             const result = await register(formData)
             if (!result.success) {
-                toast.error(result.error)
+                showError(result.error)
             }
         } catch (error) {
             console.error('利用者登録に失敗しました。', error)
-            toast.error('登録処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
+            showError('登録処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
         }
     }
 

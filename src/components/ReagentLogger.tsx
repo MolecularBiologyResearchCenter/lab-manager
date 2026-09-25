@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { logReagentUsage } from '@/app/actions'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 interface Reagent {
@@ -60,7 +61,7 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
             setQuantity(1)
             setSelectedReagent('')
         } catch (error) {
-            toast.error(t('recordFailed') + (error as Error).message)
+            showError(t('recordFailed') + (error as Error).message)
         }
     }
 

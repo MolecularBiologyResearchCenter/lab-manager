@@ -22,6 +22,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog'
 import Image from 'next/image'
+import { showError } from '@/lib/error-notifier'
 
 type Equipment = {
     id: string
@@ -87,7 +88,7 @@ export default function EquipmentPage() {
             loadData()
         } else {
             console.error('Create failed:', result.error)
-            alert(result.error || '追加に失敗しました')
+            showError(result.error || '追加に失敗しました')
         }
     }
 
@@ -103,7 +104,7 @@ export default function EquipmentPage() {
             resetForm()
             loadData()
         } else {
-            alert(result.error || '更新に失敗しました')
+            showError(result.error || '更新に失敗しました')
         }
     }
 
@@ -122,7 +123,7 @@ export default function EquipmentPage() {
         if (result.success) {
             loadData()
         } else {
-            alert(result.error || '削除に失敗しました')
+            showError(result.error || '削除に失敗しました')
         }
 
         setDeleteDialogOpen(false)
@@ -183,7 +184,7 @@ export default function EquipmentPage() {
             setAvailableIcons(prev => [...prev, result.iconPath!])
             setFormIcon(result.iconPath)
         } else {
-            alert(result.error || 'アップロードに失敗しました')
+            showError(result.error || 'アップロードに失敗しました')
         }
     }
 

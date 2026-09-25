@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { deleteUser, updateUserProfileByAdmin } from '@/app/actions'
 import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Label } from '@/components/ui/label'
@@ -79,7 +80,7 @@ export default function UsersPage() {
             if (!response.ok) {
                 const apiError = await readApiError(response, '利用者一覧を取得できませんでした。')
                 console.error('利用者一覧の取得に失敗しました。', apiError)
-                toast.error(formatApiError(apiError))
+                showError(formatApiError(apiError))
                 return
             }
             const data = await response.json()
@@ -91,7 +92,7 @@ export default function UsersPage() {
                 guidance: 'ネットワーク接続を確認して、もう一度お試しください。',
                 requestId: '問い合わせ番号を取得できませんでした',
             })
-            toast.error(formatApiError(apiError))
+            showError(formatApiError(apiError))
         } finally {
             setLoading(false)
         }
@@ -126,7 +127,7 @@ export default function UsersPage() {
             // Also refetch to update local state
             fetchUsers()
         } catch (error) {
-            toast.error('削除に失敗しました: ' + (error as Error).message)
+            showError('削除に失敗しました: ' + (error as Error).message)
         }
 
         setDeleteDialogOpen(false)
@@ -143,7 +144,7 @@ export default function UsersPage() {
             router.refresh()
             fetchUsers()
         } catch (error) {
-            toast.error('更新に失敗しました: ' + (error as Error).message)
+            showError('更新に失敗しました: ' + (error as Error).message)
         }
 
         setEditDialogOpen(false)
