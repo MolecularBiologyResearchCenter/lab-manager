@@ -162,7 +162,18 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     // react-big-calendar uses the browser's Date methods for positioning. Convert
     // only the calendar copy to Tokyo wall-clock fields; the original UTC instant
     // remains on the event for persistence and overlap checks.
-    const calendarReservations = filteredReservations.flatMap(reservation => {
+    const calendarReservations = filteredReservations.map(reservation => {
+        const { start, end } = getCalendarWindow(reservation)
+        return {
+            ...reservation,
+            sourceReservationId: reservation.id,
+            calendarStart: start,
+            calendarEnd: end,
+        }
+    })
+
+    // Mobile lists group entries by date, so keep day-specific copies there.
+    const mobileCalendarReservations = filteredReservations.flatMap(reservation => {
         const { start, end } = getCalendarWindow(reservation)
         const segments: Reservation[] = []
         const day = new Date(start)
@@ -171,15 +182,12 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         while (day < end) {
             const nextDay = new Date(day)
             nextDay.setDate(nextDay.getDate() + 1)
-            const segmentStart = start > day ? start : day
-            const segmentEnd = end < nextDay ? end : nextDay
-            const isSingleDay = segmentStart.getTime() === start.getTime() && segmentEnd.getTime() === end.getTime()
             segments.push({
                 ...reservation,
-                id: isSingleDay ? reservation.id : `${reservation.id}-${format(day, 'yyyy-MM-dd')}`,
+                id: `${reservation.id}-${format(day, 'yyyy-MM-dd')}`,
                 sourceReservationId: reservation.id,
-                calendarStart: segmentStart,
-                calendarEnd: segmentEnd,
+                calendarStart: start > day ? start : day,
+                calendarEnd: end < nextDay ? end : nextDay,
             })
             day.setDate(day.getDate() + 1)
         }
@@ -367,7 +375,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     // Mobile List View Component
     const MobileReservationList = () => {
         // Filter reservations by the selected month
-        const monthFilteredReservations = calendarReservations.filter(reservation => {
+        const monthFilteredReservations = mobileCalendarReservations.filter(reservation => {
             const reservationMonth = reservation.calendarStart?.getMonth()
             const reservationYear = reservation.calendarStart?.getFullYear()
             const selectedMonthValue = selectedMonth.getMonth()
@@ -592,6 +600,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                             onNavigate={setDate}
                             scrollToTime={DEFAULT_CALENDAR_SCROLL_TIME}
                             selectable
+                            showMultiDayTimes
                             onSelectSlot={handleSelectSlot}
                             onSelectEvent={handleSelectEvent}
                             eventPropGetter={eventPropGetter}
