@@ -243,6 +243,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
                 const result = await updateReservation(editingReservation.id, selectedEquipment, editingReservation.userId, startTime, endTime, phoneNumber)
                 if (!result.success) {
+                    setIsDialogOpen(false)
                     showError('操作に失敗しました: ' + result.error)
                     return
                 }
@@ -250,6 +251,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             } else {
                 const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
                 if (!result.success) {
+                    setIsDialogOpen(false)
                     showError('操作に失敗しました: ' + result.error)
                     return
                 }
@@ -262,6 +264,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             }, 2000)
         } catch (error) {
             console.error('Error:', error)
+            setIsDialogOpen(false)
             showError('操作に失敗しました。画面を更新して、もう一度お試しください。')
         }
     }
