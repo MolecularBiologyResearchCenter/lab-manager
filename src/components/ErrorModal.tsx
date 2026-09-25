@@ -67,8 +67,10 @@ export default function ErrorModal() {
                     <button
                         ref={okButtonRef}
                         type="button"
-                        onClickCapture={close}
-                        onClick={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            close()
+                        }}
                         onPointerDown={(event) => event.stopPropagation()}
                         className="rounded-xl bg-red-700 px-6 py-3 font-semibold text-white outline-none transition hover:bg-red-800 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
                     >
