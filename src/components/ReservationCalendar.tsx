@@ -131,6 +131,20 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     const [startTime, setStartTime] = useState<Date | null>(null)
     const [endTime, setEndTime] = useState<Date | null>(null)
 
+    const getCalendarWindow = (reservation: Reservation) => {
+        const start = toTokyoWallClock(reservation.start)
+        const end = toTokyoWallClock(reservation.end)
+
+        // Older records may have stored a cross-midnight end time on the same
+        // calendar date. Treat those records as ending the following day for
+        // display and availability checks without changing the stored values.
+        if (end <= start) {
+            end.setDate(end.getDate() + 1)
+        }
+
+        return { start, end }
+    }
+
     const filteredReservations = reservations.filter(res => {
         // Filter by equipment visibility
         if (!visibleEquipmentIds.includes(res.resourceId)) return false
@@ -138,7 +152,9 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         // Filter by active status if enabled
         if (showActiveOnly) {
             const now = new Date()
-            return res.start <= now && res.end > now
+            const { start, end } = getCalendarWindow(res)
+            const currentTokyoWallClock = toTokyoWallClock(now)
+            return start <= currentTokyoWallClock && end > currentTokyoWallClock
         }
         return true
     })
@@ -147,8 +163,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     // only the calendar copy to Tokyo wall-clock fields; the original UTC instant
     // remains on the event for persistence and overlap checks.
     const calendarReservations = filteredReservations.flatMap(reservation => {
-        const start = toTokyoWallClock(reservation.start)
-        const end = toTokyoWallClock(reservation.end)
+        const { start, end } = getCalendarWindow(reservation)
         const segments: Reservation[] = []
         const day = new Date(start)
         day.setHours(0, 0, 0, 0)
