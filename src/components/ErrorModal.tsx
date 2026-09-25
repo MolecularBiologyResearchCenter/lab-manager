@@ -67,6 +67,7 @@ export default function ErrorModal() {
                     <button
                         ref={okButtonRef}
                         type="button"
+                        onClickCapture={(event) => event.stopPropagation()}
                         onClick={(event) => {
                             event.stopPropagation()
                             close()
