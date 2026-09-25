@@ -84,6 +84,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
     // Fetch reservations filtered by date
     const reservations = await prisma.reservation.findMany({
         where: {
+            status: { notIn: ['cancelled', 'rejected'] },
             startTime: {
                 gte: startDate,
                 lt: endDate,
@@ -114,6 +115,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
     const dashboardReservationsEnd = new Date(dashboardReservationsStart.getTime() + 7 * 24 * 60 * 60 * 1000)
     const dashboardReservations = await prisma.reservation.findMany({
         where: {
+            status: { notIn: ['cancelled', 'rejected'] },
             startTime: {
                 gte: dashboardReservationsStart,
                 lt: dashboardReservationsEnd,

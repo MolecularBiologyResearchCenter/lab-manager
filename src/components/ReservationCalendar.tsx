@@ -68,6 +68,7 @@ interface Reservation {
     userLaboratory?: string
     calendarStart?: Date
     calendarEnd?: Date
+    sourceReservationId?: string
 }
 
 interface Props {
@@ -130,6 +131,20 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     const [startTime, setStartTime] = useState<Date | null>(null)
     const [endTime, setEndTime] = useState<Date | null>(null)
 
+    const getCalendarWindow = (reservation: Reservation) => {
+        const start = toTokyoWallClock(reservation.start)
+        const end = toTokyoWallClock(reservation.end)
+
+        // Older records may have stored a cross-midnight end time on the same
+        // calendar date. Treat those records as ending the following day for
+        // display and availability checks without changing the stored values.
+        if (end <= start) {
+            end.setDate(end.getDate() + 1)
+        }
+
+        return { start, end }
+    }
+
     const filteredReservations = reservations.filter(res => {
         // Filter by equipment visibility
         if (!visibleEquipmentIds.includes(res.resourceId)) return false
@@ -137,7 +152,9 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         // Filter by active status if enabled
         if (showActiveOnly) {
             const now = new Date()
-            return res.start <= now && res.end >= now
+            const { start, end } = getCalendarWindow(res)
+            const currentTokyoWallClock = toTokyoWallClock(now)
+            return start <= currentTokyoWallClock && end > currentTokyoWallClock
         }
         return true
     })
@@ -145,11 +162,37 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     // react-big-calendar uses the browser's Date methods for positioning. Convert
     // only the calendar copy to Tokyo wall-clock fields; the original UTC instant
     // remains on the event for persistence and overlap checks.
-    const calendarReservations = filteredReservations.map(reservation => ({
-        ...reservation,
-        calendarStart: toTokyoWallClock(reservation.start),
-        calendarEnd: toTokyoWallClock(reservation.end),
-    }))
+    const calendarReservations = filteredReservations.map(reservation => {
+        const { start, end } = getCalendarWindow(reservation)
+        return {
+            ...reservation,
+            sourceReservationId: reservation.id,
+            calendarStart: start,
+            calendarEnd: end,
+        }
+    })
+
+    // Mobile lists group entries by date, so keep day-specific copies there.
+    const mobileCalendarReservations = filteredReservations.flatMap(reservation => {
+        const { start, end } = getCalendarWindow(reservation)
+        const segments: Reservation[] = []
+        const day = new Date(start)
+        day.setHours(0, 0, 0, 0)
+
+        while (day < end) {
+            const nextDay = new Date(day)
+            nextDay.setDate(nextDay.getDate() + 1)
+            segments.push({
+                ...reservation,
+                id: `${reservation.id}-${format(day, 'yyyy-MM-dd')}`,
+                sourceReservationId: reservation.id,
+                calendarStart: start > day ? start : day,
+                calendarEnd: end < nextDay ? end : nextDay,
+            })
+            day.setDate(day.getDate() + 1)
+        }
+        return segments
+    })
 
     const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
         setEditingReservation(null)
@@ -163,11 +206,12 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     }
 
     const handleSelectEvent = (event: Reservation) => {
-        setEditingReservation(event)
-        setStartTime(event.start)
-        setEndTime(event.end)
-        setSelectedEquipment(event.resourceId)
-        setPhoneNumber(event.phoneNumber || '')
+        const original = reservations.find(reservation => reservation.id === (event.sourceReservationId || event.id)) || event
+        setEditingReservation(original)
+        setStartTime(original.start)
+        setEndTime(original.end)
+        setSelectedEquipment(original.resourceId)
+        setPhoneNumber(original.phoneNumber || '')
         setIsDialogOpen(true)
     }
 
@@ -187,10 +231,11 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
         try {
             if (editingReservation) {
-                // Permission check - only the owner can edit
-                const isOriginalOwner = currentUser.id === editingReservation.userId
+                // Administrators may manage every reservation; other users may
+                // edit only reservations they own.
+                const canManageReservation = currentUser.role === 'ADMIN' || currentUser.id === editingReservation.userId
 
-                if (!isOriginalOwner) {
+                if (!canManageReservation) {
                     toast.error('予約の編集・削除は本人のみ可能です。')
                     return
                 }
@@ -278,9 +323,9 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     const handleDelete = async () => {
         if (!editingReservation) return
 
-        const isOriginalOwner = currentUser.id === editingReservation.userId
+        const canManageReservation = currentUser.role === 'ADMIN' || currentUser.id === editingReservation.userId
 
-        if (!isOriginalOwner) {
+        if (!canManageReservation) {
             toast.error('予約の削除は本人のみ可能です。')
             return
         }
@@ -329,8 +374,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
     // Mobile List View Component
     const MobileReservationList = () => {
-        // Filter reservations by selected month
-        const monthFilteredReservations = calendarReservations.filter(reservation => {
+        // Filter reservations by the selected month
+        const monthFilteredReservations = mobileCalendarReservations.filter(reservation => {
             const reservationMonth = reservation.calendarStart?.getMonth()
             const reservationYear = reservation.calendarStart?.getFullYear()
             const selectedMonthValue = selectedMonth.getMonth()
@@ -402,7 +447,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
                                     return (
                                         <div
-                                            key={reservation.id}
+                                            key={`${reservation.id}-${dateKey}`}
                                             onClick={() => handleSelectEvent(reservation)}
                                             className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 active:bg-gray-100"
                                             style={{ cursor: 'pointer' }}
@@ -555,6 +600,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                             onNavigate={setDate}
                             scrollToTime={DEFAULT_CALENDAR_SCROLL_TIME}
                             selectable
+                            showMultiDayTimes
                             onSelectSlot={handleSelectSlot}
                             onSelectEvent={handleSelectEvent}
                             eventPropGetter={eventPropGetter}
@@ -652,8 +698,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                             {editingReservation && (
                                 <Button
                                     type="button"
-                                    variant="destructive"
-                                    className="h-11 flex-1 rounded-xl font-semibold"
+                                    variant="outline"
+                                    className="h-11 flex-1 rounded-xl border-red-200 bg-white font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
                                     onClick={handleDelete}
                                 >
                                     {t('delete')}

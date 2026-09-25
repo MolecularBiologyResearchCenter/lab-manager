@@ -14,6 +14,7 @@ export default async function ReservationsPage(props: { searchParams: Promise<{ 
     }
 
     const reservations = await prisma.reservation.findMany({
+        where: { status: { notIn: ['cancelled', 'rejected'] } },
         include: {
             equipment: true,
             user: {

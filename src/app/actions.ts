@@ -9,6 +9,7 @@ import { recordAuditLog } from '@/lib/audit'
 import { generateInvoicePdf } from '@/lib/invoice-pdf'
 import { sha256Pdf, validateGeneratedInvoicePdf } from '@/lib/invoice-pdf-security'
 import { formatTokyoDateTime } from '@/lib/date-format'
+import { reservationStatusFilter, validateReservationWindow } from '@/lib/reservation-rules'
 import {
     checkAuthThrottle,
     getAuthThrottleKeys,
@@ -126,6 +127,7 @@ export async function getDashboardData() {
     const upcomingReservations = await prisma.reservation.findMany({
         where: {
             userId: currentUser.id,
+            status: reservationStatusFilter,
             startTime: {
                 gte: startOfDay,
             },
@@ -146,7 +148,8 @@ export async function getDashboardData() {
     const activeReservationsCount = await prisma.reservation.count({
         where: {
             startTime: { lte: now },
-            endTime: { gte: now },
+            endTime: { gt: now },
+            status: reservationStatusFilter,
         },
     })
 
@@ -195,11 +198,17 @@ export async function createReservation(equipmentId: string, userId: string, sta
     const currentUser = await requireUser()
     if (currentUser.id !== userId) throw new Error('他のユーザーの予約は作成できません。')
 
+    const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId }, select: { name: true } })
+    if (!equipment) return { success: false, error: '指定された機器が見つかりません。' }
+    const validationError = validateReservationWindow(equipment.name, startTime, endTime)
+    if (validationError) return { success: false, error: validationError }
+
     try {
         const created = await prisma.$transaction(async (transaction) => {
             const overlap = await transaction.reservation.findFirst({
                 where: {
                     equipmentId,
+                    status: reservationStatusFilter,
                     startTime: { lt: endTime },
                     endTime: { gt: startTime },
                 },
@@ -304,7 +313,7 @@ export async function updateReservation(
     const currentUser = await requireUser()
     const existingReservation = await prisma.reservation.findUnique({
         where: { id },
-        select: { userId: true },
+        select: { userId: true, status: true },
     })
     if (!existingReservation || (existingReservation.userId !== currentUser.id && currentUser.role !== 'ADMIN')) {
         throw new Error('この予約を変更する権限がありません。')
@@ -312,12 +321,18 @@ export async function updateReservation(
     if (currentUser.role !== 'ADMIN' && userId !== currentUser.id) {
         throw new Error('予約者を変更する権限がありません。')
     }
+    if (existingReservation.status !== 'active') return { success: false, error: 'この予約は変更できない状態です。' }
+    const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId }, select: { name: true } })
+    if (!equipment) return { success: false, error: '指定された機器が見つかりません。' }
+    const validationError = validateReservationWindow(equipment.name, startTime, endTime)
+    if (validationError) return { success: false, error: validationError }
     try {
         const updated = await prisma.$transaction(async (transaction) => {
             const overlap = await transaction.reservation.findFirst({
                 where: {
                     id: { not: id },
                     equipmentId,
+                    status: reservationStatusFilter,
                     startTime: { lt: endTime },
                     endTime: { gt: startTime },
                 },
