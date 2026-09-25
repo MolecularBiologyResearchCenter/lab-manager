@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner"
+import ErrorModal from '@/components/ErrorModal'
 import Header from "@/components/Header"
 import Footer from "@/components/Footer"
 import { UserLanguageProvider } from "@/components/UserLanguageProvider"
@@ -52,6 +53,7 @@ async function LayoutContent({ children }: { children: React.ReactNode }) {
       </main>
       <Footer />
       <Toaster />
+      <ErrorModal />
     </UserLanguageProvider>
   )
 }

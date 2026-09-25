@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label'
 import CustomDateTimePicker from '@/components/CustomDateTimePicker'
 import { createReservation } from '@/app/actions'
 import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 
@@ -74,14 +75,14 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
         e.preventDefault()
 
         if (!selectedEquipment || !startTime || !endTime) {
-            toast.error('全ての項目を入力してください。')
+            showError('全ての項目を入力してください。')
             return
         }
 
         try {
             const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
             if (!result.success) {
-                toast.error('予約に失敗しました: ' + result.error)
+                showError('予約に失敗しました: ' + result.error)
                 return
             }
             toast.success('予約が完了しました!')
@@ -91,7 +92,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
             }, 2000)
         } catch (error) {
             console.error('Error:', error)
-            toast.error('予約に失敗しました。画面を更新して、もう一度お試しください。')
+            showError('予約に失敗しました。画面を更新して、もう一度お試しください。')
         }
     }
 

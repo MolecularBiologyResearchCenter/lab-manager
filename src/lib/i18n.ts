@@ -43,6 +43,7 @@ export const translations = {
         sealRegistered: '印鑑画像を登録しました',
         uploadFailed: 'アップロードに失敗しました: ',
         errorOccurred: 'エラーが発生しました',
+        ok: 'OK',
         reload: '再読み込み',
         invoiceDescription: '4か月ごとの利用料金を確認',
         noInvoices: '請求書はまだありません',
@@ -153,6 +154,7 @@ export const translations = {
         sealRegistered: 'Seal image registered',
         uploadFailed: 'Upload failed: ',
         errorOccurred: 'An error occurred',
+        ok: 'OK',
         reload: 'Reload',
         invoiceDescription: 'Review usage fees every four months',
         noInvoices: 'No invoices yet',
@@ -226,3 +228,47 @@ export const translations = {
 } as const
 
 export type TranslationKey = keyof typeof translations.ja
+
+const errorMessageReplacements: Array<[string, string]> = [
+    ['操作に失敗しました: ', 'Operation failed: '],
+    ['予約に失敗しました: ', 'Booking failed: '],
+    ['更新に失敗しました: ', 'Update failed: '],
+    ['削除に失敗しました: ', 'Deletion failed: '],
+    ['記録に失敗しました: ', 'Recording failed: '],
+    ['アップロードに失敗しました: ', 'Upload failed: '],
+    ['追加に失敗しました', 'Add failed'],
+    ['アカウントまたはパスワードが正しくありません。', 'The account or password is incorrect.'],
+    ['全ての項目を入力してください。', 'Please complete all fields.'],
+    ['終了時刻は開始時刻より後に設定してください。', 'The end time must be later than the start time.'],
+    ['この時間帯は既に予約が入っています。', 'This time slot is already booked.'],
+    ['同時に別の予約が登録されました。画面を更新して空き状況を確認してください。', 'Another booking was created at the same time. Please refresh the page and check availability.'],
+    ['予約日時が不正です。', 'The booking date and time are invalid.'],
+    ['この機器の予約は最長12時間です。', 'Bookings for this equipment can be up to 12 hours.'],
+    ['MiSeqの予約は最長48時間です。', 'MiSeq bookings can be up to 48 hours.'],
+    ['この予約は変更できない状態です。', 'This booking cannot be changed in its current state.'],
+    ['予約の編集・削除は本人のみ可能です。', 'Only the booking owner can edit or delete this booking.'],
+    ['予約の削除は本人のみ可能です。', 'Only the booking owner can delete this booking.'],
+    ['ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。', 'An error occurred while signing in. Please wait and try again.'],
+    ['登録処理中にエラーが発生しました。時間をおいて、もう一度お試しください。', 'An error occurred while registering. Please wait and try again.'],
+    ['予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。', 'An error occurred while processing the booking. Please refresh the page and try again.'],
+    ['予約に失敗しました。画面を更新して、もう一度お試しください。', 'Booking failed. Please refresh the page and try again.'],
+    ['操作に失敗しました。画面を更新して、もう一度お試しください。', 'The operation failed. Please refresh the page and try again.'],
+    ['新しいパスワードが一致しません。', 'The new passwords do not match.'],
+    ['エラー：押印済みPDFを取得できませんでした。', 'Error: The sealed PDF could not be retrieved.'],
+    ['エラー：PDFの生成に失敗しました。', 'Error: The PDF could not be generated.'],
+    ['次の操作：', 'Next step: '],
+    ['問い合わせ番号：', 'Reference number: '],
+    ['ネットワーク接続を確認して、もう一度お試しください。', 'Check your network connection and try again.'],
+    ['画面を更新して、もう一度お試しください。', 'Refresh the page and try again.'],
+    ['PDFはダウンロードされませんでした。', 'The PDF was not downloaded.'],
+    ['エラーが発生しました。', 'An error occurred.'],
+]
+
+export function translateErrorMessage(message: string, language: Language) {
+    if (language === 'ja') return message
+
+    return errorMessageReplacements.reduce(
+        (translated, [japanese, english]) => translated.split(japanese).join(english),
+        message,
+    )
+}

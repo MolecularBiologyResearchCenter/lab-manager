@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Bell, Check } from 'lucide-react'
-import { toast } from 'sonner'
+import { showError } from '@/lib/error-notifier'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatTokyoDateTime } from '@/lib/date-format'
@@ -106,14 +106,14 @@ export default function AdminNotificationsCard() {
         try {
             const response = await fetch(`/api/admin/notifications/${notificationId}/read`, { method: 'POST' })
             if (!response.ok) {
-                toast.error('通知を確認済みにできませんでした。')
+                showError('通知を確認済みにできませんでした。')
                 return
             }
             setNotifications((current) => current.map((item) => item.id === notificationId ? { ...item, isRead: true } : item))
             setUnreadCount((current) => Math.max(0, current - 1))
         } catch (error) {
             console.error('管理者通知の既読化に失敗しました。', error)
-            toast.error('通知を確認済みにできませんでした。')
+            showError('通知を確認済みにできませんでした。')
         }
     }
 
