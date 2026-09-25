@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ERROR_EVENT } from '@/lib/error-notifier'
+import { translateErrorMessage } from '@/lib/i18n'
+import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 export default function ErrorModal() {
+    const { language, t } = useUserLanguage()
     const [message, setMessage] = useState<string | null>(null)
     const okButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -71,10 +74,10 @@ export default function ErrorModal() {
                 }}
             >
                 <h2 id="error-modal-title" className="shrink-0 text-xl font-bold text-red-700">
-                    エラー
+                    {t('errorOccurred')}
                 </h2>
                 <div id="error-modal-message" className="mt-4 min-h-0 overflow-y-auto whitespace-pre-wrap break-words text-base leading-7 text-slate-800">
-                    {message}
+                    {translateErrorMessage(message, language)}
                 </div>
                 <div className="mt-6 flex shrink-0 justify-end">
                     <button
@@ -87,7 +90,7 @@ export default function ErrorModal() {
                         onPointerDown={(event) => event.stopPropagation()}
                         className="rounded-xl bg-red-700 px-6 py-3 font-semibold text-white outline-none transition hover:bg-red-800 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
                     >
-                        OK
+                        {t('ok')}
                     </button>
                 </div>
             </div>
