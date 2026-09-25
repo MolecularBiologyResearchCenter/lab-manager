@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { toast } from 'sonner'
-import { showError } from '@/lib/error-notifier'
+import { showError, showSuccess } from '@/lib/error-notifier'
 
 function ResetPasswordForm() {
     const router = useRouter()
@@ -26,7 +25,7 @@ function ResetPasswordForm() {
         setSubmitting(true)
         try {
             await resetPasswordWithCode(code, password)
-            toast.success('パスワードを変更しました。再度ログインしてください。')
+            showSuccess('パスワードを変更しました。再度ログインしてください。')
             router.push('/login')
         } catch (error) {
             showError((error as Error).message)

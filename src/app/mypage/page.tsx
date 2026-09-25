@@ -9,8 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Building, KeyRound, Mail, Pencil, Phone, Save, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
-import { showError } from '@/lib/error-notifier'
+import { showError, showSuccess } from '@/lib/error-notifier'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 type UserData = {
@@ -86,7 +85,7 @@ export default function MyPage() {
         if (!user) return
         try {
             await updateProfile(user.id, { department, laboratory, extension, mailingList })
-            toast.success(t('recorded'))
+            showSuccess(t('recorded'))
             setIsEditing(false)
             await loadUser()
             router.refresh()
@@ -103,7 +102,7 @@ export default function MyPage() {
         }
         try {
             await updateProfile(user.id, { currentPassword, newPassword })
-            toast.success(t('password') + 'を変更しました')
+            showSuccess(t('password') + 'を変更しました')
             setPasswordDialogOpen(false)
             setCurrentPassword('')
             setNewPassword('')

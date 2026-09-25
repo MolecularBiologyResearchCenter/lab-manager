@@ -21,8 +21,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog'
 import { deleteUser, updateUserProfileByAdmin } from '@/app/actions'
-import { toast } from 'sonner'
-import { showError } from '@/lib/error-notifier'
+import { showError, showSuccess } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Label } from '@/components/ui/label'
@@ -121,7 +120,7 @@ export default function UsersPage() {
 
         try {
             await deleteUser(userToDelete.id)
-            toast.success('ユーザーを削除しました')
+            showSuccess('ユーザーを削除しました')
             // Refresh the page to show updated list
             router.refresh()
             // Also refetch to update local state
@@ -140,7 +139,7 @@ export default function UsersPage() {
 
         try {
             await updateUserProfileByAdmin(userToEdit.id, { role: selectedRole, employeeId, mailingList })
-            toast.success('利用者情報を更新しました')
+            showSuccess('利用者情報を更新しました')
             router.refresh()
             fetchUsers()
         } catch (error) {

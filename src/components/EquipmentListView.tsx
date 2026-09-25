@@ -19,8 +19,7 @@ import {
 import { Label } from '@/components/ui/label'
 import CustomDateTimePicker from '@/components/CustomDateTimePicker'
 import { createReservation } from '@/app/actions'
-import { toast } from 'sonner'
-import { showError } from '@/lib/error-notifier'
+import { showError, showSuccess } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 
@@ -85,11 +84,9 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                 showError('予約に失敗しました: ' + result.error)
                 return
             }
-            toast.success('予約が完了しました!')
+            showSuccess('予約が完了しました!')
             setIsDialogOpen(false)
-            setTimeout(() => {
-                router.refresh()
-            }, 2000)
+            router.refresh()
         } catch (error) {
             console.error('Error:', error)
             showError('予約に失敗しました。画面を更新して、もう一度お試しください。')
