@@ -42,6 +42,15 @@ export function hashPasswordResetToken(token: string): string {
     return createHash('sha256').update(token).digest('hex')
 }
 
+export function createAdminPasswordResetCode() {
+    const code = randomBytes(24).toString('base64url')
+    return {
+        code,
+        codeHash: hashPasswordResetToken(code),
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    }
+}
+
 export function validatePassword(password: string): boolean {
     return /^(?=.*[0-9])(?=.*[a-z]).{8,}$/.test(password)
 }

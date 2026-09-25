@@ -16,11 +16,14 @@ import { getAuthenticatedUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { formatTokyoDate, formatTokyoTime } from '@/lib/date-format'
 import AdminNotificationsCard from '@/components/AdminNotificationsCard'
+import AdminPasswordResetRequests from '@/components/AdminPasswordResetRequests'
+import { getPasswordResetRequests } from '@/app/actions'
 
 export default async function AdminPage(props: { searchParams: Promise<{ month?: string; year?: string }> }) {
     const currentUser = await getAuthenticatedUser()
     if (!currentUser) redirect('/login')
     if (currentUser.role !== 'ADMIN') redirect('/')
+    const passwordResetRequests = await getPasswordResetRequests()
     const searchParams = await props.searchParams
 
     // Date Filtering Logic
@@ -224,8 +227,10 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
                 </Link>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-6">
                 <AdminNotificationsCard />
+
+                <AdminPasswordResetRequests initialRequests={passwordResetRequests} />
 
                 <Card className="h-full">
                     <CardHeader className="flex flex-row items-center justify-between gap-4">

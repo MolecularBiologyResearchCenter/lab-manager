@@ -7,6 +7,7 @@ export const LOGIN_WINDOW_MS = 15 * 60 * 1000
 export const LOGIN_MAX_FAILURES = 5
 export const PASSWORD_RESET_WINDOW_MS = 15 * 60 * 1000
 export const PASSWORD_RESET_MAX_REQUESTS = 3
+export const PASSWORD_RESET_CODE_MAX_ATTEMPTS = 5
 
 type ThrottleKind = 'LOGIN_ACCOUNT' | 'LOGIN_IP' | 'PASSWORD_RESET_ACCOUNT' | 'PASSWORD_RESET_IP'
 
@@ -119,6 +120,13 @@ export async function registerPasswordResetRequest(keys: ThrottleKey[], now = ne
     const status = await checkAuthThrottle(keys, now)
     if (status.blocked) return { allowed: false, newlyLocked: false, released: status.released }
     const newlyLocked = await registerFailure(keys, PASSWORD_RESET_WINDOW_MS, PASSWORD_RESET_MAX_REQUESTS, now)
+    return { allowed: !newlyLocked, newlyLocked, released: status.released }
+}
+
+export async function registerPasswordResetCodeAttempt(keys: ThrottleKey[], now = new Date()) {
+    const status = await checkAuthThrottle(keys, now)
+    if (status.blocked) return { allowed: false, newlyLocked: false, released: status.released }
+    const newlyLocked = await registerFailure(keys, PASSWORD_RESET_WINDOW_MS, PASSWORD_RESET_CODE_MAX_ATTEMPTS, now)
     return { allowed: !newlyLocked, newlyLocked, released: status.released }
 }
 

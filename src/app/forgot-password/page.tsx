@@ -1,6 +1,6 @@
 'use client'
 
-import { remindPassword } from '@/app/actions'
+import { requestPasswordReset } from '@/app/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,7 +16,7 @@ export default function ForgotPasswordPage() {
     const handleSubmit = async (formData: FormData) => {
         setIsSubmitting(true)
         try {
-            const result = await remindPassword(formData)
+            const result = await requestPasswordReset(formData)
             toast.success(result.message)
         } catch (error) {
             showError((error as Error).message)
@@ -48,21 +48,9 @@ export default function ForgotPasswordPage() {
                 <form action={handleSubmit}>
                     <CardContent className="space-y-5 px-6 py-7">
                         <CardDescription className="text-center text-gray-600">
-                            登録されているメールアドレスと職員番号を入力してください。<br />
-                            一致する登録がある場合、再設定用リンクをメールでお送りします。
+                            職員番号を入力すると、パスワード再設定依頼を管理者へ送ります。<br />
+                            登録の有無にかかわらず同じメッセージを表示します。
                         </CardDescription>
-                        <div className="space-y-2">
-                            <Label htmlFor="email">メールアドレス</Label>
-                            <Input
-                                id="email"
-                                name="email"
-                                type="email"
-                                required
-                                placeholder="user@example.com"
-                                className="h-11 rounded-xl border-slate-300 text-base"
-                                disabled={isSubmitting}
-                            />
-                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="employeeId">職員番号/学籍番号</Label>
                             <Input
@@ -81,8 +69,14 @@ export default function ForgotPasswordPage() {
                             className="h-12 w-full rounded-xl bg-blue-700 text-base font-semibold text-white hover:bg-blue-800"
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? '送信中...' : '再設定メールを送る'}
+                            {isSubmitting ? '送信中...' : '再設定依頼を送る'}
                         </Button>
+                        <div className="text-center text-sm text-gray-600">
+                            管理者からリセットコードを受け取った方は{' '}
+                            <Link href="/reset-password" className="font-medium text-blue-600 hover:text-blue-700 hover:underline">
+                                パスワード再設定画面へ
+                            </Link>
+                        </div>
                         <div className="text-sm text-center text-gray-600">
                             <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium hover:underline">
                                 ログイン画面に戻る

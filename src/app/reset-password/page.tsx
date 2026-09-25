@@ -1,8 +1,8 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { resetPassword } from '@/app/actions'
+import { useRouter } from 'next/navigation'
+import { resetPasswordWithCode } from '@/app/actions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -11,11 +11,11 @@ import { toast } from 'sonner'
 import { showError } from '@/lib/error-notifier'
 
 function ResetPasswordForm() {
-    const searchParams = useSearchParams()
     const router = useRouter()
     const [submitting, setSubmitting] = useState(false)
 
     async function handleSubmit(formData: FormData) {
+        const code = String(formData.get('code') || '')
         const password = String(formData.get('password') || '')
         const confirmation = String(formData.get('confirmation') || '')
         if (password !== confirmation) {
@@ -25,8 +25,8 @@ function ResetPasswordForm() {
 
         setSubmitting(true)
         try {
-            await resetPassword(searchParams.get('token') || '', password)
-            toast.success('パスワードを再設定しました。')
+            await resetPasswordWithCode(code, password)
+            toast.success('パスワードを変更しました。再度ログインしてください。')
             router.push('/login')
         } catch (error) {
             showError((error as Error).message)
@@ -43,6 +43,11 @@ function ResetPasswordForm() {
                 </CardHeader>
                 <form action={handleSubmit}>
                     <CardContent className="space-y-5 px-6 py-7">
+                        <p className="text-sm text-slate-600">本人確認後、管理者から受け取ったリセットコードを入力してください。</p>
+                        <div className="space-y-2">
+                            <Label htmlFor="code">リセットコード</Label>
+                            <Input id="code" name="code" type="text" required disabled={submitting} autoComplete="one-time-code" />
+                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">新しいパスワード</Label>
                             <Input id="password" name="password" type="password" required disabled={submitting} />
