@@ -132,6 +132,12 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     const [startTime, setStartTime] = useState<Date | null>(null)
     const [endTime, setEndTime] = useState<Date | null>(null)
 
+    const showReservationError = (message: string) => {
+        setIsDialogOpen(false)
+        setEditingReservation(null)
+        showError(message)
+    }
+
     const getCalendarWindow = (reservation: Reservation) => {
         const start = toTokyoWallClock(reservation.start)
         const end = toTokyoWallClock(reservation.end)
@@ -220,13 +226,13 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         e.preventDefault()
 
         if (!selectedEquipment || !startTime || !endTime) {
-            showError('全ての項目を入力してください。')
+            showReservationError('全ての項目を入力してください。')
             return
         }
 
         // Validate that end time is after start time
         if (endTime <= startTime) {
-            showError('終了時刻は開始時刻より後に設定してください。')
+            showReservationError('終了時刻は開始時刻より後に設定してください。')
             return
         }
 
@@ -237,22 +243,20 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                 const canManageReservation = currentUser.role === 'ADMIN' || currentUser.id === editingReservation.userId
 
                 if (!canManageReservation) {
-                    showError('予約の編集・削除は本人のみ可能です。')
+                    showReservationError('予約の編集・削除は本人のみ可能です。')
                     return
                 }
 
                 const result = await updateReservation(editingReservation.id, selectedEquipment, editingReservation.userId, startTime, endTime, phoneNumber)
                 if (!result.success) {
-                    setIsDialogOpen(false)
-                    showError('操作に失敗しました: ' + result.error)
+                    showReservationError('操作に失敗しました: ' + result.error)
                     return
                 }
                 toast.success('予約を更新しました！')
             } else {
                 const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
                 if (!result.success) {
-                    setIsDialogOpen(false)
-                    showError('操作に失敗しました: ' + result.error)
+                    showReservationError('操作に失敗しました: ' + result.error)
                     return
                 }
                 toast.success('予約が完了しました！')
@@ -264,8 +268,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             }, 2000)
         } catch (error) {
             console.error('Error:', error)
-            setIsDialogOpen(false)
-            showError('操作に失敗しました。画面を更新して、もう一度お試しください。')
+            showReservationError('操作に失敗しました。画面を更新して、もう一度お試しください。')
         }
     }
 
@@ -330,7 +333,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         const canManageReservation = currentUser.role === 'ADMIN' || currentUser.id === editingReservation.userId
 
         if (!canManageReservation) {
-            showError('予約の削除は本人のみ可能です。')
+            showReservationError('予約の削除は本人のみ可能です。')
             return
         }
 
@@ -345,7 +348,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                 router.refresh()
             }, 2000)
         } catch (error) {
-            showError('削除に失敗しました: ' + (error as Error).message)
+            showReservationError('削除に失敗しました: ' + (error as Error).message)
         }
     }
 
