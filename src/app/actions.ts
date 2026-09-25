@@ -2,7 +2,6 @@
 
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { sendEmail } from '@/lib/mail'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { recordAuditLog } from '@/lib/audit'
@@ -15,6 +14,7 @@ import {
     getAuthThrottleKeys,
     registerLoginFailure,
     registerPasswordResetRequest,
+    registerPasswordResetCodeAttempt,
     resetLoginFailures,
 } from '@/lib/auth-rate-limit'
 import {
@@ -27,8 +27,7 @@ import {
     setSessionCookie,
 } from '@/lib/auth'
 import {
-    createPasswordResetToken,
-    consumePasswordResetToken,
+    createAdminPasswordResetCode,
     hashPassword,
     hashPasswordResetToken,
     isPasswordHash,
@@ -465,7 +464,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
             })
         }
 
-        await setSessionCookie(user.id, rememberMe)
+        await setSessionCookie(user.id, rememberMe, user.updatedAt.getTime())
         const wasLimited = await resetLoginFailures(throttleKeys)
         if (wasLimited) {
             await recordAuditLog({
@@ -599,107 +598,114 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     redirect('/')
 }
 
-export async function remindPassword(formData: FormData) {
-    const email = String(formData.get('email') || '').trim()
-    const employeeId = String(formData.get('employeeId') || '').trim()
+const passwordResetRequestMessage = 'パスワード再設定を受け付けました。管理者に本人確認を依頼してください。'
+const invalidPasswordResetCodeMessage = 'リセットコードが無効、または有効期限が切れています。'
+const PASSWORD_RESET_CODE_MAX_ATTEMPTS = 5
 
-    const genericMessage = '入力内容が登録情報と一致する場合、パスワード再設定メールを送信しました。'
-    if (!email || !employeeId) return { message: genericMessage }
+export async function requestPasswordReset(formData: FormData) {
+    const employeeId = String(formData.get('employeeId') || '').trim()
+    if (!employeeId) return { message: passwordResetRequestMessage }
 
     try {
-        const throttleKeys = await getAuthThrottleKeys(email, 'PASSWORD_RESET')
-        const throttle = await registerPasswordResetRequest(throttleKeys)
-        if (throttle.released) {
-            await recordAuditLog({
-                actor: authAuditActor,
-                action: 'PASSWORD_RESET_THROTTLE_UNLOCK',
-                targetType: 'Authentication',
-                summary: 'パスワード再設定要求の制限を解除しました。',
-            })
-        }
-        if (!throttle.allowed) {
-            if (throttle.newlyLocked) {
-                await recordAuditLog({
-                    actor: authAuditActor,
-                    action: 'PASSWORD_RESET_THROTTLE_LOCK',
-                    targetType: 'Authentication',
-                    summary: 'パスワード再設定要求を一時制限しました。',
-                })
+        const throttle = await registerPasswordResetRequest(await getAuthThrottleKeys(employeeId, 'PASSWORD_RESET'))
+        if (throttle.allowed) {
+            const user = await prisma.user.findFirst({ where: { employeeId }, select: { id: true } })
+            if (user) {
+                await prisma.passwordResetRequest.create({ data: { userId: user.id } })
+                await recordAuditLog({ actor: authAuditActor, action: 'RESET_REQUESTED', targetType: 'User', targetId: user.id, summary: 'パスワード再設定依頼を受け付けました。' })
+            } else {
+                await recordAuditLog({ actor: authAuditActor, action: 'RESET_REQUESTED', targetType: 'Authentication', summary: 'パスワード再設定依頼を受け付けました。' })
             }
-            return { message: genericMessage }
         }
-
-        const user = await prisma.user.findFirst({
-            where: { email, employeeId },
-            select: { id: true, name: true, email: true },
-        })
-
-        if (!user) {
-            await recordAuditLog({
-                actor: authAuditActor,
-                action: 'PASSWORD_RESET_REQUEST',
-                targetType: 'Authentication',
-                summary: 'パスワード再設定要求を受け付けました。',
-            })
-            return { message: genericMessage }
-        }
-
-        const { token, tokenHash, expiresAt } = createPasswordResetToken()
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { passwordResetTokenHash: tokenHash, passwordResetTokenExpiresAt: expiresAt },
-        })
-
-        const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${encodeURIComponent(token)}`
-        await sendEmail({
-            to: email,
-            subject: '【分子生物実験センター】パスワード再設定',
-            text: `${user.name} 様\n\nパスワード再設定の申請を受け付けました。\n次のURLは30分間、一度だけ有効です。\n\n${resetUrl}\n\n申請に心当たりがない場合は、このメールを破棄してください。`,
-        })
-        await recordAuditLog({
-            actor: authAuditActor,
-            action: 'PASSWORD_RESET_REQUEST',
-            targetType: 'User',
-            targetId: user.id,
-            summary: 'パスワード再設定要求を受け付けました。',
-        })
-    } catch {
-        console.error('パスワード再設定メールの処理に失敗しました。')
+    } catch (error) {
+        console.error('パスワード再設定依頼の処理に失敗しました。', error)
     }
 
-    return { message: genericMessage }
+    return { message: passwordResetRequestMessage }
 }
 
-export async function resetPassword(token: string, newPassword: string) {
-    if (!token || !validatePassword(newPassword)) {
-        throw new Error('再設定リンクが無効か期限切れです。')
-    }
+// 既存画面からの呼び出し名を維持する互換ラッパー。メールは送信しない。
+export async function remindPassword(formData: FormData) {
+    return requestPasswordReset(formData)
+}
 
-    const tokenHash = hashPasswordResetToken(token)
-    const targetUser = await prisma.user.findFirst({
-        where: { passwordResetTokenHash: tokenHash },
-        select: { id: true },
-    })
-
+export async function getPasswordResetRequests() {
+    await requireAdmin()
     try {
-        await consumePasswordResetToken(token, newPassword, (update) => prisma.user.updateMany(update))
-    } catch (error) {
-        await recordAuditLog({
-            actor: authAuditActor,
-            action: 'PASSWORD_RESET_FAILURE',
-            targetType: 'Authentication',
-            summary: 'パスワード再設定に失敗しました。',
+        return await prisma.passwordResetRequest.findMany({
+            where: { usedAt: null, invalidatedAt: null },
+            select: {
+                id: true,
+                createdAt: true,
+                issuedAt: true,
+                codeExpiresAt: true,
+                attempts: true,
+                user: { select: { id: true, name: true, department: true, laboratory: true, employeeId: true } },
+            },
+            orderBy: { createdAt: 'asc' },
+            take: 50,
         })
+    } catch (error) {
+        // マイグレーション適用前の環境でも、既存の管理画面を停止させない。
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') return []
         throw error
     }
+}
 
-    await recordAuditLog({
-        actor: authAuditActor,
-        action: 'PASSWORD_RESET_SUCCESS',
-        targetType: 'User',
-        targetId: targetUser?.id ?? null,
-        summary: 'パスワードを再設定しました。',
+export async function issuePasswordResetCode(requestId: string) {
+    const admin = await requireAdmin()
+    const resetCode = createAdminPasswordResetCode()
+    const request = await prisma.passwordResetRequest.findFirst({
+        where: { id: requestId, usedAt: null, invalidatedAt: null },
+        select: { id: true, userId: true },
     })
+    if (!request) throw new Error('再設定依頼が見つからないか、すでに処理されています。')
+
+    await prisma.$transaction([
+        prisma.passwordResetRequest.updateMany({ where: { userId: request.userId, id: { not: request.id }, usedAt: null, invalidatedAt: null }, data: { invalidatedAt: new Date() } }),
+        prisma.passwordResetRequest.update({ where: { id: request.id }, data: { codeHash: resetCode.codeHash, codeExpiresAt: resetCode.expiresAt, issuedAt: new Date(), attempts: 0 } }),
+    ])
+    await recordAuditLog({ actor: admin, action: 'RESET_CODE_ISSUED', targetType: 'User', targetId: request.userId, summary: 'パスワード再設定コードを発行しました。' })
+    return { code: resetCode.code, expiresAt: resetCode.expiresAt.toISOString() }
+}
+
+export async function resetPasswordWithCode(code: string, newPassword: string) {
+    if (!code.trim() || !validatePassword(newPassword)) {
+        await recordAuditLog({ actor: authAuditActor, action: 'RESET_FAILED', targetType: 'Authentication', summary: 'パスワード再設定に失敗しました。' })
+        throw new Error(invalidPasswordResetCodeMessage)
+    }
+
+    const now = new Date()
+    const attemptThrottle = await registerPasswordResetCodeAttempt(await getAuthThrottleKeys('RESET_CODE', 'PASSWORD_RESET'), now)
+    if (!attemptThrottle.allowed) {
+        await recordAuditLog({ actor: authAuditActor, action: 'RESET_FAILED', targetType: 'Authentication', summary: 'パスワード再設定の試行回数制限に達しました。' })
+        throw new Error(invalidPasswordResetCodeMessage)
+    }
+    const codeHash = hashPasswordResetToken(code.trim())
+    const passwordHash = await hashPassword(newPassword)
+    try {
+        const result = await prisma.$transaction(async (tx) => {
+            const request = await tx.passwordResetRequest.findFirst({ where: { codeHash, usedAt: null, invalidatedAt: null }, select: { id: true, userId: true, codeExpiresAt: true, attempts: true } })
+            if (!request) throw new Error(invalidPasswordResetCodeMessage)
+            if (!request.codeExpiresAt || request.codeExpiresAt <= now) {
+                await tx.passwordResetRequest.update({ where: { id: request.id }, data: { invalidatedAt: now } })
+                throw new Error('RESET_EXPIRED')
+            }
+            if (request.attempts >= PASSWORD_RESET_CODE_MAX_ATTEMPTS) {
+                await tx.passwordResetRequest.update({ where: { id: request.id }, data: { invalidatedAt: now } })
+                throw new Error(invalidPasswordResetCodeMessage)
+            }
+            await tx.passwordResetRequest.update({ where: { id: request.id }, data: { usedAt: now } })
+            const user = await tx.user.update({ where: { id: request.userId }, data: { password: passwordHash, passwordResetTokenHash: null, passwordResetTokenExpiresAt: null }, select: { id: true } })
+            return user
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+
+        await recordAuditLog({ actor: authAuditActor, action: 'RESET_COMPLETED', targetType: 'User', targetId: result.id, summary: 'パスワードを変更しました。' })
+    } catch (error) {
+        const expired = error instanceof Error && error.message === 'RESET_EXPIRED'
+        await recordAuditLog({ actor: authAuditActor, action: expired ? 'RESET_EXPIRED' : 'RESET_FAILED', targetType: 'Authentication', summary: expired ? '期限切れのリセットコードを使用しました。' : 'パスワード再設定に失敗しました。' })
+        throw new Error(invalidPasswordResetCodeMessage)
+    }
 }
 
 export async function deleteUser(userId: string) {

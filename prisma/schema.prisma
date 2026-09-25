@@ -37,8 +37,27 @@ model User {
   auditLogs    AuditLog[]
   adminNotificationsTarget AdminNotification[] @relation("AdminNotificationTarget")
   adminNotificationReads   AdminNotificationRead[] @relation("AdminNotificationReader")
+  passwordResetRequests PasswordResetRequest[]
 
   @@index([passwordResetTokenHash])
+}
+
+model PasswordResetRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  codeHash        String?
+  codeExpiresAt   DateTime?
+  issuedAt        DateTime?
+  attempts        Int      @default(0)
+  usedAt          DateTime?
+  invalidatedAt   DateTime?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([codeHash])
+  @@index([usedAt, invalidatedAt, codeExpiresAt])
 }
 
 model AuditLog {
