@@ -223,10 +223,11 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
         try {
             if (editingReservation) {
-                // Permission check - only the owner can edit
-                const isOriginalOwner = currentUser.id === editingReservation.userId
+                // Administrators may manage every reservation; other users may
+                // edit only reservations they own.
+                const canManageReservation = currentUser.role === 'ADMIN' || currentUser.id === editingReservation.userId
 
-                if (!isOriginalOwner) {
+                if (!canManageReservation) {
                     toast.error('予約の編集・削除は本人のみ可能です。')
                     return
                 }
@@ -314,9 +315,9 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     const handleDelete = async () => {
         if (!editingReservation) return
 
-        const isOriginalOwner = currentUser.id === editingReservation.userId
+        const canManageReservation = currentUser.role === 'ADMIN' || currentUser.id === editingReservation.userId
 
-        if (!isOriginalOwner) {
+        if (!canManageReservation) {
             toast.error('予約の削除は本人のみ可能です。')
             return
         }
@@ -688,8 +689,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                             {editingReservation && (
                                 <Button
                                     type="button"
-                                    variant="destructive"
-                                    className="h-11 flex-1 rounded-xl font-semibold"
+                                    variant="outline"
+                                    className="h-11 flex-1 rounded-xl border-red-200 bg-white font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
                                     onClick={handleDelete}
                                 >
                                     {t('delete')}
