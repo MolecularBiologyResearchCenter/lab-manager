@@ -13,8 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { logReagentUsage } from '@/app/actions'
 import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
-import { showError } from '@/lib/error-notifier'
+import { showError, showSuccess } from '@/lib/error-notifier'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
 
 interface Reagent {
@@ -55,7 +54,7 @@ export default function ReagentLogger({ reagents, currentUser }: Props) {
 
         try {
             await logReagentUsage(currentUser.id, selectedReagent, quantity)
-            toast.success(t('recorded'))
+            showSuccess(t('recorded'))
             router.refresh()
             // Reset form
             setQuantity(1)

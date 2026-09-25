@@ -1,31 +1,48 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { ERROR_EVENT } from '@/lib/error-notifier'
+import { MESSAGE_EVENT, type TemporaryMessageDetail, type TemporaryMessageKind } from '@/lib/error-notifier'
 import { translateErrorMessage } from '@/lib/i18n'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
+import { CheckCircle2, CircleAlert, CircleX, Info } from 'lucide-react'
+
+type QueuedMessage = TemporaryMessageDetail & { id: number }
+
+const kindStyles: Record<TemporaryMessageKind, { title: string; titleEn: string; border: string; button: string; icon: ReactNode }> = {
+    error: { title: 'エラー', titleEn: 'An error occurred', border: 'border-red-200', button: 'bg-red-700 hover:bg-red-800 focus-visible:ring-red-500', icon: <CircleX className="size-7 text-red-700" aria-hidden="true" /> },
+    success: { title: '完了', titleEn: 'Completed', border: 'border-emerald-200', button: 'bg-emerald-700 hover:bg-emerald-800 focus-visible:ring-emerald-500', icon: <CheckCircle2 className="size-7 text-emerald-700" aria-hidden="true" /> },
+    warning: { title: '警告', titleEn: 'Warning', border: 'border-amber-200', button: 'bg-amber-700 hover:bg-amber-800 focus-visible:ring-amber-500', icon: <CircleAlert className="size-7 text-amber-700" aria-hidden="true" /> },
+    info: { title: '案内', titleEn: 'Information', border: 'border-blue-200', button: 'bg-blue-700 hover:bg-blue-800 focus-visible:ring-blue-500', icon: <Info className="size-7 text-blue-700" aria-hidden="true" /> },
+}
 
 export default function ErrorModal() {
     const { language, t } = useUserLanguage()
-    const [message, setMessage] = useState<string | null>(null)
+    const [messages, setMessages] = useState<QueuedMessage[]>([])
     const okButtonRef = useRef<HTMLButtonElement>(null)
+    const nextId = useRef(0)
+
+    const current = messages[0] ?? null
 
     useEffect(() => {
-        const handleError = (event: Event) => {
-            const detail = (event as CustomEvent<string>).detail
-            const activeElement = document.activeElement
-            if (activeElement instanceof HTMLElement) {
-                activeElement.blur()
-            }
-            setMessage(typeof detail === 'string' ? detail : 'エラーが発生しました。')
+        const handleMessage = (event: Event) => {
+            const detail = (event as CustomEvent<TemporaryMessageDetail>).detail
+            const message = typeof detail === 'string'
+                ? { message: detail, kind: 'error' as const }
+                : detail && typeof detail.message === 'string'
+                    ? detail
+                    : { message: 'メッセージを表示できませんでした。', kind: 'error' as const }
+            setMessages((currentMessages) => [
+                ...currentMessages,
+                { ...message, id: nextId.current++ },
+            ])
         }
-        window.addEventListener(ERROR_EVENT, handleError)
-        return () => window.removeEventListener(ERROR_EVENT, handleError)
+        window.addEventListener(MESSAGE_EVENT, handleMessage)
+        return () => window.removeEventListener(MESSAGE_EVENT, handleMessage)
     }, [])
 
     useEffect(() => {
-        if (!message) return
+        if (!current) return
 
         const focusFrame = window.requestAnimationFrame(() => {
             const activeElement = document.activeElement
@@ -36,24 +53,29 @@ export default function ErrorModal() {
         })
 
         return () => window.cancelAnimationFrame(focusFrame)
-    }, [message])
+    }, [current])
 
     useEffect(() => {
-        if (!message) return
+        if (!current) return
 
         const handleKeyboardClose = (event: KeyboardEvent) => {
             if (event.key !== 'Enter' && event.key !== ' ') return
             event.preventDefault()
-            setMessage(null)
+            setMessages((currentMessages) => currentMessages.slice(1))
         }
 
         document.addEventListener('keydown', handleKeyboardClose)
         return () => document.removeEventListener('keydown', handleKeyboardClose)
-    }, [message])
+    }, [current])
 
-    if (!message || typeof document === 'undefined') return null
+    if (!current || typeof document === 'undefined') return null
 
-    const close = () => setMessage(null)
+    const style = kindStyles[current.kind]
+    const isEnglish = language === 'en'
+    const messageText = current.kind === 'error'
+        ? translateErrorMessage(current.message, language)
+        : current.message
+    const close = () => setMessages((currentMessages) => currentMessages.slice(1))
 
     return createPortal(
         <div
@@ -63,21 +85,24 @@ export default function ErrorModal() {
             onPointerDown={(event) => event.stopPropagation()}
         >
             <div
-                role="alertdialog"
+                role={current.kind === 'error' ? 'alertdialog' : 'dialog'}
                 aria-modal="true"
-                aria-labelledby="error-modal-title"
-                aria-describedby="error-modal-message"
+                aria-labelledby="temporary-message-title"
+                aria-describedby="temporary-message-content"
                 tabIndex={-1}
-                className="flex max-h-[calc(100vh-32px)] w-full max-w-[560px] flex-col rounded-2xl border border-red-200 bg-white p-6 shadow-2xl"
+                className={`flex max-h-[calc(100vh-32px)] w-full max-w-[560px] flex-col rounded-2xl border bg-white p-6 shadow-2xl ${style.border}`}
                 onKeyDown={(event) => {
                     event.stopPropagation()
                 }}
             >
-                <h2 id="error-modal-title" className="shrink-0 text-xl font-bold text-red-700">
-                    {t('errorOccurred')}
-                </h2>
-                <div id="error-modal-message" className="mt-4 min-h-0 overflow-y-auto whitespace-pre-wrap break-words text-base leading-7 text-slate-800">
-                    {translateErrorMessage(message, language)}
+                <div className="flex shrink-0 items-center gap-3">
+                    {style.icon}
+                    <h2 id="temporary-message-title" className="text-xl font-bold text-slate-900">
+                        {isEnglish ? style.titleEn : style.title}
+                    </h2>
+                </div>
+                <div id="temporary-message-content" className="mt-4 min-h-0 overflow-y-auto whitespace-pre-wrap break-words text-base leading-7 text-slate-800">
+                    {messageText}
                 </div>
                 <div className="mt-6 flex shrink-0 justify-end">
                     <button
@@ -88,7 +113,7 @@ export default function ErrorModal() {
                             close()
                         }}
                         onPointerDown={(event) => event.stopPropagation()}
-                        className="rounded-xl bg-red-700 px-6 py-3 font-semibold text-white outline-none transition hover:bg-red-800 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+                        className={`rounded-xl px-6 py-3 font-semibold text-white outline-none transition focus-visible:ring-2 focus-visible:ring-offset-2 ${style.button}`}
                     >
                         {t('ok')}
                     </button>
