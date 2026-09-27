@@ -21,9 +21,14 @@ export default async function AdminInvoicesPage(props: { searchParams: Promise<{
     invoices.forEach((invoice) => years.add(invoice.fiscalYear))
     usageYears.forEach(({ date }) => years.add(getTokyoDateParts(date).year))
     reservationYears.forEach(({ startTime }) => years.add(getTokyoDateParts(startTime).year))
-    const periods = [...years].sort((a, b) => b - a).flatMap((year) => [1, 2, 3].map((quarter) => ({ key: getPeriodKey(year, quarter), year, quarter })))
+    const periods = [...years]
+        .sort((a, b) => a - b)
+        .flatMap((year) => [1, 2, 3].map((quarter) => ({ key: getPeriodKey(year, quarter), year, quarter })))
+        .slice(-6)
     const requested = parsePeriodKey(searchParams.period ?? '')
-    const selectedPeriod = requested && years.has(requested.year) ? { key: getPeriodKey(requested.year, requested.quarter), year: requested.year, quarter: requested.quarter } : periods.find((period) => period.key === currentPeriodKey) ?? periods[0]
+    const selectedPeriod = requested && periods.some((period) => period.key === getPeriodKey(requested.year, requested.quarter))
+        ? { key: getPeriodKey(requested.year, requested.quarter), year: requested.year, quarter: requested.quarter }
+        : periods.find((period) => period.key === currentPeriodKey) ?? periods[periods.length - 1]
     const { start, end } = getQuarterDates(selectedPeriod.year, selectedPeriod.quarter)
     const [usageLogs, reservations] = await Promise.all([
         prisma.usageLog.findMany({ where: { date: { gte: start, lt: end } }, select: { id: true, date: true, quantity: true, totalCost: true, user: { select: { name: true } }, reagent: { select: { name: true } } }, orderBy: { date: 'desc' } }),
