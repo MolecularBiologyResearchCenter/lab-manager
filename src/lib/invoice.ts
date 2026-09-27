@@ -1,43 +1,44 @@
 import { prisma } from '@/lib/prisma'
 
-/**
- * Get the current quarter (1, 2, or 3) based on the month
- */
-export function getCurrentQuarter(date: Date): number {
-    const month = date.getMonth()
-    if (month >= 0 && month <= 3) return 1
-    if (month >= 4 && month <= 7) return 2
+export type InvoiceQuarter = 1 | 2 | 3
+
+export function getTokyoDateParts(date: Date): { year: number; month: number; day: number } {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+    }).formatToParts(date)
+    const value = (type: string) => Number(parts.find((part) => part.type === type)?.value)
+    return { year: value('year'), month: value('month'), day: value('day') }
+}
+
+/** Billing periods are fixed to Tokyo calendar boundaries. */
+export function getCurrentQuarter(date: Date): InvoiceQuarter {
+    const month = getTokyoDateParts(date).month
+    if (month >= 1 && month <= 4) return 1
+    if (month >= 5 && month <= 8) return 2
     return 3
 }
 
-/**
- * Get the start and end dates for a given quarter
- */
+/** Return an exclusive end boundary; Date values are UTC instants for JST midnight. */
 export function getQuarterDates(year: number, quarter: number): { start: Date; end: Date } {
-    let startMonth: number
-    let endMonth: number
-
-    switch (quarter) {
-        case 1:
-            startMonth = 0 // January
-            endMonth = 3 // April
-            break
-        case 2:
-            startMonth = 4 // May
-            endMonth = 7 // August
-            break
-        case 3:
-            startMonth = 8 // September
-            endMonth = 11 // December
-            break
-        default:
-            throw new Error('Invalid quarter')
-    }
-
-    const start = new Date(year, startMonth, 1)
-    const end = new Date(year, endMonth + 1, 0, 23, 59, 59, 999)
-
+    const startMonth = quarter === 1 ? 1 : quarter === 2 ? 5 : quarter === 3 ? 9 : null
+    if (!startMonth) throw new Error('Invalid quarter')
+    const start = new Date(Date.UTC(year, startMonth - 1, 1, -9))
+    const end = new Date(Date.UTC(year, startMonth === 9 ? 12 : startMonth + 3, 1, -9))
     return { start, end }
+}
+
+export function getPeriodKey(year: number, quarter: number): string {
+    if (!Number.isInteger(year) || ![1, 2, 3].includes(quarter)) throw new Error('Invalid invoice period')
+    return `${year}-Q${quarter}`
+}
+
+export function parsePeriodKey(periodKey: string): { year: number; quarter: InvoiceQuarter } | null {
+    const match = /^(\d{4})-Q([123])$/.exec(periodKey)
+    if (!match) return null
+    return { year: Number(match[1]), quarter: Number(match[2]) as InvoiceQuarter }
 }
 
 /**
@@ -86,7 +87,7 @@ export async function generateInvoiceForUser(
             userId,
             date: {
                 gte: start,
-                lte: end,
+                lt: end,
             },
         },
         include: {

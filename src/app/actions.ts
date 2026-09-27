@@ -9,6 +9,7 @@ import { generateInvoicePdf } from '@/lib/invoice-pdf'
 import { sha256Pdf, validateGeneratedInvoicePdf } from '@/lib/invoice-pdf-security'
 import { formatTokyoDateTime } from '@/lib/date-format'
 import { reservationStatusFilter, validateReservationWindow } from '@/lib/reservation-rules'
+import { getCurrentQuarter, getQuarterDates, getTokyoDateParts } from '@/lib/invoice'
 import {
     checkAuthThrottle,
     getAuthThrottleKeys,
@@ -41,43 +42,6 @@ import {
  * Quarter 2: May-Aug (months 4-7)
  * Quarter 3: Sep-Dec (months 8-11)
  */
-function getCurrentQuarter(date: Date): number {
-    const month = date.getMonth()
-    if (month >= 0 && month <= 3) return 1
-    if (month >= 4 && month <= 7) return 2
-    return 3
-}
-
-/**
- * Get the start and end dates for a given quarter
- */
-function getQuarterDates(year: number, quarter: number): { start: Date; end: Date } {
-    let startMonth: number
-    let endMonth: number
-
-    switch (quarter) {
-        case 1:
-            startMonth = 0 // January
-            endMonth = 3 // April
-            break
-        case 2:
-            startMonth = 4 // May
-            endMonth = 7 // August
-            break
-        case 3:
-            startMonth = 8 // September
-            endMonth = 11 // December
-            break
-        default:
-            throw new Error('Invalid quarter')
-    }
-
-    const start = new Date(year, startMonth, 1)
-    const end = new Date(year, endMonth + 1, 0, 23, 59, 59, 999)
-
-    return { start, end }
-}
-
 const concurrentReservationError = '同時に別の予約が登録されました。画面を更新して空き状況を確認してください。'
 const reservationFailedError = '予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。'
 type ReservationActionResult = { success: true } | { success: false; error: string }
@@ -103,7 +67,7 @@ export async function getDashboardData() {
             userId: currentUser.id,
             date: {
                 gte: startOfQuarter,
-                lte: endOfQuarter,
+                lt: endOfQuarter,
             },
         },
         select: {
@@ -171,7 +135,7 @@ export async function getDashboardData() {
         upcomingReservations,
         activeReservationsCount,
         currentQuarter,
-        fiscalYear: now.getFullYear(),
+        fiscalYear: getTokyoDateParts(now).year,
         quarterLabel,
         usageLogs,
     }

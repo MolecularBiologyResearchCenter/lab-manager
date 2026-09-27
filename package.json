@@ -12,6 +12,7 @@
     "lint": "eslint",
     "security:check": "tsx scripts/security-self-test.ts",
     "test:reservation": "tsx scripts/reservation-rules-self-test.ts",
+    "test:invoice-period": "tsx scripts/invoice-period-self-test.ts",
     "postinstall": "prisma generate",
     "fix-reservations": "npx tsx scripts/fix-invalid-reservations.ts"
   },

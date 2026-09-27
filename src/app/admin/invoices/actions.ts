@@ -1,13 +1,20 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
-import { generateInvoiceForUser, getCurrentQuarter, getQuarterDates } from '@/lib/invoice'
+import { generateInvoiceForUser, getCurrentQuarter, getQuarterDates, getTokyoDateParts } from '@/lib/invoice'
 import { revalidatePath } from 'next/cache'
-import { requireAdmin } from '@/lib/auth'
+import { requireUser } from '@/lib/auth'
 import { recordAuditLog } from '@/lib/audit'
 
-export async function generateInvoicesForQuarter(year: number, quarter: number) {
-    await requireAdmin()
+export async function generateInvoicesForQuarter(year: number, quarter: number, _formData?: FormData): Promise<void> {
+    void _formData
+    const currentUser = await requireUser()
+    if (currentUser.role !== 'ADMIN' && currentUser.role !== 'CENTER_DIRECTOR') {
+        throw new Error('請求書を発行する権限がありません。')
+    }
+    if (!Number.isInteger(year) || year < 2000 || year > 2100 || ![1, 2, 3].includes(quarter)) {
+        throw new Error('請求期間が正しくありません。')
+    }
     // Get all users
     const users = await prisma.user.findMany({
         where: {
@@ -28,7 +35,7 @@ export async function generateInvoicesForQuarter(year: number, quarter: number) 
                     userId: user.id,
                     date: {
                         gte: start,
-                        lte: end,
+                        lt: end,
                     },
                 },
             })
@@ -45,7 +52,6 @@ export async function generateInvoicesForQuarter(year: number, quarter: number) 
 
                 if (!existingInvoice) {
                     const invoiceId = await generateInvoiceForUser(user.id, year, quarter)
-                    const currentUser = await requireAdmin()
                     await recordAuditLog({ actor: currentUser, action: 'INVOICE_CREATE', targetType: 'Invoice', targetId: invoiceId, targetLabel: user.name, summary: '請求書を生成しました。', metadata: { year, quarter, userId: user.id } })
                     results.push({
                         userId: user.id,
@@ -75,14 +81,12 @@ export async function generateInvoicesForQuarter(year: number, quarter: number) 
     revalidatePath('/admin/invoices')
     revalidatePath('/invoices')
 
-    return results
 }
 
 export async function generateCurrentQuarterInvoices() {
-    await requireAdmin()
     const now = new Date()
     const quarter = getCurrentQuarter(now)
-    const year = now.getFullYear()
+    const year = getTokyoDateParts(now).year
 
     await generateInvoicesForQuarter(year, quarter)
 }

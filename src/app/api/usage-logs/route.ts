@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/app/actions'
-import { getCurrentQuarter, getQuarterDates } from '@/lib/invoice'
+import { getCurrentQuarter, getQuarterDates, getTokyoDateParts } from '@/lib/invoice'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
 
 export async function GET() {
@@ -11,14 +11,14 @@ export async function GET() {
 
         const now = new Date()
         const currentQuarter = getCurrentQuarter(now)
-        const { start, end } = getQuarterDates(now.getFullYear(), currentQuarter)
+        const { start, end } = getQuarterDates(getTokyoDateParts(now).year, currentQuarter)
 
         const usageLogs = await prisma.usageLog.findMany({
             where: {
                 userId: user.id,
                 date: {
                     gte: start,
-                    lte: end,
+                    lt: end,
                 },
             },
             select: {
