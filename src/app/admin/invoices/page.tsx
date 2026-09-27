@@ -13,7 +13,7 @@ export default async function AdminInvoicesPage(props: { searchParams: Promise<{
     const todayTokyo = getTokyoDateParts(now)
     const currentPeriodKey = getPeriodKey(todayTokyo.year, getCurrentQuarter(now))
     const [invoices, usageYears, reservationYears] = await Promise.all([
-        prisma.invoice.findMany({ select: { id: true, fiscalYear: true, quarter: true, invoiceNumber: true, totalAmount: true, status: true, sealedAt: true, sealedBy: true, user: { select: { name: true, department: true, laboratory: true } } }, orderBy: [{ fiscalYear: 'desc' }, { quarter: 'desc' }, { user: { name: 'asc' } }] }),
+        prisma.invoice.findMany({ select: { id: true, userId: true, fiscalYear: true, quarter: true, invoiceNumber: true, totalAmount: true, status: true, sealedAt: true, sealedBy: true, user: { select: { name: true, department: true, laboratory: true } } }, orderBy: [{ fiscalYear: 'desc' }, { quarter: 'desc' }, { user: { name: 'asc' } }] }),
         prisma.usageLog.findMany({ select: { date: true }, distinct: ['date'] }),
         prisma.reservation.findMany({ select: { startTime: true }, distinct: ['startTime'] }),
     ])
@@ -31,8 +31,10 @@ export default async function AdminInvoicesPage(props: { searchParams: Promise<{
         : periods.find((period) => period.key === currentPeriodKey) ?? periods[periods.length - 1]
     const { start, end } = getQuarterDates(selectedPeriod.year, selectedPeriod.quarter)
     const [usageLogs, reservations] = await Promise.all([
-        prisma.usageLog.findMany({ where: { date: { gte: start, lt: end } }, select: { id: true, date: true, quantity: true, totalCost: true, user: { select: { name: true } }, reagent: { select: { name: true } } }, orderBy: { date: 'desc' } }),
+        prisma.usageLog.findMany({ where: { date: { gte: start, lt: end } }, select: { id: true, date: true, quantity: true, totalCost: true, user: { select: { id: true, name: true, role: true } }, reagent: { select: { name: true } } }, orderBy: { date: 'desc' } }),
         prisma.reservation.findMany({ where: { startTime: { lt: end }, endTime: { gt: start } }, select: { id: true, startTime: true, endTime: true, status: true, user: { select: { name: true } }, equipment: { select: { name: true } } }, orderBy: { startTime: 'desc' } }),
     ])
-    return <InvoiceManager invoices={invoices} periods={periods} selectedPeriod={selectedPeriod} usageLogs={usageLogs} reservations={reservations} canGenerate={user.role === 'ADMIN' || user.role === 'CENTER_DIRECTOR'} />
+    const eligibleUsageUserIds = [...new Set(usageLogs.filter((log) => log.user.role === 'USER').map((log) => log.user.id))]
+    const generationComplete = eligibleUsageUserIds.length > 0 && eligibleUsageUserIds.every((userId) => invoices.some((invoice) => invoice.userId === userId && invoice.fiscalYear === selectedPeriod.year && invoice.quarter === selectedPeriod.quarter))
+    return <InvoiceManager invoices={invoices} periods={periods} selectedPeriod={selectedPeriod} usageLogs={usageLogs} reservations={reservations} canGenerate={user.role === 'ADMIN' || user.role === 'CENTER_DIRECTOR'} generationComplete={generationComplete} />
 }
