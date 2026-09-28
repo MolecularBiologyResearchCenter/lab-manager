@@ -17,8 +17,8 @@ type GraphConfig = {
 }
 
 export type MicrosoftGroupSyncResult =
-    | { ok: true; operation: 'added' | 'already-member' | 'removed' | 'not-member' | 'not-found' }
-    | { ok: false; operation: 'add' | 'remove'; errorCode: string }
+    | { ok: true; operation: 'added' | 'already-member' | 'removed' | 'not-member' | 'not-found'; directoryUserId?: string }
+    | { ok: false; operation: 'add' | 'remove'; errorCode: string; directoryUserId?: string }
 
 function getGraphConfig(): GraphConfig | null {
     const tenantId = process.env.MICROSOFT_TENANT_ID?.trim()
@@ -113,30 +113,30 @@ async function syncMembership(config: GraphConfig, directoryUserId: string, enab
     const memberPath = `/groups/${encodeURIComponent(config.groupId)}/members/${encodeURIComponent(directoryUserId)}/$ref`
     const membership = await graphRequest<Record<string, never>>(config, memberPath)
     if (enabled) {
-        if (membership.ok) return { ok: true, operation: 'already-member' }
+        if (membership.ok) return { ok: true, operation: 'already-member', directoryUserId }
         if (membership.errorCode !== 'HTTP_404' && membership.errorCode !== 'Request_ResourceNotFound') {
-            return { ok: false, operation: 'add', errorCode: membership.errorCode }
+            return { ok: false, operation: 'add', errorCode: membership.errorCode, directoryUserId }
         }
         const added = await graphRequest<Record<string, never>>(config, `/groups/${encodeURIComponent(config.groupId)}/members/$ref`, {
             method: 'POST',
             body: JSON.stringify({ '@odata.id': `${GRAPH_BASE_URL}/directoryObjects/${encodeURIComponent(directoryUserId)}` }),
         })
-        if (added.ok) return { ok: true, operation: 'added' }
+        if (added.ok) return { ok: true, operation: 'added', directoryUserId }
         if (added.errorCode === 'Request_BadRequest') {
             const membershipAfterAdd = await graphRequest<Record<string, never>>(config, memberPath)
-            if (membershipAfterAdd.ok) return { ok: true, operation: 'already-member' }
+            if (membershipAfterAdd.ok) return { ok: true, operation: 'already-member', directoryUserId }
         }
-        return { ok: false, operation: 'add', errorCode: added.errorCode }
+        return { ok: false, operation: 'add', errorCode: added.errorCode, directoryUserId }
     }
 
-    if (!membership.ok && membership.errorCode === 'HTTP_404') return { ok: true, operation: 'not-member' }
-    if (!membership.ok) return { ok: false, operation: 'remove', errorCode: membership.errorCode }
+    if (!membership.ok && membership.errorCode === 'HTTP_404') return { ok: true, operation: 'not-member', directoryUserId }
+    if (!membership.ok) return { ok: false, operation: 'remove', errorCode: membership.errorCode, directoryUserId }
     const removed = await graphRequest<Record<string, never>>(config, memberPath, { method: 'DELETE' })
     return removed.ok
-        ? { ok: true, operation: 'removed' }
+        ? { ok: true, operation: 'removed', directoryUserId }
         : removed.errorCode === 'HTTP_404'
-            ? { ok: true, operation: 'not-member' }
-            : { ok: false, operation: 'remove', errorCode: removed.errorCode }
+            ? { ok: true, operation: 'not-member', directoryUserId }
+            : { ok: false, operation: 'remove', errorCode: removed.errorCode, directoryUserId }
 }
 
 export async function syncMicrosoftGroupMembership(input: { email: string; enabled: boolean }): Promise<MicrosoftGroupSyncResult> {
@@ -157,6 +157,8 @@ export async function syncUserMicrosoftGroupMembership(input: {
     email: string
     enabled: boolean
     actor?: { id?: string | null; name?: string | null; role?: string | null }
+    preserveFailureNotification?: boolean
+    context?: 'USER_DELETE'
 }) {
     const result = await syncMicrosoftGroupMembership({ email: input.email, enabled: input.enabled })
     const status = result.ok ? 'SYNCED' : 'FAILED'
@@ -169,9 +171,14 @@ export async function syncUserMicrosoftGroupMembership(input: {
         },
     })
 
+    const isDelete = input.context === 'USER_DELETE' && !input.enabled
     await recordAuditLog({
         actor: input.actor,
-        action: input.enabled ? 'MICROSOFT_GROUP_MEMBER_ADD' : 'MICROSOFT_GROUP_MEMBER_REMOVE',
+        action: isDelete
+            ? result.ok
+                ? result.operation === 'removed' ? 'MICROSOFT_GROUP_MEMBER_REMOVE_SUCCESS' : 'MICROSOFT_GROUP_MEMBER_NOT_REGISTERED'
+                : 'MICROSOFT_GROUP_MEMBER_REMOVE_FAILURE'
+            : input.enabled ? 'MICROSOFT_GROUP_MEMBER_ADD' : 'MICROSOFT_GROUP_MEMBER_REMOVE',
         targetType: 'User',
         targetId: input.userId,
         targetLabel: input.name,
@@ -183,19 +190,39 @@ export async function syncUserMicrosoftGroupMembership(input: {
         },
     })
 
+    if (isDelete && !result.ok) {
+        await recordAuditLog({
+            actor: input.actor,
+            action: 'MICROSOFT_GROUP_SYNC_RETRY_PENDING',
+            targetType: 'User',
+            targetId: input.userId,
+            targetLabel: input.name,
+            summary: 'Microsoft 365グループからの削除を再試行待ちにしました。',
+            metadata: { result: 'pending', errorCode: result.errorCode },
+        })
+    }
+
     const dedupeKey = `${SYNC_FAILURE_NOTIFICATION}:${input.userId}`
     if (result.ok) {
-        await prisma.adminNotification.updateMany({ where: { dedupeKey, resolvedAt: null }, data: { resolvedAt: new Date() } })
+        await prisma.adminNotification.updateMany({ where: { dedupeKey, resolvedAt: null }, data: { resolvedAt: new Date(), microsoftDirectoryUserId: null, microsoftGroupSyncErrorCode: null } })
     } else {
         await prisma.adminNotification.upsert({
             where: { dedupeKey },
             create: {
                 type: SYNC_FAILURE_NOTIFICATION,
-                targetUserId: input.userId,
+                targetUserId: input.preserveFailureNotification ? null : input.userId,
                 name: input.name,
                 dedupeKey,
+                microsoftDirectoryUserId: result.directoryUserId ?? null,
+                microsoftGroupSyncErrorCode: result.errorCode,
             },
-            update: { resolvedAt: null, name: input.name },
+            update: {
+                resolvedAt: null,
+                targetUserId: input.preserveFailureNotification ? null : input.userId,
+                name: input.name,
+                microsoftDirectoryUserId: result.directoryUserId ?? null,
+                microsoftGroupSyncErrorCode: result.errorCode,
+            },
         })
     }
     return result
