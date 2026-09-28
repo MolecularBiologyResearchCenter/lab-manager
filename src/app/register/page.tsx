@@ -8,9 +8,11 @@ import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Link from 'next/link'
 import { showError } from '@/lib/error-notifier'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 export default function RegisterPage() {
+    const router = useRouter()
     const [mailingList, setMailingList] = useState(true)
 
     async function handleSubmit(formData: FormData) {
@@ -18,7 +20,9 @@ export default function RegisterPage() {
             const result = await register(formData)
             if (!result.success) {
                 showError(result.error)
+                return
             }
+            router.replace('/')
         } catch (error) {
             console.error('利用者登録に失敗しました。', error)
             showError('登録処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')

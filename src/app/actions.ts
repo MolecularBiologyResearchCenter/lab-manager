@@ -608,8 +608,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     }
 
     await setSessionCookie(user.id)
-
-    redirect('/')
+    return { success: true }
 }
 
 const passwordResetRequestMessage = 'パスワード再設定を受け付けました。管理者に本人確認を依頼してください。'
