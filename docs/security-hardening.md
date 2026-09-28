@@ -6,6 +6,10 @@
 
 - `DATABASE_URL`: Prismaの通常接続先
 - `DIRECT_URL`: Prisma migration用の直接接続先
+- `MICROSOFT_TENANT_ID`: Microsoft Entra IDテナントID
+- `MICROSOFT_CLIENT_ID`: Microsoft Entra IDアプリケーションID
+- `MICROSOFT_CLIENT_SECRET`: Microsoft Entra IDアプリケーションのSecret（値は記録・共有しない）
+- `MICROSOFT_GROUP_ID`: 同期対象として固定するMicrosoft 365グループID
 - `AUTH_SECRET`: セッション署名用の強いランダム値。本番必須
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`: メール送信を有効化する場合のみ
 - `VERCEL_REGION`: Vercel Functionの実行リージョン確認用

@@ -158,6 +158,15 @@ export default function AdminNotificationsCard() {
                                                     {notification.fiscalYear}年 第{notification.quarter}期の請求書が未発行です。
                                                 </p>
                                             </>
+                                        ) : notification.type === 'MICROSOFT_GROUP_SYNC_FAILURE' ? (
+                                            <>
+                                                <p className="font-medium text-red-700">Microsoft 365グループとの同期に失敗</p>
+                                                <p className="mt-1 text-sm text-slate-600">
+                                                    <Link href="/admin/users" className="hover:text-blue-700 hover:underline">
+                                                        {notification.name}さんのメーリングリスト設定を確認してください。
+                                                    </Link>
+                                                </p>
+                                            </>
                                         ) : (
                                             <>
                                                 <p className="font-medium text-slate-800">

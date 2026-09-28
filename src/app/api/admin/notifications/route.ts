@@ -6,6 +6,7 @@ import { getActiveInvoiceReminderPeriod, getInvoiceReminderDedupeKey, INVOICE_IS
 import { performanceTrace } from '@/lib/performance'
 
 const NEW_USER_NOTIFICATION_TYPE = 'NEW_USER_REGISTRATION'
+const MICROSOFT_GROUP_SYNC_FAILURE_TYPE = 'MICROSOFT_GROUP_SYNC_FAILURE'
 // 通知機能の切り替え時に取りこぼした登録を救済できる期間。
 const RECENT_REGISTRATION_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -162,8 +163,9 @@ export async function GET() {
             prisma.adminNotification.findMany({
                 where: {
                     OR: [
-                        { type: { not: INVOICE_ISSUE_REMINDER_TYPE } },
+                        { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
                         { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
+                        { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
                     ],
                 },
                 select: {
@@ -187,8 +189,9 @@ export async function GET() {
             prisma.adminNotification.count({
                 where: {
                     OR: [
-                        { type: { not: INVOICE_ISSUE_REMINDER_TYPE } },
+                        { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
                         { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
+                        { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
                     ],
                     reads: { none: { adminId: currentUser!.id } },
                 },
