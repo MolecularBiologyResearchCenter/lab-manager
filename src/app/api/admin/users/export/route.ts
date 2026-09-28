@@ -3,7 +3,7 @@ import { adminUserSelect, getAuthenticatedUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { authorizationStatus } from '@/lib/authorization'
 import { API_ERROR_CODES, apiErrorResponse, apiHeaders, createRequestId } from '@/lib/api-response'
-import { recordAuditLog } from '@/lib/audit'
+import { recordAuditLog, recordAuthorizationFailure } from '@/lib/audit'
 import { performanceTrace } from '@/lib/performance'
 
 const MAX_CSV_RANGE = 500
@@ -41,6 +41,7 @@ export async function GET(request: Request) {
             return apiErrorResponse(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。', requestId)
         }
         if (status === 403) {
+            await recordAuthorizationFailure(currentUser, 'ADMIN')
             return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この操作を行う権限がありません。', '管理者権限でログインしてください。', requestId)
         }
 

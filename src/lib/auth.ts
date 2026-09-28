@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { assertUserRole } from '@/lib/authorization'
+import { recordAuthorizationFailure } from '@/lib/audit'
 
 export const SESSION_COOKIE_NAME = 'session'
 
@@ -129,7 +130,12 @@ export async function requireUser() {
 
 export async function requireRole(role: 'ADMIN' | 'CENTER_DIRECTOR') {
     const user = await requireUser()
-    assertUserRole(user, role)
+    try {
+        assertUserRole(user, role)
+    } catch (error) {
+        await recordAuthorizationFailure(user, role)
+        throw error
+    }
     return user
 }
 

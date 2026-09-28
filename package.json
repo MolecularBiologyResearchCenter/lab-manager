@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "security:check": "tsx scripts/security-self-test.ts",
+    "password:migrate": "tsx scripts/hash-existing-passwords.ts",
     "test:reservation": "tsx scripts/reservation-rules-self-test.ts",
     "test:invoice-period": "tsx scripts/invoice-period-self-test.ts",
     "performance:summary": "tsx scripts/performance-summary.ts",

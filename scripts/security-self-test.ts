@@ -8,6 +8,7 @@ import {
     verifyPassword,
 } from '../src/lib/password'
 import { createSignedSessionValue, verifySignedSessionValue } from '../src/lib/auth'
+import { currentUserSelect, adminUserSelect } from '../src/lib/auth'
 import { MAX_INVOICE_PDF_SIZE, sha256Pdf, validateGeneratedInvoicePdf } from '../src/lib/invoice-pdf-security'
 import { getActiveInvoiceReminderPeriod, getInvoiceReminderDedupeKey } from '../src/lib/invoice-reminders'
 import { apiHeaders } from '../src/lib/api-response'
@@ -19,6 +20,11 @@ async function main() {
     assert.notEqual(passwordHash, password)
     assert.equal(await verifyPassword(password, passwordHash), true)
     assert.equal(await verifyPassword('incorrect123', passwordHash), false)
+    assert.equal(await verifyPassword(password, password), false)
+    assert.equal('password' in currentUserSelect, false)
+    assert.equal('password' in adminUserSelect, false)
+    assert.equal('sealImage' in currentUserSelect, false)
+    assert.equal('sealImage' in adminUserSelect, false)
 
     const session = createSignedSessionValue('user-123')
     assert.equal(verifySignedSessionValue(session), 'user-123')

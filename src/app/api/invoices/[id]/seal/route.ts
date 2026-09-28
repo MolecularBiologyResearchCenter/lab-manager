@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getCurrentUser, sealInvoice } from '@/app/actions'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
-import { recordAuditLog } from '@/lib/audit'
+import { recordAuditLog, recordAuthorizationFailure } from '@/lib/audit'
 import { performanceTrace } from '@/lib/performance'
 
 export const runtime = 'nodejs'
@@ -20,6 +20,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         }
 
         if (user.role !== 'CENTER_DIRECTOR') {
+            await recordAuthorizationFailure(user, 'CENTER_DIRECTOR')
             return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この操作を実行する権限がありません。', 'センター長のアカウントで、もう一度お試しください。', requestId)
         }
 

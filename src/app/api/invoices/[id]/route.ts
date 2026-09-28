@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/app/actions'
 import { prisma } from '@/lib/prisma'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
 import { performanceTrace } from '@/lib/performance'
+import { recordAuthorizationFailure } from '@/lib/audit'
 
 export async function GET(
     request: NextRequest,
@@ -28,6 +29,7 @@ export async function GET(
         }
 
         if (ownership.userId !== user.id && user.role !== 'ADMIN' && user.role !== 'CENTER_DIRECTOR') {
+            await recordAuthorizationFailure(user, 'INVOICE_OWNER_OR_ADMIN_OR_CENTER_DIRECTOR')
             return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この請求書を閲覧する権限がありません。', '自分の請求書を選ぶか、管理者へ確認してください。', requestId)
         }
 
@@ -73,8 +75,16 @@ export async function GET(
         }
 
         trace.finish()
+        const safeSealer = invoice.sealer
+            ? {
+                name: invoice.sealer.name,
+                ...(user.role === 'CENTER_DIRECTOR' ? { sealImage: invoice.sealer.sealImage } : {}),
+            }
+            : null
+
         return apiSuccessResponse({
             ...invoice,
+            sealer: safeSealer,
             viewerRole: user.role,
         }, requestId)
     } catch (error) {
