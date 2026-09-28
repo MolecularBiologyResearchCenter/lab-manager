@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { authorizationStatus } from '@/lib/authorization'
 import { API_ERROR_CODES, apiErrorResponse, apiHeaders, createRequestId } from '@/lib/api-response'
 import { recordAuditLog } from '@/lib/audit'
+import { performanceTrace } from '@/lib/performance'
 
 const MAX_CSV_RANGE = 500
 
@@ -31,9 +32,10 @@ function parseNo(value: string | null): number | null {
 
 export async function GET(request: Request) {
     const requestId = createRequestId()
+    const trace = performanceTrace('api.admin.users.export', requestId)
 
     try {
-        const currentUser = await getAuthenticatedUser()
+        const currentUser = await trace.measure('auth', getAuthenticatedUser)
         const status = authorizationStatus(currentUser, 'ADMIN')
         if (status === 401) {
             return apiErrorResponse(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。', requestId)
@@ -55,17 +57,17 @@ export async function GET(request: Request) {
             return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, `一度にダウンロードできるのは${MAX_CSV_RANGE}人までです。`, '範囲を狭めて、もう一度お試しください。', requestId)
         }
 
-        const totalUsers = await prisma.user.count()
+        const totalUsers = await trace.measure('prismaQuery', () => prisma.user.count())
         if (endNo > totalUsers) {
             return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, `指定したNoは存在しません。登録ユーザーは${totalUsers}人です。`, '存在するNoの範囲を指定してください。', requestId)
         }
 
-        const users = await prisma.user.findMany({
+        const users = await trace.measure('prismaQuery', () => prisma.user.findMany({
             select: adminUserSelect,
             orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
             skip: startNo - 1,
             take: endNo - startNo + 1,
-        })
+        }))
 
         const rows = [
             ['No.', '氏名', '学部', '所属・研究室', '職員番号', '登録日'].map(csvCell).join(','),
@@ -80,14 +82,15 @@ export async function GET(request: Request) {
         ]
         const csv = `\uFEFF${rows.join('\r\n')}\r\n`
 
-        await recordAuditLog({
+        await trace.measure('prismaQuery', () => recordAuditLog({
             actor: currentUser,
             action: 'USER_CSV_EXPORT',
             targetType: 'UserExport',
             summary: '利用者情報CSVをダウンロードしました。',
             metadata: { startNo, endNo, userCount: users.length },
-        })
+        }))
 
+        trace.finish()
         return new NextResponse(csv, {
             headers: {
                 ...apiHeaders(requestId),
@@ -96,6 +99,7 @@ export async function GET(request: Request) {
             },
         })
     } catch {
+        trace.finish('failure')
         console.error(`[${requestId}] 利用者情報CSVの作成に失敗しました。`)
         return apiErrorResponse(500, API_ERROR_CODES.INTERNAL_ERROR, '利用者情報CSVを作成できませんでした。', '時間をおいて、もう一度お試しください。', requestId)
     }

@@ -9,6 +9,7 @@ type Sample = {
     dbRegion?: string
 }
 
+const STAGES = ['auth', 'dbConnection', 'prismaQuery', 'externalApi', 'pdf', 'app', 'response'] as const
 async function main() {
     const inputPath = process.argv[2]
     if (!inputPath) {
@@ -44,6 +45,19 @@ async function main() {
     const durations = operationSamples.map((sample) => sample.durationMs)
     const category = operation.includes('pdf') ? 'PDF処理' : operation.includes('api') || operation.includes('page') ? 'アプリ処理' : operation.includes('login') ? '認証' : 'DB/アプリ処理'
         console.log([index + 1, operation, percentile(durations, 0.5), percentile(durations, 0.95), Math.max(...durations), durations.length, category].join(','))
+    }
+
+    const stageSamples = new Map<string, number[]>()
+    for (const sample of samples) {
+        for (const stage of STAGES) {
+            const duration = sample.stages?.[stage]
+            if (typeof duration === 'number') stageSamples.set(stage, [...(stageSamples.get(stage) ?? []), duration])
+        }
+    }
+
+    console.log('stage,p50Ms,p95Ms,maxMs,count')
+    for (const [stage, durations] of [...stageSamples.entries()].sort((a, b) => Math.max(...b[1]) - Math.max(...a[1]))) {
+        console.log([stage, percentile(durations, 0.5), percentile(durations, 0.95), Math.max(...durations), durations.length].join(','))
     }
 
     const regions = [...new Set(samples.map((sample) => sample.region ?? 'unknown'))].join('|') || 'unknown'

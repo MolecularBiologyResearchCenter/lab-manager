@@ -2,12 +2,14 @@ import { prisma } from '@/lib/prisma'
 import { getAuthenticatedUser } from '@/lib/auth'
 import { recordAuditLog } from '@/lib/audit'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
+import { performanceTrace } from '@/lib/performance'
 
 export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
     const requestId = createRequestId()
+    const trace = performanceTrace('api.admin.notifications.read', requestId)
 
     try {
-        const currentUser = await getAuthenticatedUser()
+        const currentUser = await trace.measure('auth', getAuthenticatedUser)
         const status = !currentUser
             ? 401
             : currentUser.role === 'ADMIN' || currentUser.role === 'CENTER_DIRECTOR'
@@ -21,15 +23,15 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
         }
 
         const { id } = await context.params
-        const notification = await prisma.adminNotification.findUnique({
+        const notification = await trace.measure('prismaQuery', () => prisma.adminNotification.findUnique({
             where: { id },
             select: { id: true },
-        })
+        }))
         if (!notification) {
             return apiErrorResponse(404, API_ERROR_CODES.NOT_FOUND, '通知が見つかりません。', '画面を更新して、もう一度お試しください。', requestId)
         }
 
-        await prisma.adminNotificationRead.upsert({
+        await trace.measure('prismaQuery', () => prisma.adminNotificationRead.upsert({
             where: {
                 notificationId_adminId: {
                     notificationId: id,
@@ -38,18 +40,20 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
             },
             create: { notificationId: id, adminId: currentUser!.id },
             update: { readAt: new Date() },
-        })
+        }))
 
-        await recordAuditLog({
+        await trace.measure('prismaQuery', () => recordAuditLog({
             actor: currentUser,
             action: 'ADMIN_NOTIFICATION_READ',
             targetType: 'AdminNotification',
             targetId: id,
             summary: '管理者通知を確認済みにしました。',
-        })
+        }))
 
+        trace.finish()
         return apiSuccessResponse({ success: true }, requestId)
     } catch {
+        trace.finish('failure')
         console.error(`[${requestId}] 管理者通知の既読化に失敗しました。`)
         return apiErrorResponse(500, API_ERROR_CODES.INTERNAL_ERROR, '通知を確認済みにできませんでした。', '時間をおいて、もう一度お試しください。', requestId)
     }
