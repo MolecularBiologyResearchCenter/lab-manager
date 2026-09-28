@@ -6,6 +6,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { requireAdmin } from '@/lib/auth'
 import { recordAuditLog } from '@/lib/audit'
+import { randomUUID } from 'crypto'
 
 export async function getEquipment() {
     await requireAdmin()
@@ -28,7 +29,7 @@ export async function getAvailableIcons() {
         const iconsDir = path.join(process.cwd(), 'public', 'icons-blue')
         const files = await fs.readdir(iconsDir)
         const icons = files
-            .filter(file => file.endsWith('.jpg'))
+            .filter(file => /\.(?:jpg|jpeg|png|webp)$/i.test(file))
             .map(file => `/icons-blue/${file}`)
 
         return { success: true, icons }
@@ -130,12 +131,17 @@ export async function uploadIcon(formData: FormData) {
     const currentUser = await requireAdmin()
     try {
         const file = formData.get('file') as File
-        if (!file) {
+        if (!(file instanceof File) || file.size === 0) {
             return { success: false, error: 'No file uploaded' }
         }
 
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+            return { success: false, error: '画像はJPEG、PNG、WebPの2MB以下で指定してください' }
+        }
+
         const buffer = Buffer.from(await file.arrayBuffer())
-        const filename = file.name.replace(/\s+/g, '-') // Replace spaces with hyphens
+        const extension = file.type === 'image/jpeg' ? '.jpg' : file.type === 'image/png' ? '.png' : '.webp'
+        const filename = `${randomUUID()}${extension}`
         const uploadDir = path.join(process.cwd(), 'public', 'icons-blue')
         const filePath = path.join(uploadDir, filename)
 

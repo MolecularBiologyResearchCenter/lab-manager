@@ -26,12 +26,31 @@ export default async function AuditLogsPage({
     const action = (await searchParams)?.action
     const selectedAction = actionOptions.some(([value]) => value === action) ? action : undefined
 
-    let logs: Awaited<ReturnType<typeof prisma.auditLog.findMany>> = []
+    let logs: Array<{
+        id: string
+        createdAt: Date
+        actorName: string
+        actorRole: string
+        action: string
+        targetType: string
+        targetLabel: string | null
+        summary: string
+    }> = []
     let databaseMessage: string | null = null
 
     try {
         logs = await prisma.auditLog.findMany({
             where: selectedAction ? { action: selectedAction } : undefined,
+            select: {
+                id: true,
+                createdAt: true,
+                actorName: true,
+                actorRole: true,
+                action: true,
+                targetType: true,
+                targetLabel: true,
+                summary: true,
+            },
             orderBy: { createdAt: 'desc' },
             take: 200,
         })

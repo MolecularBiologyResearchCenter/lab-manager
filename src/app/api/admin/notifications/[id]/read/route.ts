@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getAuthenticatedUser } from '@/lib/auth'
-import { recordAuditLog } from '@/lib/audit'
+import { recordAuditLog, recordAuthorizationFailure } from '@/lib/audit'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
 import { performanceTrace } from '@/lib/performance'
 
@@ -19,6 +19,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
             return apiErrorResponse(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。', requestId)
         }
         if (status === 403) {
+            await recordAuthorizationFailure(currentUser, 'ADMIN_OR_CENTER_DIRECTOR')
             return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この操作を行う権限がありません。', '管理者またはセンター長権限でログインしてください。', requestId)
         }
 

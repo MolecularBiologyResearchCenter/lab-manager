@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/app/actions'
 import { prisma } from '@/lib/prisma'
 import { generateInvoicePdf } from '@/lib/invoice-pdf'
 import { API_ERROR_CODES, apiErrorResponse, apiHeaders, createRequestId } from '@/lib/api-response'
-import { recordAuditLog } from '@/lib/audit'
+import { recordAuditLog, recordAuthorizationFailure } from '@/lib/audit'
 import { sha256Pdf, validateGeneratedInvoicePdf } from '@/lib/invoice-pdf-security'
 import { performanceTrace } from '@/lib/performance'
 
@@ -67,7 +67,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         if (!invoice) return failure(404, API_ERROR_CODES.NOT_FOUND, '請求書が見つかりません。', '請求書一覧から対象を選び直してください。')
 
         const isPrivileged = user.role === 'ADMIN' || user.role === 'CENTER_DIRECTOR'
-        if (invoice.userId !== user.id && !isPrivileged) return failure(403, API_ERROR_CODES.FORBIDDEN, 'この請求書をダウンロードする権限がありません。', '自分の請求書を選ぶか、管理者へ確認してください。')
+        if (invoice.userId !== user.id && !isPrivileged) {
+            await recordAuthorizationFailure(user, 'INVOICE_OWNER_OR_ADMIN_OR_CENTER_DIRECTOR')
+            return failure(403, API_ERROR_CODES.FORBIDDEN, 'この請求書をダウンロードする権限がありません。', '自分の請求書を選ぶか、管理者へ確認してください。')
+        }
         if (invoice.status === 'rejected') return failure(409, API_ERROR_CODES.CONFLICT, 'この請求書は現在ダウンロードできません。', '請求書の状態を確認して、もう一度お試しください。')
         if (!invoice.sealedAt || !invoice.sealedBy || !invoice.sealer || invoice.sealer.role !== 'CENTER_DIRECTOR') return failure(409, API_ERROR_CODES.CONFLICT, '押印済み請求書のみダウンロードできます。', 'センター長の押印完了後に、もう一度お試しください。')
 

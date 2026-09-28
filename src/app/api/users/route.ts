@@ -3,6 +3,7 @@ import { adminUserSelect, getAuthenticatedUser } from '@/lib/auth'
 import { authorizationStatus } from '@/lib/authorization'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
 import { performanceTrace } from '@/lib/performance'
+import { recordAuthorizationFailure } from '@/lib/audit'
 
 export async function GET() {
     const requestId = createRequestId()
@@ -14,6 +15,7 @@ export async function GET() {
             return apiErrorResponse(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。', requestId)
         }
         if (status === 403) {
+            await recordAuthorizationFailure(currentUser, 'ADMIN')
             return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この操作を行う権限がありません。', '管理者権限でログインしてください。', requestId)
         }
 

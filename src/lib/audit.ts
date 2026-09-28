@@ -37,3 +37,13 @@ export async function recordAuditLog(input: AuditLogInput): Promise<void> {
         console.error('監査ログの記録に失敗しました。', error)
     }
 }
+
+export async function recordAuthorizationFailure(actor: AuditActor | null, requiredRole: string) {
+    await recordAuditLog({
+        actor,
+        action: 'AUTHZ_DENIED',
+        targetType: 'Authorization',
+        targetLabel: requiredRole,
+        summary: '権限のない操作を拒否しました。',
+    })
+}

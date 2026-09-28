@@ -15,11 +15,9 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 export async function verifyPassword(password: string, storedValue: string): Promise<boolean> {
-    if (!isPasswordHash(storedValue)) {
-        const supplied = Buffer.from(password)
-        const stored = Buffer.from(storedValue)
-        return supplied.length === stored.length && timingSafeEqual(supplied, stored)
-    }
+    // Legacy plaintext values are deliberately never compared. Run the
+    // credential migration before enabling this hardened verifier.
+    if (!isPasswordHash(storedValue)) return false
 
     const [, salt, encodedHash] = storedValue.split('$')
     if (!salt || !encodedHash) return false

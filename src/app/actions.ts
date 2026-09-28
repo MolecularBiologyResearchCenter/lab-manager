@@ -31,7 +31,6 @@ import {
     createAdminPasswordResetCode,
     hashPassword,
     hashPasswordResetToken,
-    isPasswordHash,
     validatePassword,
     verifyPassword,
 } from '@/lib/password'
@@ -461,13 +460,6 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
             return { success: false, error: genericLoginError }
         }
 
-        if (!isPasswordHash(user.password)) {
-            await prisma.user.update({
-                where: { id: user.id },
-                data: { password: await hashPassword(password) },
-            })
-        }
-
         await setSessionCookie(user.id, rememberMe, user.updatedAt.getTime())
         const wasLimited = await resetLoginFailures(throttleKeys)
         if (wasLimited) {
@@ -722,7 +714,7 @@ export async function deleteUser(userId: string) {
         throw new Error('自分自身を削除することはできません。')
     }
 
-    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true, role: true } })
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true } })
     if (!targetUser) throw new Error('ユーザーが見つかりません。')
 
     await prisma.user.delete({
@@ -736,7 +728,7 @@ export async function deleteUser(userId: string) {
         targetId: userId,
         targetLabel: targetUser.name,
         summary: 'ユーザーを削除しました。',
-        metadata: { email: targetUser.email, role: targetUser.role },
+        metadata: { role: targetUser.role },
     })
 
     revalidatePath('/admin/users')
@@ -1093,7 +1085,7 @@ export async function updateUserProfileByAdmin(
 }
 
 export async function adminSetUserPassword(userId: string, newPassword: string) {
-    await requireAdmin()
+    const currentUser = await requireAdmin()
     if (!validatePassword(newPassword)) {
         throw new Error('パスワードは英小文字と数字を含む8文字以上で入力してください。')
     }
@@ -1104,6 +1096,14 @@ export async function adminSetUserPassword(userId: string, newPassword: string) 
             passwordResetTokenHash: null,
             passwordResetTokenExpiresAt: null,
         },
+    })
+
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'ADMIN_PASSWORD_RESET',
+        targetType: 'User',
+        targetId: userId,
+        summary: '管理者がユーザーのパスワードを再設定しました。',
     })
 
 }
