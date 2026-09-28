@@ -10,7 +10,6 @@ type Sample = {
 }
 
 const STAGES = ['auth', 'dbConnection', 'prismaQuery', 'externalApi', 'pdf', 'app', 'response'] as const
-
 async function main() {
     const inputPath = process.argv[2]
     if (!inputPath) {
