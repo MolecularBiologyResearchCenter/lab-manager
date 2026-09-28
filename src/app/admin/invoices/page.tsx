@@ -3,10 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentQuarter, getPeriodKey, getQuarterDates, getTokyoDateParts, parsePeriodKey } from '@/lib/invoice'
 import { redirect } from 'next/navigation'
 import InvoiceManager from './InvoiceManager'
+import { performanceTrace } from '@/lib/performance'
 
 export default async function AdminInvoicesPage(props: { searchParams: Promise<{ period?: string }> }) {
+    const trace = performanceTrace('page.admin.invoices')
     const searchParams = await props.searchParams
-    const user = await getCurrentUser()
+    const user = await trace.measure('auth', getCurrentUser)
     if (!user || (user.role !== 'ADMIN' && user.role !== 'CENTER_DIRECTOR')) redirect('/')
 
     const now = new Date()
@@ -30,11 +32,12 @@ export default async function AdminInvoicesPage(props: { searchParams: Promise<{
         ? { key: getPeriodKey(requested.year, requested.quarter), year: requested.year, quarter: requested.quarter }
         : periods.find((period) => period.key === currentPeriodKey) ?? periods[periods.length - 1]
     const { start, end } = getQuarterDates(selectedPeriod.year, selectedPeriod.quarter)
-    const [usageLogs, reservations] = await Promise.all([
+    const [usageLogs, reservations] = await trace.measure('prismaQuery', () => Promise.all([
         prisma.usageLog.findMany({ where: { date: { gte: start, lt: end } }, select: { id: true, date: true, quantity: true, totalCost: true, user: { select: { id: true, name: true, role: true } }, reagent: { select: { name: true } } }, orderBy: { date: 'desc' } }),
         prisma.reservation.findMany({ where: { startTime: { lt: end }, endTime: { gt: start } }, select: { id: true, startTime: true, endTime: true, status: true, user: { select: { name: true } }, equipment: { select: { name: true } } }, orderBy: { startTime: 'desc' } }),
-    ])
+    ]))
     const eligibleUsageUserIds = [...new Set(usageLogs.filter((log) => log.user.role === 'USER').map((log) => log.user.id))]
     const generationComplete = eligibleUsageUserIds.length > 0 && eligibleUsageUserIds.every((userId) => invoices.some((invoice) => invoice.userId === userId && invoice.fiscalYear === selectedPeriod.year && invoice.quarter === selectedPeriod.quarter))
+    trace.finish()
     return <InvoiceManager invoices={invoices} periods={periods} selectedPeriod={selectedPeriod} usageLogs={usageLogs} reservations={reservations} canGenerate={user.role === 'ADMIN' || user.role === 'CENTER_DIRECTOR'} generationComplete={generationComplete} />
 }

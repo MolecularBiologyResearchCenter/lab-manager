@@ -22,6 +22,7 @@ import { createReservation } from '@/app/actions'
 import { showError, showSuccess } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
+import ProcessingOverlay from '@/components/ProcessingOverlay'
 
 interface Equipment {
     id: string
@@ -58,6 +59,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
     const [startTime, setStartTime] = useState<Date | null>(null)
     const [endTime, setEndTime] = useState<Date | null>(null)
     const [phoneNumber, setPhoneNumber] = useState<string>('')
+    const [submitting, setSubmitting] = useState(false)
 
     const handleOpenDialog = (equipmentId: string) => {
         setSelectedEquipment(equipmentId)
@@ -78,8 +80,9 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
             return
         }
 
+        setSubmitting(true)
         try {
-            const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+            const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber, crypto.randomUUID())
             if (!result.success) {
                 showError('予約に失敗しました: ' + result.error)
                 return
@@ -90,6 +93,8 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
         } catch (error) {
             console.error('Error:', error)
             showError('予約に失敗しました。画面を更新して、もう一度お試しください。')
+        } finally {
+            setSubmitting(false)
         }
     }
 
@@ -224,13 +229,14 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                         </div>
 
                         <div className="flex gap-2">
-                            <Button type="submit" className="h-11 flex-1 rounded-xl bg-blue-700 font-semibold text-white hover:bg-blue-800">
+                            <Button type="submit" disabled={submitting} className="h-11 flex-1 rounded-xl bg-blue-700 font-semibold text-white hover:bg-blue-800">
                                 {t('book')}
                             </Button>
                         </div>
                     </form>
                 </DialogContent>
             </Dialog>
+            {submitting && <ProcessingOverlay />}
         </div>
     )
 }

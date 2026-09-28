@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { FileText, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { generateInvoicesForQuarter } from './actions'
-import { type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useFormStatus } from 'react-dom'
 
 type Invoice = { id: string; userId: string; fiscalYear: number; quarter: number; totalAmount: number; status: string; sealedAt: Date | string | null; sealedBy: string | null; invoiceNumber: string; user: { name: string; department: string | null; laboratory: string | null } }
@@ -24,6 +24,7 @@ function GenerateButton({ disabled, children }: { disabled: boolean; children: R
 }
 
 export default function InvoiceManager({ invoices, periods, selectedPeriod, usageLogs, reservations, canGenerate, generationComplete }: Props) {
+    const [idempotencyKey] = useState(() => crypto.randomUUID())
     const filteredInvoices = invoices.filter((invoice) => invoice.fiscalYear === selectedPeriod.year && invoice.quarter === selectedPeriod.quarter)
     const totalUsage = usageLogs.reduce((total, log) => total + log.totalCost, 0)
     const generate = generateInvoicesForQuarter.bind(null, selectedPeriod.year, selectedPeriod.quarter)
@@ -31,7 +32,7 @@ export default function InvoiceManager({ invoices, periods, selectedPeriod, usag
     return <div className="content-wrapper py-8">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div><h1>請求書管理</h1><p className="mt-2 text-sm text-slate-500">すべての利用者の請求書を管理できます</p></div>
-            {canGenerate && <form action={generate}><GenerateButton disabled={generationComplete || usageLogs.length === 0}>{generationComplete ? 'この期間の請求書は生成済み' : usageLogs.length === 0 ? '対象明細がありません' : `${selectedPeriod.year}年 ${quarterLabel(selectedPeriod.quarter)}の請求書を一括生成`}</GenerateButton></form>}
+            {canGenerate && <form action={generate}><input type="hidden" name="idempotencyKey" value={idempotencyKey} /><GenerateButton disabled={generationComplete || usageLogs.length === 0}>{generationComplete ? 'この期間の請求書は生成済み' : usageLogs.length === 0 ? '対象明細がありません' : `${selectedPeriod.year}年 ${quarterLabel(selectedPeriod.quarter)}の請求書を一括生成`}</GenerateButton></form>}
         </div>
         <div className="mb-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 text-sm font-medium text-gray-700">請求期間を選択</div>

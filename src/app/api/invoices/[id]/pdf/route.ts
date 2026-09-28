@@ -5,6 +5,7 @@ import { generateInvoicePdf } from '@/lib/invoice-pdf'
 import { API_ERROR_CODES, apiErrorResponse, apiHeaders, createRequestId } from '@/lib/api-response'
 import { recordAuditLog } from '@/lib/audit'
 import { sha256Pdf, validateGeneratedInvoicePdf } from '@/lib/invoice-pdf-security'
+import { performanceTrace } from '@/lib/performance'
 
 export const runtime = 'nodejs'
 
@@ -14,10 +15,12 @@ function safeFilenamePart(value: string) {
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const requestId = createRequestId()
+    const trace = performanceTrace('api.invoice.pdf', requestId)
     let actor: { id: string; name: string; role: string } | null = null
     let targetId: string | null = null
 
     const failure = async (status: number, code: typeof API_ERROR_CODES[keyof typeof API_ERROR_CODES], error: string, guidance: string) => {
+        trace.finish('failure', { status, errorCode: code })
         await recordAuditLog({
             actor,
             action: 'INVOICE_PDF_DOWNLOAD',
@@ -30,7 +33,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }
 
     try {
-        const user = await getCurrentUser()
+        const user = await trace.measure('auth', getCurrentUser)
         if (user) actor = { id: user.id, name: user.name, role: user.role }
         if (!user) return failure(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。')
 
@@ -38,7 +41,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         targetId = id
         if (!id || id.length > 64) return failure(400, API_ERROR_CODES.INVALID_REQUEST, '請求書IDが正しくありません。', '請求書画面からもう一度ダウンロードしてください。')
 
-        const invoice = await prisma.invoice.findUnique({
+        const invoice = await trace.measure('prismaQuery', () => prisma.invoice.findUnique({
             where: { id },
             select: {
                 id: true,
@@ -60,7 +63,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
                 },
                 sealer: { select: { name: true, role: true, sealImage: true } },
             },
-        })
+        }))
         if (!invoice) return failure(404, API_ERROR_CODES.NOT_FOUND, '請求書が見つかりません。', '請求書一覧から対象を選び直してください。')
 
         const isPrivileged = user.role === 'ADMIN' || user.role === 'CENTER_DIRECTOR'
@@ -68,7 +71,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         if (invoice.status === 'rejected') return failure(409, API_ERROR_CODES.CONFLICT, 'この請求書は現在ダウンロードできません。', '請求書の状態を確認して、もう一度お試しください。')
         if (!invoice.sealedAt || !invoice.sealedBy || !invoice.sealer || invoice.sealer.role !== 'CENTER_DIRECTOR') return failure(409, API_ERROR_CODES.CONFLICT, '押印済み請求書のみダウンロードできます。', 'センター長の押印完了後に、もう一度お試しください。')
 
-        const buffer = await generateInvoicePdf({
+        const buffer = await trace.measure('pdf', () => generateInvoicePdf({
             invoiceNumber: invoice.invoiceNumber,
             fiscalYear: invoice.fiscalYear,
             quarter: invoice.quarter,
@@ -78,9 +81,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             budgetCode: invoice.budgetCode,
             user: invoice.user,
             items: invoice.items,
-            sealedAt: invoice.sealedAt,
-            sealer: invoice.sealer,
-        })
+            sealedAt: invoice.sealedAt!,
+            sealer: invoice.sealer!,
+        }))
         try {
             validateGeneratedInvoicePdf(buffer)
         } catch (error) {
@@ -108,7 +111,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         }
 
         const executedAt = new Date()
-        await prisma.auditLog.create({
+        await trace.measure('prismaQuery', () => prisma.auditLog.create({
             data: {
                 actorId: user.id,
                 actorName: user.name,
@@ -123,15 +126,16 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
                     invoiceNumber: invoice.invoiceNumber,
                     downloadedBy: user.id,
                     sealerId: invoice.sealedBy,
-                    sealedAt: invoice.sealedAt.toISOString(),
+                    sealedAt: invoice.sealedAt!.toISOString(),
                     executedAt: executedAt.toISOString(),
                     fileSize: buffer.length,
                     pdfSha256,
                     result: 'success',
                 },
             },
-        })
+        }))
 
+        trace.finish()
         return new NextResponse(buffer as any, {
             headers: {
                 'Content-Type': 'application/pdf',
@@ -140,6 +144,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             },
         })
     } catch {
+        trace.finish('failure')
         console.error(`[${requestId}] 押印済み請求書PDFの生成に失敗しました。`)
         return failure(500, API_ERROR_CODES.INTERNAL_ERROR, '押印済みPDFを取得できませんでした。', '時間をおいて、もう一度お試しください。')
     }

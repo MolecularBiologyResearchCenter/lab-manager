@@ -8,11 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardFooter } from '@/co
 import Link from 'next/link'
 import { showError } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import ProcessingOverlay from '@/components/ProcessingOverlay'
 
 export default function LoginPage() {
     const router = useRouter()
+    const [submitting, setSubmitting] = useState(false)
 
     const handleSubmit = async (formData: FormData) => {
+        if (submitting) return
+        setSubmitting(true)
         try {
             const result = await login(formData)
             if (!result.success) {
@@ -23,6 +28,8 @@ export default function LoginPage() {
             router.replace(currentUser?.role === 'ADMIN' ? '/admin' : '/')
         } catch {
             showError('ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
+        } finally {
+            setSubmitting(false)
         }
     }
 
@@ -93,8 +100,8 @@ export default function LoginPage() {
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-4 px-6 pb-7">
-                        <Button type="submit" className="h-12 w-full rounded-xl bg-blue-700 text-base font-semibold text-white hover:bg-blue-800">
-                            ログイン
+                        <Button type="submit" disabled={submitting} className="h-12 w-full rounded-xl bg-blue-700 text-base font-semibold text-white hover:bg-blue-800">
+                            {submitting ? '処理中です' : 'ログイン'}
                         </Button>
                         <div className="text-sm text-center text-gray-600">
                             <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium hover:underline">
@@ -110,6 +117,7 @@ export default function LoginPage() {
                     </CardFooter>
                 </form>
             </Card>
+            {submitting && <ProcessingOverlay />}
         </div>
     )
 }

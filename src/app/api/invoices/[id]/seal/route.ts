@@ -2,16 +2,18 @@ import { NextRequest } from 'next/server'
 import { getCurrentUser, sealInvoice } from '@/app/actions'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
 import { recordAuditLog } from '@/lib/audit'
+import { performanceTrace } from '@/lib/performance'
 
 export const runtime = 'nodejs'
 
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const requestId = createRequestId()
+    const trace = performanceTrace('api.invoice.seal', requestId)
     let actor: { id: string; name: string; role: string } | null = null
     let targetId: string | null = null
 
     try {
-        const user = await getCurrentUser()
+        const user = await trace.measure('auth', getCurrentUser)
         if (user) actor = { id: user.id, name: user.name, role: user.role }
         if (!user) {
             return apiErrorResponse(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。', requestId)
@@ -27,9 +29,11 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
             return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, '請求書IDが正しくありません。', '請求書画面からもう一度お試しください。', requestId)
         }
 
-        await sealInvoice(id, requestId)
+        await trace.measure('app', () => sealInvoice(id, requestId))
+        trace.finish()
         return apiSuccessResponse({ success: true }, requestId)
     } catch {
+        trace.finish('failure')
         await recordAuditLog({
             actor,
             action: 'INVOICE_SEAL',

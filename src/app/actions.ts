@@ -35,6 +35,8 @@ import {
     validatePassword,
     verifyPassword,
 } from '@/lib/password'
+import { claimIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey } from '@/lib/idempotency'
+import { performanceTrace } from '@/lib/performance'
 
 /**
  * Get the current quarter (1, 2, or 3) based on the month
@@ -56,13 +58,14 @@ function isTransactionConflict(error: unknown): boolean {
 }
 
 export async function getDashboardData() {
+    const trace = performanceTrace('dashboard.user')
     const currentUser = await requireUser()
     const now = new Date()
     const currentQuarter = getCurrentQuarter(now)
     const { start: startOfQuarter, end: endOfQuarter } = getQuarterDates(now.getFullYear(), currentQuarter)
 
     // Get total cost for current quarter
-    const usageLogs = await prisma.usageLog.findMany({
+    const usageQuery = prisma.usageLog.findMany({
         where: {
             userId: currentUser.id,
             date: {
@@ -81,13 +84,11 @@ export async function getDashboardData() {
         },
     })
 
-    const totalCost = usageLogs.reduce((sum: number, log: any) => sum + log.totalCost, 0)
-
     // Get upcoming reservations (starting from today 00:00)
     const startOfDay = new Date(now)
     startOfDay.setHours(0, 0, 0, 0)
 
-    const upcomingReservations = await prisma.reservation.findMany({
+    const reservationsQuery = prisma.reservation.findMany({
         where: {
             userId: currentUser.id,
             status: reservationStatusFilter,
@@ -108,13 +109,15 @@ export async function getDashboardData() {
     })
 
     // Get equipment status (count of active reservations right now)
-    const activeReservationsCount = await prisma.reservation.count({
+    const activeCountQuery = prisma.reservation.count({
         where: {
             startTime: { lte: now },
             endTime: { gt: now },
             status: reservationStatusFilter,
         },
     })
+    const [usageLogs, upcomingReservations, activeReservationsCount] = await trace.measure('prismaQuery', () => Promise.all([usageQuery, reservationsQuery, activeCountQuery]))
+    const totalCost = usageLogs.reduce((sum: number, log: any) => sum + log.totalCost, 0)
 
     // Generate quarter label
     let quarterLabel = ''
@@ -130,7 +133,7 @@ export async function getDashboardData() {
             break
     }
 
-    return {
+    const result = {
         totalCost,
         upcomingReservations,
         activeReservationsCount,
@@ -139,6 +142,8 @@ export async function getDashboardData() {
         quarterLabel,
         usageLogs,
     }
+    trace.finish()
+    return result
 }
 
 export async function getEquipmentList() {
@@ -154,10 +159,11 @@ export async function getReagentList() {
         sensitivity: 'base',
     })
 
-    return reagents.sort((a, b) => nameCollator.compare(a.name, b.name))
+    return reagents.sort((a: { name: string }, b: { name: string }) => nameCollator.compare(a.name, b.name))
 }
 
-export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string): Promise<ReservationActionResult> {
+export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string, idempotencyKey?: string): Promise<ReservationActionResult> {
+    const trace = performanceTrace('reservation.create')
     const currentUser = await requireUser()
     if (currentUser.id !== userId) throw new Error('他のユーザーの予約は作成できません。')
 
@@ -166,8 +172,11 @@ export async function createReservation(equipmentId: string, userId: string, sta
     const validationError = validateReservationWindow(equipment.name, startTime, endTime)
     if (validationError) return { success: false, error: validationError }
 
+    const claim = await claimIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey)
+    if (claim.state === 'duplicate') return (claim.result as ReservationActionResult | null) ?? { success: false, error: '処理中です。完了するまでお待ちください。' }
+
     try {
-        const created = await prisma.$transaction(async (transaction) => {
+        const created = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
             const overlap = await transaction.reservation.findFirst({
                 where: {
                     equipmentId,
@@ -185,7 +194,12 @@ export async function createReservation(equipmentId: string, userId: string, sta
             })
             return reservation.id
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
-        if (!created) return { success: false, error: 'この時間帯は既に予約が入っています。' }
+        if (!created) {
+            const result = { success: false as const, error: 'この時間帯は既に予約が入っています。' }
+            await completeIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey!, result)
+            trace.finish('failure')
+            return result
+        }
         await recordAuditLog({
             actor: currentUser,
             action: 'RESERVATION_CREATE',
@@ -196,14 +210,19 @@ export async function createReservation(equipmentId: string, userId: string, sta
             metadata: { equipmentId, userId },
         })
     } catch (error) {
-        if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
+        await releaseIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey)
+        if (isTransactionConflict(error)) { trace.finish('failure'); return { success: false, error: concurrentReservationError } }
         console.error('Failed to create reservation', error)
+        trace.finish('failure')
         return { success: false, error: reservationFailedError }
     }
 
     revalidatePath('/reservations')
     revalidatePath('/')
-    return { success: true }
+    const result = { success: true as const }
+    await completeIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey!, result)
+    trace.finish()
+    return result
 }
 
 export async function logReagentUsage(userId: string, reagentId: string, quantity: number) {
@@ -271,8 +290,10 @@ export async function updateReservation(
     userId: string,
     startTime: Date,
     endTime: Date,
-    phoneNumber?: string
+    phoneNumber?: string,
+    idempotencyKey?: string,
 ): Promise<ReservationActionResult> {
+    const trace = performanceTrace('reservation.update')
     const currentUser = await requireUser()
     const existingReservation = await prisma.reservation.findUnique({
         where: { id },
@@ -289,8 +310,10 @@ export async function updateReservation(
     if (!equipment) return { success: false, error: '指定された機器が見つかりません。' }
     const validationError = validateReservationWindow(equipment.name, startTime, endTime)
     if (validationError) return { success: false, error: validationError }
+    const claim = await claimIdempotencyKey(currentUser.id, 'reservation.update', idempotencyKey)
+    if (claim.state === 'duplicate') return (claim.result as ReservationActionResult | null) ?? { success: false, error: '処理中です。完了するまでお待ちください。' }
     try {
-        const updated = await prisma.$transaction(async (transaction) => {
+        const updated = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
             const overlap = await transaction.reservation.findFirst({
                 where: {
                     id: { not: id },
@@ -310,7 +333,12 @@ export async function updateReservation(
             })
             return reservation.id
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
-        if (!updated) return { success: false, error: 'この時間帯は既に予約が入っています。' }
+        if (!updated) {
+            const result = { success: false as const, error: 'この時間帯は既に予約が入っています。' }
+            await completeIdempotencyKey(currentUser.id, 'reservation.update', idempotencyKey!, result)
+            trace.finish('failure')
+            return result
+        }
         await recordAuditLog({
             actor: currentUser,
             action: 'RESERVATION_UPDATE',
@@ -321,19 +349,26 @@ export async function updateReservation(
             metadata: { equipmentId, userId },
         })
     } catch (error) {
-        if (isTransactionConflict(error)) return { success: false, error: concurrentReservationError }
+        await releaseIdempotencyKey(currentUser.id, 'reservation.update', idempotencyKey)
+        if (isTransactionConflict(error)) { trace.finish('failure'); return { success: false, error: concurrentReservationError } }
         console.error('Failed to update reservation', error)
+        trace.finish('failure')
         return { success: false, error: reservationFailedError }
     }
 
     revalidatePath('/reservations')
     revalidatePath('/')
     revalidatePath('/admin')
-    return { success: true }
+    const result = { success: true as const }
+    await completeIdempotencyKey(currentUser.id, 'reservation.update', idempotencyKey!, result)
+    trace.finish()
+    return result
 }
 
-export async function deleteReservation(id: string) {
+export async function deleteReservation(id: string, idempotencyKey?: string) {
     const currentUser = await requireUser()
+    const claim = await claimIdempotencyKey(currentUser.id, 'reservation.delete', idempotencyKey)
+    if (claim.state === 'duplicate') return
     const reservation = await prisma.reservation.findUnique({
         where: { id },
         select: { userId: true, equipment: { select: { name: true } }, startTime: true, endTime: true },
@@ -358,6 +393,7 @@ export async function deleteReservation(id: string) {
     revalidatePath('/reservations')
     revalidatePath('/')
     revalidatePath('/admin')
+    await completeIdempotencyKey(currentUser.id, 'reservation.delete', idempotencyKey!, { success: true })
 }
 
 export async function getCurrentUser() {
@@ -374,11 +410,13 @@ export async function getCurrentUserSealImage() {
 }
 
 export async function login(formData: FormData): Promise<LoginActionResult | never> {
+    const trace = performanceTrace('auth.login')
     const email = String(formData.get('email') || '').trim()
     const password = String(formData.get('password') || '').trim()
     const rememberMe = formData.get('rememberMe') === 'on'
 
     if (!email || !password) {
+        trace.finish('failure')
         throw new Error('メールアドレスとパスワードを入力してください。')
     }
 
@@ -394,6 +432,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
             })
         }
         if (throttleStatus.blocked) {
+            trace.finish('failure')
             return { success: false, error: genericLoginError }
         }
 
@@ -418,6 +457,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
                     summary: 'ログイン試行制限により一時ロックしました。',
                 })
             }
+            trace.finish('failure')
             return { success: false, error: genericLoginError }
         }
 
@@ -440,9 +480,11 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
         }
     } catch {
         console.error('ログイン処理に失敗しました。')
+        trace.finish('failure')
         return { success: false, error: 'ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。' }
     }
 
+    trace.finish()
     return { success: true }
 }
 
@@ -648,7 +690,7 @@ export async function resetPasswordWithCode(code: string, newPassword: string) {
     const codeHash = hashPasswordResetToken(code.trim())
     const passwordHash = await hashPassword(newPassword)
     try {
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const request = await tx.passwordResetRequest.findFirst({ where: { codeHash, usedAt: null, invalidatedAt: null }, select: { id: true, userId: true, codeExpiresAt: true, attempts: true } })
             if (!request) throw new Error(invalidPasswordResetCodeMessage)
             if (!request.codeExpiresAt || request.codeExpiresAt <= now) {
@@ -877,7 +919,7 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
 
     const pdfSha256 = sha256Pdf(canonicalPdf)
     try {
-        const result = await prisma.$transaction(async (transaction) => {
+        const result = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
             const updated = await transaction.invoice.updateMany({
                 where: { id: invoiceId, sealedAt: null, sealedBy: null },
                 data: {
@@ -1005,7 +1047,7 @@ export async function updateUserProfileByAdmin(
     if (employeeIdChanged) updateData.employeeId = normalizedEmployeeId
     if (mailingListChanged) updateData.mailingList = data.mailingList
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.user.update({ where: { id: userId }, data: updateData })
 
         if (roleChanged) {

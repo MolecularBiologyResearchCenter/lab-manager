@@ -13,14 +13,25 @@ export const API_ERROR_CODES = {
 
 export type ApiErrorCode = typeof API_ERROR_CODES[keyof typeof API_ERROR_CODES]
 
+const requestStarts = new Map<string, number>()
+
 export function createRequestId() {
-    return randomUUID()
+    const requestId = randomUUID()
+    requestStarts.set(requestId, performance.now())
+    return requestId
 }
 
 export function apiHeaders(requestId: string) {
+    const startedAt = requestStarts.get(requestId)
+    const durationMs = startedAt === undefined ? undefined : Math.round((performance.now() - startedAt) * 100) / 100
+    requestStarts.delete(requestId)
     return {
         'Cache-Control': 'no-store',
         'X-Request-ID': requestId,
+        ...(durationMs === undefined ? {} : {
+            'X-Request-Duration-Ms': String(durationMs),
+            'Server-Timing': `total;dur=${durationMs}`,
+        }),
     }
 }
 
