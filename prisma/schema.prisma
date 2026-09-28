@@ -129,6 +129,19 @@ model AuthThrottle {
   @@index([updatedAt])
 }
 
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  actorId   String
+  operation String
+  key       String
+  result    Json?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([actorId, operation, key])
+  @@index([expiresAt])
+}
+
 model Equipment {
   id          String   @id @default(cuid())
   name        String

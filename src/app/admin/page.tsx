@@ -18,12 +18,14 @@ import { formatTokyoDate, formatTokyoTime } from '@/lib/date-format'
 import AdminNotificationsCard from '@/components/AdminNotificationsCard'
 import AdminPasswordResetRequests from '@/components/AdminPasswordResetRequests'
 import { getPasswordResetRequests } from '@/app/actions'
+import { performanceTrace } from '@/lib/performance'
 
 export default async function AdminPage(props: { searchParams: Promise<{ month?: string; year?: string }> }) {
-    const currentUser = await getAuthenticatedUser()
+    const trace = performanceTrace('page.admin.dashboard')
+    const currentUser = await trace.measure('auth', getAuthenticatedUser)
     if (!currentUser) redirect('/login')
     if (currentUser.role !== 'ADMIN') redirect('/')
-    const passwordResetRequests = await getPasswordResetRequests()
+    const passwordResetRequests = await trace.measure('prismaQuery', getPasswordResetRequests)
     const searchParams = await props.searchParams
 
     // Date Filtering Logic
@@ -68,7 +70,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
     }
 
     // Fetch usage logs filtered by date
-    const usageLogs = await prisma.usageLog.findMany({
+    const usageQuery = prisma.usageLog.findMany({
         where: {
             date: {
                 gte: startDate,
@@ -85,7 +87,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
     })
 
     // Fetch reservations filtered by date
-    const reservations = await prisma.reservation.findMany({
+    const reservationsQuery = prisma.reservation.findMany({
         where: {
             status: { notIn: ['cancelled', 'rejected'] },
             startTime: {
@@ -101,6 +103,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
             startTime: 'desc',
         },
     })
+    const [usageLogs, reservations] = await trace.measure('prismaQuery', () => Promise.all([usageQuery, reservationsQuery]))
 
     const tokyoDateParts = new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Tokyo',
@@ -116,7 +119,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
         -9,
     ))
     const dashboardReservationsEnd = new Date(dashboardReservationsStart.getTime() + 7 * 24 * 60 * 60 * 1000)
-    const dashboardReservations = await prisma.reservation.findMany({
+    const dashboardReservations = await trace.measure('prismaQuery', () => prisma.reservation.findMany({
         where: {
             status: { notIn: ['cancelled', 'rejected'] },
             startTime: {
@@ -130,7 +133,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
         },
         orderBy: { startTime: 'asc' },
         take: 5,
-    })
+    }))
 
     // Calculate billing per user
     const billingByUser: Record<string, number> = {}
@@ -139,6 +142,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
         billingByUser[userName] = (billingByUser[userName] || 0) + log.totalCost
     })
 
+    trace.finish()
     return (
         <div className="content-wrapper space-y-8 py-8">
             <div>

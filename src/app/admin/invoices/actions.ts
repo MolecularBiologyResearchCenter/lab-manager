@@ -5,9 +5,11 @@ import { generateInvoiceForUser, getCurrentQuarter, getQuarterDates, getTokyoDat
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth'
 import { recordAuditLog } from '@/lib/audit'
+import { claimIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey } from '@/lib/idempotency'
+import { performanceTrace } from '@/lib/performance'
 
 export async function generateInvoicesForQuarter(year: number, quarter: number, _formData?: FormData): Promise<void> {
-    void _formData
+    const trace = performanceTrace('invoice.generate')
     const currentUser = await requireUser()
     if (currentUser.role !== 'ADMIN' && currentUser.role !== 'CENTER_DIRECTOR') {
         throw new Error('請求書を発行する権限がありません。')
@@ -15,72 +17,46 @@ export async function generateInvoicesForQuarter(year: number, quarter: number, 
     if (!Number.isInteger(year) || year < 2000 || year > 2100 || ![1, 2, 3].includes(quarter)) {
         throw new Error('請求期間が正しくありません。')
     }
-    // Get all users
-    const users = await prisma.user.findMany({
+    const idempotencyKey = _formData?.get('idempotencyKey')?.toString()
+    const claim = await claimIdempotencyKey(currentUser.id, 'invoice.generate', idempotencyKey)
+    if (claim.state === 'duplicate') return
+
+    try {
+    const { start, end } = getQuarterDates(year, quarter)
+    const [users, usageByUser, existingInvoices] = await Promise.all([
+        prisma.user.findMany({
         where: {
             role: 'USER', // Only generate for regular users
         },
         select: { id: true, name: true },
-    })
-
-    const { start, end } = getQuarterDates(year, quarter)
-
-    const results = []
-
-    for (const user of users) {
-        try {
-            // Check if user has any usage logs in this period
-            const usageLogs = await prisma.usageLog.findMany({
-                where: {
-                    userId: user.id,
-                    date: {
-                        gte: start,
-                        lt: end,
-                    },
-                },
-            })
-
-            if (usageLogs.length > 0) {
-                // Check if invoice already exists
-                const existingInvoice = await prisma.invoice.findFirst({
-                    where: {
-                        userId: user.id,
-                        fiscalYear: year,
-                        quarter,
-                    },
-                })
-
-                if (!existingInvoice) {
-                    const invoiceId = await generateInvoiceForUser(user.id, year, quarter)
-                    await recordAuditLog({ actor: currentUser, action: 'INVOICE_CREATE', targetType: 'Invoice', targetId: invoiceId, targetLabel: user.name, summary: '請求書を生成しました。', metadata: { year, quarter, userId: user.id } })
-                    results.push({
-                        userId: user.id,
-                        userName: user.name,
-                        status: 'success',
-                        invoiceId,
-                    })
-                } else {
-                    results.push({
-                        userId: user.id,
-                        userName: user.name,
-                        status: 'skipped',
-                        message: '既に請求書が存在します',
-                    })
-                }
-            }
-        } catch (error) {
-            results.push({
-                userId: user.id,
-                userName: user.name,
-                status: 'error',
-                message: error instanceof Error ? error.message : '不明なエラー',
-            })
-        }
-    }
+        }),
+        prisma.usageLog.groupBy({
+            by: ['userId'],
+            where: { date: { gte: start, lt: end } },
+            _count: { _all: true },
+        }),
+        prisma.invoice.findMany({
+            where: { fiscalYear: year, quarter },
+            select: { userId: true },
+        }),
+    ])
+    const usageUserIds = new Set(usageByUser.filter((usage) => usage._count._all > 0).map((usage) => usage.userId))
+    const invoiceUserIds = new Set(existingInvoices.map((invoice) => invoice.userId))
+    const pendingUsers = users.filter((user) => usageUserIds.has(user.id) && !invoiceUserIds.has(user.id))
+    await Promise.all(pendingUsers.map(async (user) => {
+        const invoiceId = await generateInvoiceForUser(user.id, year, quarter)
+        await recordAuditLog({ actor: currentUser, action: 'INVOICE_CREATE', targetType: 'Invoice', targetId: invoiceId, targetLabel: user.name, summary: '請求書を生成しました。', metadata: { year, quarter, userId: user.id } })
+    }))
 
     revalidatePath('/admin/invoices')
     revalidatePath('/invoices')
-
+    await completeIdempotencyKey(currentUser.id, 'invoice.generate', idempotencyKey!, { success: true, generatedCount: pendingUsers.length })
+    trace.finish('success', { generatedCount: pendingUsers.length })
+    } catch (error) {
+        await releaseIdempotencyKey(currentUser.id, 'invoice.generate', idempotencyKey)
+        trace.finish('failure')
+        throw error
+    }
 }
 
 export async function generateCurrentQuarterInvoices() {

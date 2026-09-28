@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth'
 import { recordAuditLog } from '@/lib/audit'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
 import { getActiveInvoiceReminderPeriod, getInvoiceReminderDedupeKey, INVOICE_ISSUE_REMINDER_TYPE } from '@/lib/invoice-reminders'
+import { performanceTrace } from '@/lib/performance'
 
 const NEW_USER_NOTIFICATION_TYPE = 'NEW_USER_REGISTRATION'
 // 通知機能の切り替え時に取りこぼした登録を救済できる期間。
@@ -135,9 +136,10 @@ async function syncInvoiceIssueReminder() {
 
 export async function GET() {
     const requestId = createRequestId()
+    const trace = performanceTrace('api.admin.notifications', requestId)
 
     try {
-        const currentUser = await getAuthenticatedUser()
+        const currentUser = await trace.measure('auth', getAuthenticatedUser)
         const status = !currentUser
             ? 401
             : currentUser.role === 'ADMIN' || currentUser.role === 'CENTER_DIRECTOR'
@@ -150,10 +152,12 @@ export async function GET() {
             return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この操作を行う権限がありません。', '管理者またはセンター長権限でログインしてください。', requestId)
         }
 
-        await syncInvoiceIssueReminder()
-        await syncRecentRegistrationNotifications(currentUser!)
+        await trace.measure('prismaQuery', async () => {
+            await syncInvoiceIssueReminder()
+            await syncRecentRegistrationNotifications(currentUser!)
+        })
 
-        const [notifications, unreadCount] = await Promise.all([
+        const [notifications, unreadCount] = await trace.measure('prismaQuery', () => Promise.all([
             prisma.adminNotification.findMany({
                 where: {
                     OR: [
@@ -188,7 +192,7 @@ export async function GET() {
                     reads: { none: { adminId: currentUser!.id } },
                 },
             }),
-        ])
+        ]))
 
         await recordAuditLog({
             actor: currentUser,
@@ -198,6 +202,7 @@ export async function GET() {
             metadata: { notificationCount: notifications.length },
         })
 
+        trace.finish()
         return apiSuccessResponse({
             unreadCount,
             notifications: notifications.map(({ reads, ...notification }) => ({
@@ -206,6 +211,7 @@ export async function GET() {
             })),
         }, requestId)
     } catch {
+        trace.finish('failure')
         console.error(`[${requestId}] 管理者通知の取得に失敗しました。`)
         return apiErrorResponse(500, API_ERROR_CODES.INTERNAL_ERROR, '管理者通知を取得できませんでした。', '時間をおいて、もう一度お試しください。', requestId)
     }

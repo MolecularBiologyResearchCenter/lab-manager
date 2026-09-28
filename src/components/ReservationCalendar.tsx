@@ -28,6 +28,7 @@ import CustomDateTimePicker from '@/components/CustomDateTimePicker'
 import { useRouter } from 'next/navigation'
 import { formatTokyoDateTimeLocal, fromTokyoWallClock, parseTokyoDateTimeLocal, toTokyoWallClock } from '@/lib/date-format'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
+import ProcessingOverlay from '@/components/ProcessingOverlay'
 
 const locales = {
     'ja': ja,
@@ -92,6 +93,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     const [showActiveOnly, setShowActiveOnly] = useState(false)
     const [visibleEquipmentIds, setVisibleEquipmentIds] = useState<string[]>([])
     const [phoneNumber, setPhoneNumber] = useState<string>('')
+    const [submitting, setSubmitting] = useState(false)
 
     // Mobile detection
     const [isMobile, setIsMobile] = useState(false)
@@ -235,6 +237,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             return
         }
 
+        setSubmitting(true)
         try {
             if (editingReservation) {
                 // Administrators may manage every reservation; other users may
@@ -246,14 +249,14 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                     return
                 }
 
-                const result = await updateReservation(editingReservation.id, selectedEquipment, editingReservation.userId, startTime, endTime, phoneNumber)
+                const result = await updateReservation(editingReservation.id, selectedEquipment, editingReservation.userId, startTime, endTime, phoneNumber, crypto.randomUUID())
                 if (!result.success) {
                     showReservationError('操作に失敗しました: ' + result.error)
                     return
                 }
                 showSuccess('予約を更新しました！')
             } else {
-                const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber)
+                const result = await createReservation(selectedEquipment, currentUser.id, startTime, endTime, phoneNumber, crypto.randomUUID())
                 if (!result.success) {
                     showReservationError('操作に失敗しました: ' + result.error)
                     return
@@ -266,6 +269,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         } catch (error) {
             console.error('Error:', error)
             showReservationError('操作に失敗しました。画面を更新して、もう一度お試しください。')
+        } finally {
+            setSubmitting(false)
         }
     }
 
@@ -337,13 +342,16 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         if (!confirm('本当にこの予約を削除しますか？')) return
 
         try {
-            await deleteReservation(editingReservation.id)
+            setSubmitting(true)
+            await deleteReservation(editingReservation.id, crypto.randomUUID())
             setIsDialogOpen(false)
             showSuccess('予約を削除しました。')
             // Refresh data to reflect changes
             router.refresh()
         } catch (error) {
             showReservationError('削除に失敗しました: ' + (error as Error).message)
+        } finally {
+            setSubmitting(false)
         }
     }
 
@@ -694,7 +702,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                         </div>
 
                         <div className="flex gap-2">
-                            <Button type="submit" className="h-11 flex-1 rounded-xl bg-blue-700 font-semibold text-white hover:bg-blue-800">
+                            <Button type="submit" disabled={submitting} className="h-11 flex-1 rounded-xl bg-blue-700 font-semibold text-white hover:bg-blue-800">
                                 {editingReservation ? t('update') : t('book')}
                             </Button>
                             {editingReservation && (
@@ -702,6 +710,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                                     type="button"
                                     variant="outline"
                                     className="h-11 flex-1 rounded-xl border-red-200 bg-white font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
+                                    disabled={submitting}
                                     onClick={handleDelete}
                                 >
                                     {t('delete')}
@@ -710,7 +719,8 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
                         </div>
                     </form>
                 </DialogContent>
-            </Dialog>
+        </Dialog>
+        {submitting && <ProcessingOverlay />}
         </div>
     )
 }

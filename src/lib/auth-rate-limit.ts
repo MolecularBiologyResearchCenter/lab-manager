@@ -77,7 +77,7 @@ async function registerFailure(
     now = new Date(),
 ) {
     let locked = false
-    await prisma.$transaction(async (transaction) => {
+    await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
         for (const item of keys) {
             const existing = await transaction.authThrottle.findUnique({
                 where: { kind_key: { kind: item.kind, key: item.key } },

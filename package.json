@@ -13,6 +13,7 @@
     "security:check": "tsx scripts/security-self-test.ts",
     "test:reservation": "tsx scripts/reservation-rules-self-test.ts",
     "test:invoice-period": "tsx scripts/invoice-period-self-test.ts",
+    "performance:summary": "tsx scripts/performance-summary.ts",
     "postinstall": "prisma generate",
     "fix-reservations": "npx tsx scripts/fix-invalid-reservations.ts"
   },

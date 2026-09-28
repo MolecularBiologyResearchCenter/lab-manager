@@ -5,15 +5,17 @@ import { getCurrentUser, getEquipmentList } from '@/app/actions'
 import { redirect } from 'next/navigation'
 import ReservationViewToggle from '@/components/ReservationViewToggle'
 import UserLanguageText from '@/components/UserLanguageText'
+import { performanceTrace } from '@/lib/performance'
 
 export default async function ReservationsPage(props: { searchParams: Promise<{ view?: string }> }) {
+    const trace = performanceTrace('page.reservations')
     const searchParams = await props.searchParams
-    const currentUser = await getCurrentUser()
+    const currentUser = await trace.measure('auth', getCurrentUser)
     if (!currentUser) {
         redirect('/login')
     }
 
-    const reservations = await prisma.reservation.findMany({
+    const reservationsQuery = prisma.reservation.findMany({
         where: { status: { notIn: ['cancelled', 'rejected'] } },
         include: {
             equipment: true,
@@ -22,8 +24,8 @@ export default async function ReservationsPage(props: { searchParams: Promise<{ 
             },
         },
     })
-
-    const equipmentList = await getEquipmentList()
+    const equipmentQuery = getEquipmentList()
+    const [reservations, equipmentList] = await trace.measure('prismaQuery', () => Promise.all([reservationsQuery, equipmentQuery]))
 
     const events = reservations.map(res => ({
         id: res.id,
@@ -41,6 +43,7 @@ export default async function ReservationsPage(props: { searchParams: Promise<{ 
     // Get view preference from URL params, default to 'calendar'
     const view = searchParams.view || 'calendar'
 
+    trace.finish()
     return (
         <div className="content-wrapper app-page">
             <div className="app-page-header">
