@@ -10,7 +10,7 @@ VercelのFunction LogsをJSON Linesで保存し、次を実行します。
 npm run performance:summary -- ./vercel-function-logs.jsonl
 ```
 
-出力は処理単位のp50、p95、最大値、件数、原因分類を遅い順に表示します。上位10件は出力の先頭10行を採用します。`region` は `VERCEL_REGION`、`dbRegion` は `SUPABASE_REGION` または `DB_REGION` を読み取ります。未設定の場合は `unknown` として、環境変数の設定漏れを確認できます。
+出力は処理単位のp50、p95、最大値、件数、原因分類を遅い順に表示し、続けて認証・DB接続・Prisma・外部処理・PDF・アプリ・レスポンスの段階別集計も表示します。上位10件は処理単位の一覧の先頭10行を採用します。`region` は `VERCEL_REGION`、`dbRegion` は `SUPABASE_REGION` または `DB_REGION` を読み取ります。未設定の場合は `unknown` として、環境変数の設定漏れを確認できます。
 
 ## 計測対象と分類
 
@@ -24,7 +24,7 @@ npm run performance:summary -- ./vercel-function-logs.jsonl
 | 通知取得 | `api.admin.notifications` | アプリ処理 |
 | PDF生成・取得 | `api.invoice.pdf` / `api.invoice.seal` | PDF処理 |
 
-各APIレスポンスの `X-Request-ID` と、ログの `requestId` を照合できます。Prismaは安全なクエリ実行時間のみを `lab_manager_prisma_query` として出力します。
+各APIレスポンスの `X-Request-ID` と、ログの `requestId` を照合できます。Prismaは安全なクエリ実行時間のみを `lab_manager_prisma_query` として出力します。利用者一覧、利用履歴、CSV出力、通知既読化もAPI単位のトレース対象です。
 
 ## 実施した改善
 
