@@ -11,12 +11,14 @@ import { formatTokyoDateTime } from '@/lib/date-format'
 interface AdminNotification {
     id: string
     type: string
+    targetUserId: string | null
     name: string
     department: string | null
     laboratory: string | null
     employeeId: string | null
     fiscalYear: number | null
     quarter: number | null
+    microsoftGroupSyncErrorCode: string | null
     createdAt: string
     isRead: boolean
 }
@@ -160,11 +162,17 @@ export default function AdminNotificationsCard() {
                                             </>
                                         ) : notification.type === 'MICROSOFT_GROUP_SYNC_FAILURE' ? (
                                             <>
-                                                <p className="font-medium text-red-700">Microsoft 365グループとの同期に失敗</p>
+                                                <p className="font-medium text-red-700">
+                                                    {notification.targetUserId ? 'Microsoft 365グループとの同期に失敗' : 'Microsoft 365グループからの削除が未完了'}
+                                                </p>
                                                 <p className="mt-1 text-sm text-slate-600">
-                                                    <Link href="/admin/users" className="hover:text-blue-700 hover:underline">
-                                                        {notification.name}さんのメーリングリスト設定を確認してください。
-                                                    </Link>
+                                                    {notification.targetUserId ? (
+                                                        <Link href="/admin/users" className="hover:text-blue-700 hover:underline">
+                                                            {notification.name}さんのメーリングリスト設定を確認してください。
+                                                        </Link>
+                                                    ) : (
+                                                        <>削除済み利用者 {notification.name} さんのグループ同期が再試行待ちです。</>
+                                                    )}
                                                 </p>
                                             </>
                                         ) : (

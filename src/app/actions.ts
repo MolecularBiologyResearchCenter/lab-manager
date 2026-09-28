@@ -729,29 +729,47 @@ export async function deleteUser(userId: string) {
         throw new Error('自分自身を削除することはできません。')
     }
 
-    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, email: true, mailingList: true } })
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, email: true } })
     if (!targetUser) throw new Error('ユーザーが見つかりません。')
 
-    if (targetUser.mailingList) {
-        try {
-            await syncUserMicrosoftGroupMembership({
-                userId,
-                name: targetUser.name,
-                email: targetUser.email,
-                enabled: false,
-                actor: currentUser,
-            })
-        } catch {
-            await recordAuditLog({
-                actor: currentUser,
-                action: 'MICROSOFT_GROUP_MEMBER_REMOVE',
-                targetType: 'User',
-                targetId: userId,
-                targetLabel: targetUser.name,
-                summary: 'ユーザー削除前のMicrosoft 365グループ同期に失敗しました。',
-                metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
-            })
-        }
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'ADMIN_USER_DELETE_START',
+        targetType: 'User',
+        targetId: userId,
+        targetLabel: targetUser.name,
+        summary: '管理者によるユーザー削除を開始しました。',
+    })
+
+    try {
+        await syncUserMicrosoftGroupMembership({
+            userId,
+            name: targetUser.name,
+            email: targetUser.email,
+            enabled: false,
+            actor: currentUser,
+            preserveFailureNotification: true,
+            context: 'USER_DELETE',
+        })
+    } catch {
+        await recordAuditLog({
+            actor: currentUser,
+            action: 'MICROSOFT_GROUP_MEMBER_REMOVE_FAILURE',
+            targetType: 'User',
+            targetId: userId,
+            targetLabel: targetUser.name,
+            summary: 'ユーザー削除前のMicrosoft 365グループ同期記録に失敗しました。',
+            metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
+        })
+        await recordAuditLog({
+            actor: currentUser,
+            action: 'MICROSOFT_GROUP_SYNC_RETRY_PENDING',
+            targetType: 'User',
+            targetId: userId,
+            targetLabel: targetUser.name,
+            summary: 'Microsoft 365グループからの削除を再試行待ちにしました。',
+            metadata: { result: 'pending', errorCode: 'SYNC_RECORD_FAILED' },
+        })
     }
 
     await prisma.user.delete({
