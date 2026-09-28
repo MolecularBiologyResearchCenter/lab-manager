@@ -26,6 +26,9 @@ model User {
   laboratory  String?  // 研究室 (旧 affiliation)
   extension   String?  // 内線
   role        String   @default("USER") // USER, ADMIN
+  microsoftGroupSyncStatus    String   @default("NOT_REQUESTED")
+  microsoftGroupSyncErrorCode String?
+  microsoftGroupSyncAt        DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

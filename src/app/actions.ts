@@ -36,6 +36,7 @@ import {
 } from '@/lib/password'
 import { claimIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey } from '@/lib/idempotency'
 import { performanceTrace } from '@/lib/performance'
+import { syncUserMicrosoftGroupMembership } from '@/lib/microsoft-group-sync'
 
 /**
  * Get the current quarter (1, 2, or 3) based on the month
@@ -591,6 +592,21 @@ export async function register(formData: FormData): Promise<RegisterActionResult
         console.error('新規利用者登録通知の作成に失敗しました。登録処理は完了しています。')
     }
 
+    if (mailingList) {
+        try {
+            await syncUserMicrosoftGroupMembership({ userId: user.id, name, email, enabled: true })
+        } catch {
+            await recordAuditLog({
+                action: 'MICROSOFT_GROUP_MEMBER_ADD',
+                targetType: 'User',
+                targetId: user.id,
+                targetLabel: name,
+                summary: 'Microsoft 365グループ同期の記録に失敗しました。登録処理は完了しています。',
+                metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
+            })
+        }
+    }
+
     await setSessionCookie(user.id)
 
     redirect('/')
@@ -714,8 +730,30 @@ export async function deleteUser(userId: string) {
         throw new Error('自分自身を削除することはできません。')
     }
 
-    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true } })
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, email: true, mailingList: true } })
     if (!targetUser) throw new Error('ユーザーが見つかりません。')
+
+    if (targetUser.mailingList) {
+        try {
+            await syncUserMicrosoftGroupMembership({
+                userId,
+                name: targetUser.name,
+                email: targetUser.email,
+                enabled: false,
+                actor: currentUser,
+            })
+        } catch {
+            await recordAuditLog({
+                actor: currentUser,
+                action: 'MICROSOFT_GROUP_MEMBER_REMOVE',
+                targetType: 'User',
+                targetId: userId,
+                targetLabel: targetUser.name,
+                summary: 'ユーザー削除前のMicrosoft 365グループ同期に失敗しました。',
+                metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
+            })
+        }
+    }
 
     await prisma.user.delete({
         where: { id: userId },
@@ -810,6 +848,28 @@ export async function updateProfile(
             ? { metadata: { mailingList: { previous: previousProfile.mailingList, next: data.mailingList } } }
             : {}),
     })
+
+    if (mailingListChanged) {
+        try {
+            await syncUserMicrosoftGroupMembership({
+                userId,
+                name: currentUser.name,
+                email: currentUser.email,
+                enabled: data.mailingList === true,
+                actor: currentUser,
+            })
+        } catch {
+            await recordAuditLog({
+                actor: currentUser,
+                action: data.mailingList === true ? 'MICROSOFT_GROUP_MEMBER_ADD' : 'MICROSOFT_GROUP_MEMBER_REMOVE',
+                targetType: 'User',
+                targetId: userId,
+                targetLabel: currentUser.name,
+                summary: 'Microsoft 365グループ同期の記録に失敗しました。プロフィール更新は完了しています。',
+                metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
+            })
+        }
+    }
 
     revalidatePath('/mypage')
 }
@@ -1003,7 +1063,7 @@ export async function updateUserProfileByAdmin(
 
     const targetUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { name: true, role: true, employeeId: true, mailingList: true },
+        select: { name: true, email: true, role: true, employeeId: true, mailingList: true },
     })
     if (!targetUser) throw new Error('ユーザーが見つかりません。')
 
@@ -1079,6 +1139,28 @@ export async function updateUserProfileByAdmin(
             })
         }
     })
+
+    if (mailingListChanged) {
+        try {
+            await syncUserMicrosoftGroupMembership({
+                userId,
+                name: targetUser.name,
+                email: targetUser.email,
+                enabled: data.mailingList === true,
+                actor: currentUser,
+            })
+        } catch {
+            await recordAuditLog({
+                actor: currentUser,
+                action: data.mailingList === true ? 'MICROSOFT_GROUP_MEMBER_ADD' : 'MICROSOFT_GROUP_MEMBER_REMOVE',
+                targetType: 'User',
+                targetId: userId,
+                targetLabel: targetUser.name,
+                summary: 'Microsoft 365グループ同期の記録に失敗しました。プロフィール更新は完了しています。',
+                metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
+            })
+        }
+    }
 
     revalidatePath('/admin/users')
     revalidatePath('/mypage')
