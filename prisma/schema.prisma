@@ -97,6 +97,7 @@ model AdminNotification {
   quarter                     Int?
   microsoftDirectoryUserId    String?
   microsoftGroupSyncErrorCode String?
+  microsoftGroupSyncEmail     String?
   dedupeKey                   String?   @unique
   resolvedAt                  DateTime?
   createdAt                   DateTime  @default(now())

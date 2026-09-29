@@ -10,6 +10,10 @@ const MICROSOFT_GROUP_SYNC_FAILURE_TYPE = 'MICROSOFT_GROUP_SYNC_FAILURE'
 // 通知機能の切り替え時に取りこぼした登録を救済できる期間。
 const RECENT_REGISTRATION_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000
 
+function isMissingRetryColumn(error: unknown) {
+    return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'P2022')
+}
+
 /**
  * 登録処理と通知作成が別リクエストになった場合に備え、直近の登録だけを補完する。
  * dedupeKeyを一意キーとして使うため、ポーリングや同時アクセスでも通知は重複しない。
@@ -159,46 +163,79 @@ export async function GET() {
             await syncRecentRegistrationNotifications(currentUser!)
         })
 
-        const [notifications, unreadCount] = await trace.measure('prismaQuery', () => Promise.all([
-            prisma.adminNotification.findMany({
-                where: {
-                    OR: [
-                        { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
-                        { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
-                        { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
-                    ],
-                },
-                select: {
-                    id: true,
-                    type: true,
-                    targetUserId: true,
-                    name: true,
-                    department: true,
-                    laboratory: true,
-                    employeeId: true,
-                    fiscalYear: true,
-                    quarter: true,
-                    microsoftGroupSyncErrorCode: true,
-                    createdAt: true,
-                    reads: {
-                        where: { adminId: currentUser!.id },
-                        select: { readAt: true },
+        const notifications = await trace.measure('prismaQuery', async () => {
+            try {
+                return await prisma.adminNotification.findMany({
+                    where: {
+                        OR: [
+                            { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
+                            { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
+                            { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
+                        ],
                     },
-                },
-                orderBy: { createdAt: 'desc' },
-                take: 50,
-            }),
-            prisma.adminNotification.count({
-                where: {
-                    OR: [
-                        { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
-                        { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
-                        { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
-                    ],
-                    reads: { none: { adminId: currentUser!.id } },
-                },
-            }),
-        ]))
+                    select: {
+                        id: true,
+                        type: true,
+                        targetUserId: true,
+                        name: true,
+                        department: true,
+                        laboratory: true,
+                        employeeId: true,
+                        fiscalYear: true,
+                        quarter: true,
+                        microsoftGroupSyncErrorCode: true,
+                        microsoftGroupSyncEmail: true,
+                        createdAt: true,
+                        reads: {
+                            where: { adminId: currentUser!.id },
+                            select: { readAt: true },
+                        },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    take: 50,
+                })
+            } catch (error) {
+                if (!isMissingRetryColumn(error)) throw error
+                return prisma.adminNotification.findMany({
+                    where: {
+                        OR: [
+                            { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
+                            { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
+                            { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
+                        ],
+                    },
+                    select: {
+                        id: true,
+                        type: true,
+                        targetUserId: true,
+                        name: true,
+                        department: true,
+                        laboratory: true,
+                        employeeId: true,
+                        fiscalYear: true,
+                        quarter: true,
+                        microsoftGroupSyncErrorCode: true,
+                        createdAt: true,
+                        reads: {
+                            where: { adminId: currentUser!.id },
+                            select: { readAt: true },
+                        },
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    take: 50,
+                })
+            }
+        })
+        const unreadCount = await trace.measure('prismaQuery', () => prisma.adminNotification.count({
+            where: {
+                OR: [
+                    { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
+                    { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
+                    { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
+                ],
+                reads: { none: { adminId: currentUser!.id } },
+            },
+        }))
 
         await recordAuditLog({
             actor: currentUser,
@@ -213,6 +250,10 @@ export async function GET() {
             unreadCount,
             notifications: notifications.map(({ reads, ...notification }) => ({
                 ...notification,
+                canRetryMicrosoftGroupSync: 'microsoftGroupSyncEmail' in notification
+                    ? Boolean(notification.microsoftGroupSyncEmail)
+                    : false,
+                ...('microsoftGroupSyncEmail' in notification ? { microsoftGroupSyncEmail: undefined } : {}),
                 isRead: reads.length > 0,
             })),
         }, requestId)

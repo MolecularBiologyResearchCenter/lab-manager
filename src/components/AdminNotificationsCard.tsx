@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Bell, Check } from 'lucide-react'
-import { showError } from '@/lib/error-notifier'
+import { showError, showSuccess } from '@/lib/error-notifier'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatTokyoDateTime } from '@/lib/date-format'
@@ -19,6 +19,7 @@ interface AdminNotification {
     fiscalYear: number | null
     quarter: number | null
     microsoftGroupSyncErrorCode: string | null
+    canRetryMicrosoftGroupSync: boolean
     createdAt: string
     isRead: boolean
 }
@@ -119,6 +120,21 @@ export default function AdminNotificationsCard() {
         }
     }
 
+    const retryGroupSync = async (notificationId: string) => {
+        try {
+            const response = await fetch(`/api/admin/notifications/${notificationId}/retry`, { method: 'POST' })
+            if (!response.ok) {
+                showError('分子生物実験センターグループの削除を再試行できませんでした。')
+                return
+            }
+            showSuccess('分子生物実験センターグループの削除を再試行しました。')
+            await fetchNotifications()
+        } catch {
+            console.error('分子生物実験センターグループの削除再試行に失敗しました。')
+            showError('分子生物実験センターグループの削除を再試行できませんでした。')
+        }
+    }
+
     const visibleNotifications = showAll ? notifications : notifications.slice(0, 3)
 
     return (
@@ -163,7 +179,7 @@ export default function AdminNotificationsCard() {
                                         ) : notification.type === 'MICROSOFT_GROUP_SYNC_FAILURE' ? (
                                             <>
                                                 <p className="font-medium text-red-700">
-                                                    {notification.targetUserId ? 'Microsoft 365グループとの同期に失敗' : 'Microsoft 365グループからの削除が未完了'}
+                                                    {notification.targetUserId ? '分子生物実験センターグループとの同期に失敗' : '分子生物実験センターグループからの削除が未完了'}
                                                 </p>
                                                 <p className="mt-1 text-sm text-slate-600">
                                                     {notification.targetUserId ? (
@@ -171,7 +187,18 @@ export default function AdminNotificationsCard() {
                                                             {notification.name}さんのメーリングリスト設定を確認してください。
                                                         </Link>
                                                     ) : (
-                                                        <>削除済み利用者 {notification.name} さんのグループ同期が再試行待ちです。</>
+                                                        <>
+                                                            <span>削除済み利用者 {notification.name} さんの分子生物実験センターグループ同期が再試行待ちです。</span>
+                                                            {notification.canRetryMicrosoftGroupSync ? (
+                                                                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void retryGroupSync(notification.id)}>
+                                                                    グループから削除を再試行
+                                                                </Button>
+                                                            ) : (
+                                                                <span className="mt-2 block text-xs text-amber-700">
+                                                                    この通知は旧形式で作成されたため、自動再試行に必要な情報がありません。対象利用者を削除した時点で、最新の管理者通知から再試行してください。
+                                                                </span>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </p>
                                             </>
