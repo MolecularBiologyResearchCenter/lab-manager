@@ -8,8 +8,36 @@ export const ANNUAL_REGISTRATION_FEES: Record<string, number> = {
     UNDERGRADUATE_STUDENT: 0,
 }
 
-export function getAnnualRegistrationFee(affiliationType: string, quarter: number): number {
-    return quarter === 2 ? ANNUAL_REGISTRATION_FEES[affiliationType] ?? 0 : 0
+export type AnnualRegistrationChargePeriod = { academicYear: number; start: Date; end: Date }
+
+function getFirstAnnualRegistrationBillingPeriod(createdAt: Date): { year: number; quarter: InvoiceQuarter } {
+    const { year, month } = getTokyoDateParts(createdAt)
+    if (month <= 4) return { year, quarter: 2 }
+    if (month <= 8) return { year, quarter: 3 }
+    return { year: year + 1, quarter: 1 }
+}
+
+export function getAnnualRegistrationChargePeriods(createdAt: Date, billingYear: number, billingQuarter: number): AnnualRegistrationChargePeriod[] {
+    const createdParts = getTokyoDateParts(createdAt)
+    const firstBilling = getFirstAnnualRegistrationBillingPeriod(createdAt)
+    const billingDate = billingQuarter === 1
+        ? tokyoMidnight(billingYear, 1, 1)
+        : billingQuarter === 2
+            ? tokyoMidnight(billingYear, 5, 1)
+            : tokyoMidnight(billingYear, 9, 1)
+    if (createdAt >= billingDate || (billingYear < firstBilling.year || (billingYear === firstBilling.year && billingQuarter < firstBilling.quarter))) return []
+    if (billingYear !== firstBilling.year || billingQuarter !== firstBilling.quarter) {
+        return billingQuarter === 2 ? [{ academicYear: billingYear, ...getAnnualRegistrationPeriod(billingYear, 2)! }] : []
+    }
+
+    const academicYears = createdParts.month >= 1 && createdParts.month <= 3
+        ? [billingYear - 1, billingYear]
+        : [billingYear]
+    return academicYears.map((academicYear) => ({ academicYear, ...getAnnualRegistrationPeriod(academicYear, 2)! }))
+}
+
+export function getAnnualRegistrationFee(affiliationType: string, createdAt: Date, billingYear: number, billingQuarter: number): number {
+    return getAnnualRegistrationChargePeriods(createdAt, billingYear, billingQuarter).length * (ANNUAL_REGISTRATION_FEES[affiliationType] ?? 0)
 }
 
 function tokyoMidnight(year: number, month: number, day = 1): Date {
@@ -106,7 +134,7 @@ export async function generateInvoiceForUser(
 
     const invoiceUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { affiliationType: true, enrollmentStatus: true },
+        select: { affiliationType: true, enrollmentStatus: true, createdAt: true },
     })
     if (!invoiceUser || invoiceUser.enrollmentStatus !== 'ACTIVE') {
         throw new Error('現在の在籍状態では新規請求書を発行できません')
@@ -129,7 +157,9 @@ export async function generateInvoiceForUser(
         },
     })
 
-    const annualRegistrationFee = getAnnualRegistrationFee(invoiceUser.affiliationType, quarter)
+    const annualRegistrationPeriods = getAnnualRegistrationChargePeriods(invoiceUser.createdAt, year, quarter)
+    const annualRegistrationUnitFee = ANNUAL_REGISTRATION_FEES[invoiceUser.affiliationType] ?? 0
+    const annualRegistrationFee = annualRegistrationPeriods.length * annualRegistrationUnitFee
     if (usageLogs.length === 0 && annualRegistrationFee === 0) {
         throw new Error('この期間の利用履歴がありません')
     }
@@ -154,8 +184,8 @@ export async function generateInvoiceForUser(
             totalAmount,
             affiliationTypeSnapshot: invoiceUser.affiliationType,
             annualRegistrationFee,
-            annualRegistrationPeriodStart: annualRegistrationPeriod?.start,
-            annualRegistrationPeriodEnd: annualRegistrationPeriod?.end,
+            annualRegistrationPeriodStart: annualRegistrationPeriods[0]?.start ?? annualRegistrationPeriod?.start,
+            annualRegistrationPeriodEnd: annualRegistrationPeriods.at(-1)?.end ?? annualRegistrationPeriod?.end,
             ...(issueDate ? { issuedDate: issueDate } : {}),
             status: 'issued',
             items: {
@@ -168,13 +198,13 @@ export async function generateInvoiceForUser(
                         amount: log.totalCost,
                         reagentLogId: log.id,
                     })),
-                    ...(annualRegistrationFee > 0 ? [{
+                    ...annualRegistrationPeriods.filter(() => annualRegistrationUnitFee > 0).map((period) => ({
                         date: issueDate ?? new Date(),
-                        itemName: `年間登録料（${invoiceUser.affiliationType === 'FACULTY_STAFF' ? '教職員' : '大学院生'}）`,
-                        unitPrice: annualRegistrationFee,
+                        itemName: `年間登録料（${invoiceUser.affiliationType === 'FACULTY_STAFF' ? '教職員' : '大学院生'}・${period.academicYear}年度）`,
+                        unitPrice: annualRegistrationUnitFee,
                         quantity: 1,
-                        amount: annualRegistrationFee,
-                    }] : []),
+                        amount: annualRegistrationUnitFee,
+                    })),
                 ],
             },
         },

@@ -35,10 +35,10 @@ export default async function AdminInvoicesPage(props: { searchParams: Promise<{
     const [usageLogs, reservations, activeUsers] = await trace.measure('prismaQuery', () => Promise.all([
         prisma.usageLog.findMany({ where: { date: { gte: start, lt: end } }, select: { id: true, date: true, quantity: true, totalCost: true, user: { select: { id: true, name: true, role: true } }, reagent: { select: { name: true } } }, orderBy: { date: 'desc' } }),
         prisma.reservation.findMany({ where: { startTime: { lt: end }, endTime: { gt: start } }, select: { id: true, startTime: true, endTime: true, status: true, user: { select: { name: true } }, equipment: { select: { name: true } } }, orderBy: { startTime: 'desc' } }),
-        prisma.user.findMany({ where: { role: 'USER', enrollmentStatus: 'ACTIVE' }, select: { id: true, affiliationType: true } }),
+        prisma.user.findMany({ where: { role: 'USER', enrollmentStatus: 'ACTIVE' }, select: { id: true, affiliationType: true, createdAt: true } }),
     ]))
     const eligibleUsageUserIds = [...new Set(usageLogs.filter((log) => log.user.role === 'USER').map((log) => log.user.id))]
-    const annualFeeUserIds = selectedPeriod.quarter === 2 ? activeUsers.filter((user) => getAnnualRegistrationFee(user.affiliationType, selectedPeriod.quarter) > 0).map((user) => user.id) : []
+    const annualFeeUserIds = activeUsers.filter((user) => getAnnualRegistrationFee(user.affiliationType, user.createdAt, selectedPeriod.year, selectedPeriod.quarter) > 0).map((user) => user.id)
     const generationTargetUserIds = [...new Set([...eligibleUsageUserIds, ...annualFeeUserIds])]
     const generationComplete = generationTargetUserIds.length > 0 && generationTargetUserIds.every((userId) => invoices.some((invoice) => invoice.userId === userId && invoice.fiscalYear === selectedPeriod.year && invoice.quarter === selectedPeriod.quarter))
     trace.finish()

@@ -29,7 +29,7 @@ export async function generateInvoicesForQuarter(year: number, quarter: number, 
             role: 'USER', // Only generate for regular users
             enrollmentStatus: 'ACTIVE',
         },
-        select: { id: true, name: true, affiliationType: true },
+        select: { id: true, name: true, affiliationType: true, createdAt: true },
         }),
         prisma.usageLog.groupBy({
             by: ['userId'],
@@ -43,7 +43,7 @@ export async function generateInvoicesForQuarter(year: number, quarter: number, 
     ])
     const usageUserIds = new Set(usageByUser.filter((usage) => usage._count._all > 0).map((usage) => usage.userId))
     const invoiceUserIds = new Set(existingInvoices.map((invoice) => invoice.userId))
-    const pendingUsers = users.filter((user) => (usageUserIds.has(user.id) || getAnnualRegistrationFee(user.affiliationType, quarter) > 0) && !invoiceUserIds.has(user.id))
+    const pendingUsers = users.filter((user) => (usageUserIds.has(user.id) || getAnnualRegistrationFee(user.affiliationType, user.createdAt, year, quarter) > 0) && !invoiceUserIds.has(user.id))
     await Promise.all(pendingUsers.map(async (user) => {
         const invoiceId = await generateInvoiceForUser(user.id, year, quarter)
         await recordAuditLog({ actor: currentUser, action: 'INVOICE_CREATE', targetType: 'Invoice', targetId: invoiceId, targetLabel: user.name, summary: '請求書を生成しました。', metadata: { year, quarter, userId: user.id } })
