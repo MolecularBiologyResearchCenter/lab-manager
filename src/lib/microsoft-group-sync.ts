@@ -20,6 +20,8 @@ export type MicrosoftGroupSyncResult =
     | { ok: true; operation: 'added' | 'already-member' | 'removed' | 'not-member' | 'not-found'; directoryUserId?: string }
     | { ok: false; operation: 'add' | 'remove'; errorCode: string; directoryUserId?: string }
 
+export type MicrosoftGroupMembershipStatus = 'member' | 'not-member' | 'unknown'
+
 function getGraphConfig(): GraphConfig | null {
     const tenantId = process.env.MICROSOFT_TENANT_ID?.trim()
     const clientId = process.env.MICROSOFT_CLIENT_ID?.trim()
@@ -137,6 +139,21 @@ async function syncMembership(config: GraphConfig, directoryUserId: string, enab
         : removed.errorCode === 'HTTP_404'
             ? { ok: true, operation: 'not-member', directoryUserId }
             : { ok: false, operation: 'remove', errorCode: removed.errorCode, directoryUserId }
+}
+
+export async function getMicrosoftGroupMembershipStatus(email: string): Promise<MicrosoftGroupMembershipStatus> {
+    const config = getGraphConfig()
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!config || !normalizedEmail) return 'unknown'
+
+    const directoryUser = await findDirectoryUser(config, normalizedEmail)
+    if (!directoryUser.ok) return directoryUser.errorCode === 'DIRECTORY_USER_NOT_FOUND' ? 'not-member' : 'unknown'
+
+    const memberPath = `/groups/${encodeURIComponent(config.groupId)}/members/${encodeURIComponent(directoryUser.id)}/$ref`
+    const membership = await graphRequest<Record<string, never>>(config, memberPath)
+    if (membership.ok) return 'member'
+    if (membership.errorCode === 'HTTP_404' || membership.errorCode === 'Request_ResourceNotFound') return 'not-member'
+    return 'unknown'
 }
 
 export async function syncMicrosoftGroupMembership(input: { email: string; enabled: boolean }): Promise<MicrosoftGroupSyncResult> {
