@@ -17,6 +17,8 @@ model User {
   name                        String
   nameKana                    String? // ふりがな
   employeeId                  String? // 職員番号/学籍番号
+  affiliationType             String    @default("FACULTY_STAFF") // FACULTY_STAFF, GRADUATE_STUDENT, UNDERGRADUATE_STUDENT
+  enrollmentStatus            String    @default("ACTIVE") // ACTIVE, SUSPENDED, GRADUATED, RETIRED
   mailingList                 Boolean   @default(false) // メーリングリスト登録
   email                       String    @unique
   password                    String
@@ -42,6 +44,7 @@ model User {
   adminNotificationsTarget AdminNotification[]     @relation("AdminNotificationTarget")
   adminNotificationReads   AdminNotificationRead[] @relation("AdminNotificationReader")
   passwordResetRequests    PasswordResetRequest[]
+  affiliationChanges       UserAffiliationChange[]
 
   @@index([passwordResetTokenHash])
 }
@@ -62,6 +65,21 @@ model PasswordResetRequest {
   @@index([userId, createdAt])
   @@index([codeHash])
   @@index([usedAt, invalidatedAt, codeExpiresAt])
+}
+
+model UserAffiliationChange {
+  id             String   @id @default(cuid())
+  userId         String
+  previousType   String
+  nextType       String
+  effectiveFrom  DateTime
+  changedById    String?
+  changedByName  String
+  changedAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, changedAt])
 }
 
 model AuditLog {
@@ -217,6 +235,8 @@ model Invoice {
 
   // 金額情報
   totalAmount Float
+  affiliationTypeSnapshot String? // 請求書作成時点の所属区分
+  annualRegistrationFee   Float?   // 年間登録料（設定されている場合）
 
   // 請求書情報
   issuedDate DateTime @default(now())

@@ -81,6 +81,14 @@ export async function generateInvoiceForUser(
 ): Promise<string> {
     const { start, end } = getQuarterDates(year, quarter)
 
+    const invoiceUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { affiliationType: true, enrollmentStatus: true },
+    })
+    if (!invoiceUser || invoiceUser.enrollmentStatus !== 'ACTIVE') {
+        throw new Error('現在の在籍状態では新規請求書を発行できません')
+    }
+
     // Get all usage logs for this period
     const usageLogs = await prisma.usageLog.findMany({
         where: {
@@ -118,6 +126,7 @@ export async function generateInvoiceForUser(
             startDate: start,
             endDate: end,
             totalAmount,
+            affiliationTypeSnapshot: invoiceUser.affiliationType,
             status: 'issued',
             items: {
                 create: usageLogs.map((log) => ({

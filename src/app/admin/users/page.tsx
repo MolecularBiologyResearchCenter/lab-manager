@@ -28,6 +28,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Pencil } from 'lucide-react'
 import { ApiClientError, formatApiError, readApiError } from '@/lib/api-client'
+import { affiliationLabels, enrollmentStatusLabels, AFFILIATION_TYPES, ENROLLMENT_STATUSES } from '@/lib/user-lifecycle'
 
 interface User {
     id: string
@@ -35,11 +36,14 @@ interface User {
     email: string
     employeeId: string | null
     mailingList: boolean
+    affiliationType: string
+    enrollmentStatus: string
     role: string
     department: string | null
     laboratory: string | null
     extension: string | null
     createdAt: Date
+    affiliationChanges?: Array<{ id: string; previousType: string; nextType: string; effectiveFrom: Date; changedByName: string; changedAt: Date }>
 }
 
 const roleLabels: Record<string, string> = {
@@ -64,6 +68,11 @@ export default function UsersPage() {
     const [selectedRole, setSelectedRole] = useState<string>('USER')
     const [employeeId, setEmployeeId] = useState('')
     const [mailingList, setMailingList] = useState(false)
+    const [selectedAffiliationType, setSelectedAffiliationType] = useState('FACULTY_STAFF')
+    const [selectedEnrollmentStatus, setSelectedEnrollmentStatus] = useState('ACTIVE')
+    const [search, setSearch] = useState('')
+    const [affiliationFilter, setAffiliationFilter] = useState('ALL')
+    const [statusFilter, setStatusFilter] = useState('ALL')
     const [csvDialogOpen, setCsvDialogOpen] = useState(false)
     const [csvStartNo, setCsvStartNo] = useState('1')
     const [csvEndNo, setCsvEndNo] = useState('')
@@ -112,6 +121,8 @@ export default function UsersPage() {
         setSelectedRole(user.role)
         setEmployeeId(user.employeeId || '')
         setMailingList(user.mailingList)
+        setSelectedAffiliationType(user.affiliationType)
+        setSelectedEnrollmentStatus(user.enrollmentStatus)
         setEditDialogOpen(true)
     }
 
@@ -138,7 +149,7 @@ export default function UsersPage() {
         if (!userToEdit) return
 
         try {
-            await updateUserProfileByAdmin(userToEdit.id, { role: selectedRole, employeeId, mailingList })
+            await updateUserProfileByAdmin(userToEdit.id, { role: selectedRole, employeeId, mailingList, affiliationType: selectedAffiliationType, enrollmentStatus: selectedEnrollmentStatus })
             showSuccess('利用者情報を更新しました')
             router.refresh()
             fetchUsers()
@@ -150,6 +161,8 @@ export default function UsersPage() {
         setUserToEdit(null)
         setEmployeeId('')
         setMailingList(false)
+        setSelectedAffiliationType('FACULTY_STAFF')
+        setSelectedEnrollmentStatus('ACTIVE')
     }
 
     const cancelDelete = () => {
@@ -169,6 +182,12 @@ export default function UsersPage() {
         setCsvError('')
         setCsvDialogOpen(true)
     }
+
+    const filteredUsers = users.filter((user) => {
+        const query = search.trim().toLowerCase()
+        const matchesSearch = !query || [user.name, user.email, user.employeeId || ''].some((value) => value.toLowerCase().includes(query))
+        return matchesSearch && (affiliationFilter === 'ALL' || user.affiliationType === affiliationFilter) && (statusFilter === 'ALL' || user.enrollmentStatus === statusFilter)
+    })
 
     const downloadCsv = async () => {
         const start = Number(csvStartNo)
@@ -266,7 +285,7 @@ export default function UsersPage() {
 
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-4">
-                    <CardTitle>登録ユーザー ({users.length}名)</CardTitle>
+                    <CardTitle>登録ユーザー ({filteredUsers.length}/{users.length}名)</CardTitle>
                     <Button
                         type="button"
                         variant="outline"
@@ -278,6 +297,17 @@ export default function UsersPage() {
                     </Button>
                 </CardHeader>
                 <CardContent>
+                    <div className="mb-4 grid gap-3 md:grid-cols-3">
+                        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="氏名・メール・職員番号で検索" className="h-10 rounded-md border border-slate-300 px-3 text-sm" />
+                        <Select value={affiliationFilter} onValueChange={setAffiliationFilter}>
+                            <SelectTrigger><SelectValue placeholder="所属区分で絞り込み" /></SelectTrigger>
+                            <SelectContent><SelectItem value="ALL">所属区分：すべて</SelectItem>{AFFILIATION_TYPES.map((type) => <SelectItem key={type} value={type}>{affiliationLabels[type]}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger><SelectValue placeholder="在籍状態で絞り込み" /></SelectTrigger>
+                            <SelectContent><SelectItem value="ALL">在籍状態：すべて</SelectItem>{ENROLLMENT_STATUSES.map((status) => <SelectItem key={status} value={status}>{enrollmentStatusLabels[status]}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
                     <div className="max-h-[38rem] overflow-auto">
                         <Table>
                             <TableHeader className="sticky top-0 z-10 bg-white">
@@ -288,6 +318,8 @@ export default function UsersPage() {
                                     <TableHead>職員番号</TableHead>
                                     <TableHead>メーリングリスト</TableHead>
                                     <TableHead>権限</TableHead>
+                                    <TableHead>所属区分</TableHead>
+                                    <TableHead>在籍状態</TableHead>
                                     <TableHead>所属</TableHead>
                                     <TableHead>研究室</TableHead>
                                     <TableHead>内線</TableHead>
@@ -296,7 +328,7 @@ export default function UsersPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {users.map((user, index) => (
+                                {filteredUsers.map((user, index) => (
                                     <TableRow key={user.id} style={index % 2 === 1 ? { backgroundColor: '#f3f4f6' } : { backgroundColor: '#ffffff' }}>
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell className="font-medium">{user.name}</TableCell>
@@ -311,6 +343,8 @@ export default function UsersPage() {
                                                 {roleLabels[user.role] ?? '一般利用者'}
                                             </span>
                                         </TableCell>
+                                        <TableCell>{affiliationLabels[user.affiliationType as keyof typeof affiliationLabels] ?? user.affiliationType}</TableCell>
+                                        <TableCell><span className={user.enrollmentStatus === 'ACTIVE' ? 'text-green-700' : 'font-medium text-red-700'}>{enrollmentStatusLabels[user.enrollmentStatus as keyof typeof enrollmentStatusLabels] ?? user.enrollmentStatus}</span></TableCell>
                                         <TableCell>{user.department || '-'}</TableCell>
                                         <TableCell>{user.laboratory || '-'}</TableCell>
                                         <TableCell>{user.extension || '-'}</TableCell>
@@ -402,6 +436,26 @@ export default function UsersPage() {
                             <p className="font-medium text-slate-800">変更前 → 変更後</p>
                             <p className="mt-1 text-slate-600">{userToEdit && roleLabels[userToEdit.role]} → {roleLabels[selectedRole]}</p>
                         </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="affiliation-type">所属区分</Label>
+                            <Select value={selectedAffiliationType} onValueChange={setSelectedAffiliationType}>
+                                <SelectTrigger id="affiliation-type"><SelectValue /></SelectTrigger>
+                                <SelectContent>{AFFILIATION_TYPES.map((type) => <SelectItem key={type} value={type}>{affiliationLabels[type]}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="enrollment-status">在籍状態</Label>
+                            <Select value={selectedEnrollmentStatus} onValueChange={setSelectedEnrollmentStatus}>
+                                <SelectTrigger id="enrollment-status"><SelectValue /></SelectTrigger>
+                                <SelectContent>{ENROLLMENT_STATUSES.map((status) => <SelectItem key={status} value={status}>{enrollmentStatusLabels[status]}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                        {userToEdit?.affiliationChanges && userToEdit.affiliationChanges.length > 0 && (
+                            <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm">
+                                <p className="font-medium">所属区分の変更履歴</p>
+                                {userToEdit.affiliationChanges.map((change) => <p key={change.id} className="text-slate-600">{affiliationLabels[change.previousType as keyof typeof affiliationLabels] ?? change.previousType} → {affiliationLabels[change.nextType as keyof typeof affiliationLabels] ?? change.nextType}（{new Date(change.effectiveFrom).toLocaleDateString('ja-JP')}・{change.changedByName}）</p>)}
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="admin-employee-id">職員番号</Label>
                             <input

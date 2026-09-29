@@ -27,6 +27,7 @@ export async function generateInvoicesForQuarter(year: number, quarter: number, 
         prisma.user.findMany({
         where: {
             role: 'USER', // Only generate for regular users
+            enrollmentStatus: 'ACTIVE',
         },
         select: { id: true, name: true },
         }),

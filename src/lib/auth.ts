@@ -14,6 +14,8 @@ export const currentUserSelect = {
     laboratory: true,
     extension: true,
     employeeId: true,
+    affiliationType: true,
+    enrollmentStatus: true,
     mailingList: true,
     role: true,
 } as const
@@ -23,12 +25,25 @@ export const adminUserSelect = {
     name: true,
     email: true,
     employeeId: true,
+    affiliationType: true,
+    enrollmentStatus: true,
     mailingList: true,
     role: true,
     department: true,
     laboratory: true,
     extension: true,
     createdAt: true,
+    affiliationChanges: {
+        select: {
+            id: true,
+            previousType: true,
+            nextType: true,
+            effectiveFrom: true,
+            changedByName: true,
+            changedAt: true,
+        },
+        orderBy: { changedAt: 'desc' },
+    },
 } as const
 
 export const credentialUserSelect = {
@@ -82,11 +97,11 @@ export async function getSessionUserId(): Promise<string | null> {
     if (!value) return null
     const userId = verifySignedSessionValue(value)
     if (!userId) return null
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { updatedAt: true } })
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { updatedAt: true, enrollmentStatus: true } })
     const sessionEpoch = getSessionVersion(value)
     // 旧形式のCookieは既存利用者をログアウトさせずに互換維持する。
     // 新形式のCookieはパスワード変更でupdatedAtが変わるため無効化される。
-    return user && (sessionEpoch === 0 || user.updatedAt.getTime() === sessionEpoch) ? userId : null
+    return user && user.enrollmentStatus === 'ACTIVE' && (sessionEpoch === 0 || user.updatedAt.getTime() === sessionEpoch) ? userId : null
 }
 
 export async function setSessionCookie(userId: string, rememberMe = false, sessionEpoch = 0) {

@@ -77,6 +77,19 @@ export default function RegisterPage() {
                             <Input id="employeeId" name="employeeId" required placeholder="12345678" className="h-11 rounded-xl border-slate-300 text-base" />
                         </div>
                         <div className="space-y-2">
+                            <Label htmlFor="affiliationType">所属区分</Label>
+                            <Select name="affiliationType" required>
+                                <SelectTrigger id="affiliationType" className="h-11 rounded-xl border-slate-300 text-base">
+                                    <SelectValue placeholder="所属区分を選択" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="FACULTY_STAFF">教職員</SelectItem>
+                                    <SelectItem value="GRADUATE_STUDENT">大学院生</SelectItem>
+                                    <SelectItem value="UNDERGRADUATE_STUDENT">学部学生</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
                             <Label htmlFor="email">メールアドレス</Label>
                             <Input id="email" name="email" type="email" required placeholder="user@example.com" className="h-11 rounded-xl border-slate-300 text-base" />
                         </div>
