@@ -78,7 +78,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         if (invoice.status === 'rejected') return failure(409, API_ERROR_CODES.CONFLICT, 'この請求書は現在ダウンロードできません。', '請求書の状態を確認して、もう一度お試しください。')
         if (!invoice.sealedAt || !invoice.sealedBy || !invoice.sealer || invoice.sealer.role !== 'CENTER_DIRECTOR') return failure(409, API_ERROR_CODES.CONFLICT, '押印済み請求書のみダウンロードできます。', 'センター長の押印完了後に、もう一度お試しください。')
 
-        const buffer = await trace.measure('pdf', () => generateInvoicePdf({
+        const pdfInput = {
             invoiceNumber: invoice.invoiceNumber,
             fiscalYear: invoice.fiscalYear,
             quarter: invoice.quarter,
@@ -94,7 +94,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             items: invoice.items,
             sealedAt: invoice.sealedAt!,
             sealer: invoice.sealer!,
-        }))
+        }
+        let buffer = await trace.measure('pdf', () => generateInvoicePdf(pdfInput))
         try {
             validateGeneratedInvoicePdf(buffer)
         } catch (error) {
@@ -104,7 +105,6 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             return failure(error instanceof Error && error.message === 'PDF_TOO_LARGE' ? 413 : 500, API_ERROR_CODES.INVALID_REQUEST, reason, '時間をおいて、もう一度お試しください。')
         }
 
-        const pdfSha256 = sha256Pdf(buffer)
         const sealAudit = await prisma.auditLog.findFirst({
             where: {
                 action: 'INVOICE_SEAL',
@@ -117,7 +117,20 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         const sealMetadata = sealAudit?.metadata && typeof sealAudit.metadata === 'object' && !Array.isArray(sealAudit.metadata)
             ? sealAudit.metadata as Record<string, unknown>
             : null
-        if (sealMetadata?.result !== 'success' || sealMetadata.pdfSha256 !== pdfSha256 || sealMetadata.fileSize !== buffer.length) {
+        const matchesSeal = (candidate: Buffer) => {
+            const candidateHash = sha256Pdf(candidate)
+            return sealMetadata?.result === 'success' && sealMetadata.pdfSha256 === candidateHash && sealMetadata.fileSize === candidate.length
+        }
+        // Annual registration fields were introduced after some invoices had already
+        // been sealed. Try the pre-issue-date layout only when its stored audit hash
+        // proves that it is the original sealed document.
+        if (!matchesSeal(buffer) && invoice.annualRegistrationFee !== null) {
+            const legacyBuffer = await trace.measure('pdf', () => generateInvoicePdf({ ...pdfInput, includeIssuedDate: false }))
+            validateGeneratedInvoicePdf(legacyBuffer)
+            if (matchesSeal(legacyBuffer)) buffer = legacyBuffer
+        }
+        const pdfSha256 = sha256Pdf(buffer)
+        if (!matchesSeal(buffer)) {
             return failure(409, API_ERROR_CODES.CONFLICT, '押印対象と請求書の内容が一致しません。', '請求書を再読み込みして、もう一度お試しください。')
         }
 
