@@ -284,7 +284,10 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                         </>
                     ) : invoice.sealedAt && invoice.sealedBy ? (
                         <>
-                            <strong>{t('invoiceNotice')}:</strong> {t('languageEnglish') === 'English' ? t('submissionNotice') : `${t('submissionNotice')}${getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課に提出してください`}
+                            <strong>{t('invoiceNotice')}:</strong>{' '}
+                            {t('languageEnglish') === 'English'
+                                ? t('submissionNotice')
+                                : `ダウンロード後に印刷し、必要事項をご記入の上、${getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課へ提出してください。`}
                         </>
                     ) : (
                         <>

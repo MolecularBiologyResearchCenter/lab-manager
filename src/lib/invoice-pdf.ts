@@ -160,7 +160,11 @@ export async function generateInvoicePdf(invoice: InvoicePdfData) {
     let y = PAGE_HEIGHT - MARGIN
 
     drawText(page, font, `${invoice.fiscalYear}年 ${quarterLabel(invoice.quarter)} 分子生物実験センター利用料`, MARGIN, y - 20, 17, { maxWidth: contentWidth, align: 'center' })
-    drawText(page, font, `請求日：${formatDate(invoice.issuedDate)}`, MARGIN, y - 42, 10, { maxWidth: contentWidth, align: 'center' })
+    // The issue date was added after older invoices had already been sealed.
+    // Keep the historical layout for those invoices so their seal hash remains valid.
+    if (invoice.annualRegistrationFee !== null) {
+        drawText(page, font, `請求日：${formatDate(invoice.issuedDate)}`, MARGIN, y - 42, 10, { maxWidth: contentWidth, align: 'center' })
+    }
     drawText(page, font, '個人別請求書（研究用）', MARGIN, y - 46, 13, { maxWidth: contentWidth, align: 'center' })
     y -= 70
 
