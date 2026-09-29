@@ -19,6 +19,7 @@ interface AdminNotification {
     fiscalYear: number | null
     quarter: number | null
     microsoftGroupSyncErrorCode: string | null
+    canRetryMicrosoftGroupSync: boolean
     createdAt: string
     isRead: boolean
 }
@@ -188,9 +189,15 @@ export default function AdminNotificationsCard() {
                                                     ) : (
                                                         <>
                                                             <span>削除済み利用者 {notification.name} さんの分子生物実験センターグループ同期が再試行待ちです。</span>
-                                                            <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void retryGroupSync(notification.id)}>
-                                                                グループから削除を再試行
-                                                            </Button>
+                                                            {notification.canRetryMicrosoftGroupSync ? (
+                                                                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void retryGroupSync(notification.id)}>
+                                                                    グループから削除を再試行
+                                                                </Button>
+                                                            ) : (
+                                                                <span className="mt-2 block text-xs text-amber-700">
+                                                                    この通知は旧形式で作成されたため、自動再試行に必要な情報がありません。対象利用者を削除した時点で、最新の管理者通知から再試行してください。
+                                                                </span>
+                                                            )}
                                                         </>
                                                     )}
                                                 </p>

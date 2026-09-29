@@ -29,6 +29,14 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
             actor: currentUser!,
         }))
 
+        if (!result.ok) {
+            trace.finish('failure')
+            const message = result.errorCode === 'GRAPH_CONFIG_MISSING'
+                ? 'このPreview環境にMicrosoft 365連携設定がありません。VercelのPreview環境変数を確認してください。'
+                : '分子生物実験センターグループの削除を再試行できませんでした。'
+            return apiErrorResponse(502, API_ERROR_CODES.EXTERNAL_SERVICE, message, '設定を確認してから、もう一度お試しください。', requestId)
+        }
+
         trace.finish()
         return apiSuccessResponse({ success: true, operation: result.ok ? result.operation : null }, requestId)
     } catch (error) {

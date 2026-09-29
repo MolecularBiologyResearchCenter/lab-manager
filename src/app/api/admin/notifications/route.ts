@@ -179,6 +179,7 @@ export async function GET() {
                     fiscalYear: true,
                     quarter: true,
                     microsoftGroupSyncErrorCode: true,
+                    microsoftGroupSyncEmail: true,
                     createdAt: true,
                     reads: {
                         where: { adminId: currentUser!.id },
@@ -211,8 +212,9 @@ export async function GET() {
         trace.finish()
         return apiSuccessResponse({
             unreadCount,
-            notifications: notifications.map(({ reads, ...notification }) => ({
+            notifications: notifications.map(({ reads, microsoftGroupSyncEmail, ...notification }) => ({
                 ...notification,
+                canRetryMicrosoftGroupSync: Boolean(microsoftGroupSyncEmail),
                 isRead: reads.length > 0,
             })),
         }, requestId)

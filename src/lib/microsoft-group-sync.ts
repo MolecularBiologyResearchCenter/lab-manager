@@ -170,6 +170,13 @@ export async function syncMicrosoftGroupMembership(input: { email: string; enabl
     return syncMembership(config, directoryUser.id, input.enabled)
 }
 
+async function syncMicrosoftGroupMembershipByDirectoryUserId(directoryUserId: string, enabled: boolean): Promise<MicrosoftGroupSyncResult> {
+    const config = getGraphConfig()
+    if (!config) return { ok: false, operation: enabled ? 'add' : 'remove', errorCode: 'GRAPH_CONFIG_MISSING', directoryUserId }
+    if (!directoryUserId.trim()) return { ok: false, operation: enabled ? 'add' : 'remove', errorCode: 'DIRECTORY_USER_ID_MISSING' }
+    return syncMembership(config, directoryUserId.trim(), enabled)
+}
+
 export async function syncUserMicrosoftGroupMembership(input: {
     userId: string
     name: string
@@ -267,14 +274,17 @@ export async function retryDeletedUserMicrosoftGroupSync(input: {
             type: true,
             name: true,
             microsoftGroupSyncEmail: true,
+            microsoftDirectoryUserId: true,
             resolvedAt: true,
         },
     })
-    if (!notification || notification.type !== SYNC_FAILURE_NOTIFICATION || notification.resolvedAt || !notification.microsoftGroupSyncEmail) {
+    if (!notification || notification.type !== SYNC_FAILURE_NOTIFICATION || notification.resolvedAt || (!notification.microsoftGroupSyncEmail && !notification.microsoftDirectoryUserId)) {
         throw new Error('MICROSOFT_GROUP_RETRY_NOT_AVAILABLE')
     }
 
-    const result = await syncMicrosoftGroupMembership({ email: notification.microsoftGroupSyncEmail, enabled: false })
+    const result = notification.microsoftDirectoryUserId
+        ? await syncMicrosoftGroupMembershipByDirectoryUserId(notification.microsoftDirectoryUserId, false)
+        : await syncMicrosoftGroupMembership({ email: notification.microsoftGroupSyncEmail!, enabled: false })
     if (result.ok) {
         await prisma.adminNotification.update({
             where: { id: notification.id },
