@@ -16,6 +16,10 @@ type InvoicePdfData = {
     fiscalYear: number
     quarter: number
     totalAmount: number
+    issuedDate: Date
+    annualRegistrationFee: number | null
+    annualRegistrationPeriodStart: Date | null
+    annualRegistrationPeriodEnd: Date | null
     budgetDepartment: string | null
     budgetCategory: string | null
     budgetCode: string | null
@@ -156,6 +160,7 @@ export async function generateInvoicePdf(invoice: InvoicePdfData) {
     let y = PAGE_HEIGHT - MARGIN
 
     drawText(page, font, `${invoice.fiscalYear}年 ${quarterLabel(invoice.quarter)} 分子生物実験センター利用料`, MARGIN, y - 20, 17, { maxWidth: contentWidth, align: 'center' })
+    drawText(page, font, `請求日：${formatDate(invoice.issuedDate)}`, MARGIN, y - 42, 10, { maxWidth: contentWidth, align: 'center' })
     drawText(page, font, '個人別請求書（研究用）', MARGIN, y - 46, 13, { maxWidth: contentWidth, align: 'center' })
     y -= 70
 

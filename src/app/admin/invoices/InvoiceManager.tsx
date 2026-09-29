@@ -12,7 +12,7 @@ type Invoice = { id: string; userId: string; fiscalYear: number; quarter: number
 type Period = { key: string; year: number; quarter: number }
 type UsageLog = { id: string; date: Date; quantity: number; totalCost: number; user: { id: string; name: string; role: string }; reagent: { name: string } }
 type Reservation = { id: string; startTime: Date; endTime: Date; status: string; user: { name: string }; equipment: { name: string } }
-type Props = { invoices: Invoice[]; periods: Period[]; selectedPeriod: Period; usageLogs: UsageLog[]; reservations: Reservation[]; canGenerate: boolean; generationComplete: boolean }
+type Props = { invoices: Invoice[]; periods: Period[]; selectedPeriod: Period; usageLogs: UsageLog[]; reservations: Reservation[]; canGenerate: boolean; generationComplete: boolean; hasGenerationTargets: boolean }
 
 const quarterLabel = (quarter: number) => quarter === 1 ? '第1期（1-4月）' : quarter === 2 ? '第2期（5-8月）' : quarter === 3 ? '第3期（9-12月）' : `第${quarter}期`
 const formatDate = (value: Date | string) => new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' }).format(new Date(value))
@@ -23,7 +23,7 @@ function GenerateButton({ disabled, children }: { disabled: boolean; children: R
     return <Button type="submit" disabled={disabled || pending} className="btn-primary"><Plus className="mr-2 h-4 w-4" />{pending ? '生成中...' : children}</Button>
 }
 
-export default function InvoiceManager({ invoices, periods, selectedPeriod, usageLogs, reservations, canGenerate, generationComplete }: Props) {
+export default function InvoiceManager({ invoices, periods, selectedPeriod, usageLogs, reservations, canGenerate, generationComplete, hasGenerationTargets }: Props) {
     const [idempotencyKey] = useState(() => crypto.randomUUID())
     const filteredInvoices = invoices.filter((invoice) => invoice.fiscalYear === selectedPeriod.year && invoice.quarter === selectedPeriod.quarter)
     const totalUsage = usageLogs.reduce((total, log) => total + log.totalCost, 0)
@@ -32,7 +32,7 @@ export default function InvoiceManager({ invoices, periods, selectedPeriod, usag
     return <div className="content-wrapper py-8">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div><h1>請求書管理</h1><p className="mt-2 text-sm text-slate-500">すべての利用者の請求書を管理できます</p></div>
-            {canGenerate && <form action={generate}><input type="hidden" name="idempotencyKey" value={idempotencyKey} /><GenerateButton disabled={generationComplete || usageLogs.length === 0}>{generationComplete ? 'この期間の請求書は生成済み' : usageLogs.length === 0 ? '対象明細がありません' : `${selectedPeriod.year}年 ${quarterLabel(selectedPeriod.quarter)}の請求書を一括生成`}</GenerateButton></form>}
+            {canGenerate && <form action={generate}><input type="hidden" name="idempotencyKey" value={idempotencyKey} /><GenerateButton disabled={generationComplete || !hasGenerationTargets}>{generationComplete ? 'この期間の請求書は生成済み' : !hasGenerationTargets ? '請求対象がありません' : `${selectedPeriod.year}年 ${quarterLabel(selectedPeriod.quarter)}の請求書を一括生成`}</GenerateButton></form>}
         </div>
         <div className="mb-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 text-sm font-medium text-gray-700">請求期間を選択</div>
@@ -43,7 +43,7 @@ export default function InvoiceManager({ invoices, periods, selectedPeriod, usag
             <CardHeader className="pb-2"><CardTitle className="text-lg font-medium text-blue-900">{selectedPeriod.year}年 {quarterLabel(selectedPeriod.quarter)} の集計</CardTitle></CardHeader>
             <CardContent><div className="flex flex-wrap gap-6 text-sm text-blue-800"><span>発行済み: {filteredInvoices.length}件</span><span>利用明細: {usageLogs.length}件</span><span>利用料金合計: ¥{totalUsage.toLocaleString()}</span><span>予約履歴: {reservations.length}件</span></div></CardContent>
         </Card>
-        {filteredInvoices.length === 0 && <Card className="mb-8"><CardContent className="py-8 text-center text-gray-600"><FileText className="mx-auto mb-3 h-10 w-10 text-gray-400" /><p>この期間の請求書はありません。</p>{usageLogs.length > 0 && canGenerate && <p className="mt-2 font-medium text-blue-700">請求書を発行してください。</p>}</CardContent></Card>}
+        {filteredInvoices.length === 0 && <Card className="mb-8"><CardContent className="py-8 text-center text-gray-600"><FileText className="mx-auto mb-3 h-10 w-10 text-gray-400" /><p>この期間の請求書はありません。</p>{hasGenerationTargets && canGenerate && <p className="mt-2 font-medium text-blue-700">請求書を発行してください。</p>}</CardContent></Card>}
         {filteredInvoices.length > 0 && <div className="mb-8 flex flex-col gap-8">{filteredInvoices.map((invoice) => { const sealed = Boolean(invoice.sealedAt && invoice.sealedBy); return <Card key={invoice.id} className="card-elevated" style={{ backgroundColor: 'white', border: '2px solid #2563eb', borderRadius: '12px', maxWidth: '800px', margin: '0 auto', width: '100%' }}><CardHeader><div className="flex items-center justify-between gap-4"><div><CardTitle className="mb-2 text-blue-700">{invoice.user.name}</CardTitle><p className="text-sm text-gray-600">請求書番号: {invoice.invoiceNumber}</p><p className="text-sm text-gray-600">{invoice.user.department} - {invoice.user.laboratory}</p></div><span className={`rounded-full px-3 py-1 text-sm font-medium ${sealed ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>{sealed ? '押印済み' : invoice.status === 'issued' ? '発行済み' : invoice.status}</span></div></CardHeader><CardContent><div className="flex items-center justify-between"><div><p className="mb-1 text-sm text-gray-600">利用料金合計</p><p className="text-3xl font-bold text-blue-600">¥{invoice.totalAmount.toLocaleString()}</p></div><Link href={`/invoices/${invoice.id}?from=admin`}><Button className="btn-primary"><FileText className="mr-2 h-4 w-4" />詳細を見る</Button></Link></div></CardContent></Card> })}</div>}
         <div className="grid gap-6 lg:grid-cols-2">
             <Card><CardHeader><CardTitle>利用明細（{selectedPeriod.year}年 {quarterLabel(selectedPeriod.quarter)}）</CardTitle></CardHeader><CardContent>{usageLogs.length === 0 ? <p className="text-sm text-slate-500">この期間の利用明細はありません。</p> : <div className="max-h-80 space-y-2 overflow-y-auto">{usageLogs.map((log) => <div key={log.id} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm"><span>{formatDate(log.date)} {log.user.name} / {log.reagent.name} × {log.quantity}</span><span className="font-medium">¥{log.totalCost.toLocaleString()}</span></div>)}</div>}</CardContent></Card>

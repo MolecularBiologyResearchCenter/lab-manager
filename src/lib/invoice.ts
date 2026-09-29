@@ -2,6 +2,29 @@ import { prisma } from '@/lib/prisma'
 
 export type InvoiceQuarter = 1 | 2 | 3
 
+export const ANNUAL_REGISTRATION_FEES: Record<string, number> = {
+    FACULTY_STAFF: 5000,
+    GRADUATE_STUDENT: 1000,
+    UNDERGRADUATE_STUDENT: 0,
+}
+
+export function getAnnualRegistrationFee(affiliationType: string, quarter: number): number {
+    return quarter === 2 ? ANNUAL_REGISTRATION_FEES[affiliationType] ?? 0 : 0
+}
+
+function tokyoMidnight(year: number, month: number, day = 1): Date {
+    return new Date(Date.UTC(year, month - 1, day, -9))
+}
+
+export function getAnnualRegistrationPeriod(year: number, quarter: number): { start: Date; end: Date } | null {
+    if (quarter !== 2) return null
+    return { start: tokyoMidnight(year, 4, 1), end: tokyoMidnight(year + 1, 4, 1) }
+}
+
+export function getInvoiceIssueDate(year: number, quarter: number): Date | null {
+    return quarter === 2 ? tokyoMidnight(year, 5, 1) : null
+}
+
 export function getTokyoDateParts(date: Date): { year: number; month: number; day: number } {
     const parts = new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Tokyo',
@@ -106,12 +129,15 @@ export async function generateInvoiceForUser(
         },
     })
 
-    if (usageLogs.length === 0) {
+    const annualRegistrationFee = getAnnualRegistrationFee(invoiceUser.affiliationType, quarter)
+    if (usageLogs.length === 0 && annualRegistrationFee === 0) {
         throw new Error('この期間の利用履歴がありません')
     }
 
     // Calculate total amount
-    const totalAmount = usageLogs.reduce((sum, log) => sum + log.totalCost, 0)
+    const annualRegistrationPeriod = getAnnualRegistrationPeriod(year, quarter)
+    const issueDate = getInvoiceIssueDate(year, quarter)
+    const totalAmount = usageLogs.reduce((sum, log) => sum + log.totalCost, 0) + annualRegistrationFee
 
     // Generate invoice number
     const invoiceNumber = await generateInvoiceNumber(year, quarter)
@@ -127,16 +153,29 @@ export async function generateInvoiceForUser(
             endDate: end,
             totalAmount,
             affiliationTypeSnapshot: invoiceUser.affiliationType,
+            annualRegistrationFee,
+            annualRegistrationPeriodStart: annualRegistrationPeriod?.start,
+            annualRegistrationPeriodEnd: annualRegistrationPeriod?.end,
+            ...(issueDate ? { issuedDate: issueDate } : {}),
             status: 'issued',
             items: {
-                create: usageLogs.map((log) => ({
-                    date: log.date,
-                    itemName: log.reagent.name,
-                    unitPrice: log.reagent.unitPrice,
-                    quantity: log.quantity,
-                    amount: log.totalCost,
-                    reagentLogId: log.id,
-                })),
+                create: [
+                    ...usageLogs.map((log) => ({
+                        date: log.date,
+                        itemName: log.reagent.name,
+                        unitPrice: log.reagent.unitPrice,
+                        quantity: log.quantity,
+                        amount: log.totalCost,
+                        reagentLogId: log.id,
+                    })),
+                    ...(annualRegistrationFee > 0 ? [{
+                        date: issueDate ?? new Date(),
+                        itemName: `年間登録料（${invoiceUser.affiliationType === 'FACULTY_STAFF' ? '教職員' : '大学院生'}）`,
+                        unitPrice: annualRegistrationFee,
+                        quantity: 1,
+                        amount: annualRegistrationFee,
+                    }] : []),
+                ],
             },
         },
         include: {

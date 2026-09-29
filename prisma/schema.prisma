@@ -237,6 +237,8 @@ model Invoice {
   totalAmount Float
   affiliationTypeSnapshot String? // 請求書作成時点の所属区分
   annualRegistrationFee   Float?   // 年間登録料（設定されている場合）
+  annualRegistrationPeriodStart DateTime?
+  annualRegistrationPeriodEnd   DateTime?
 
   // 請求書情報
   issuedDate DateTime @default(now())

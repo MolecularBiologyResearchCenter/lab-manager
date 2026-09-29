@@ -31,6 +31,10 @@ interface Invoice {
     fiscalYear: number
     quarter: number
     totalAmount: number
+    issuedDate: Date | string
+    annualRegistrationFee: number | null
+    annualRegistrationPeriodStart: Date | string | null
+    annualRegistrationPeriodEnd: Date | string | null
     budgetDepartment: string | null
     budgetCategory: string | null
     budgetCode: string | null
@@ -457,6 +461,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                                 {invoice.fiscalYear}年 {getQuarterLabel(invoice.quarter)} 分子生物実験センター利用料
                             </h1>
                             <p style={{ fontSize: isMobile ? '16px' : '18px' }}>個人別請求書（研究用）</p>
+                            <p className="mt-2 text-sm text-slate-600">請求日：{new Date(invoice.issuedDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>
                         </div>
 
                         {/* User Info */}
