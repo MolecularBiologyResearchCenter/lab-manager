@@ -230,7 +230,7 @@ export async function syncUserMicrosoftGroupMembership(input: {
 
     const dedupeKey = `${SYNC_FAILURE_NOTIFICATION}:${input.userId}`
     if (result.ok) {
-        await prisma.adminNotification.updateMany({ where: { dedupeKey, resolvedAt: null }, data: { resolvedAt: new Date(), microsoftDirectoryUserId: null, microsoftGroupSyncErrorCode: null } })
+        await prisma.adminNotification.updateMany({ where: { dedupeKey, resolvedAt: null }, data: { resolvedAt: new Date(), microsoftDirectoryUserId: null, microsoftGroupSyncErrorCode: null, microsoftGroupSyncEmail: null } })
     } else {
         await prisma.adminNotification.upsert({
             where: { dedupeKey },
@@ -241,6 +241,7 @@ export async function syncUserMicrosoftGroupMembership(input: {
                 dedupeKey,
                 microsoftDirectoryUserId: result.directoryUserId ?? null,
                 microsoftGroupSyncErrorCode: result.errorCode,
+                microsoftGroupSyncEmail: input.preserveFailureNotification ? input.email.trim().toLowerCase() : null,
             },
             update: {
                 resolvedAt: null,
@@ -248,8 +249,66 @@ export async function syncUserMicrosoftGroupMembership(input: {
                 name: input.name,
                 microsoftDirectoryUserId: result.directoryUserId ?? null,
                 microsoftGroupSyncErrorCode: result.errorCode,
+                microsoftGroupSyncEmail: input.preserveFailureNotification ? input.email.trim().toLowerCase() : null,
             },
         })
     }
+    return result
+}
+
+export async function retryDeletedUserMicrosoftGroupSync(input: {
+    notificationId: string
+    actor: { id?: string | null; name?: string | null; role?: string | null }
+}) {
+    const notification = await prisma.adminNotification.findUnique({
+        where: { id: input.notificationId },
+        select: {
+            id: true,
+            type: true,
+            name: true,
+            microsoftGroupSyncEmail: true,
+            resolvedAt: true,
+        },
+    })
+    if (!notification || notification.type !== SYNC_FAILURE_NOTIFICATION || notification.resolvedAt || !notification.microsoftGroupSyncEmail) {
+        throw new Error('MICROSOFT_GROUP_RETRY_NOT_AVAILABLE')
+    }
+
+    const result = await syncMicrosoftGroupMembership({ email: notification.microsoftGroupSyncEmail, enabled: false })
+    if (result.ok) {
+        await prisma.adminNotification.update({
+            where: { id: notification.id },
+            data: {
+                resolvedAt: new Date(),
+                microsoftDirectoryUserId: null,
+                microsoftGroupSyncErrorCode: null,
+                microsoftGroupSyncEmail: null,
+            },
+        })
+        await recordAuditLog({
+            actor: input.actor,
+            action: result.operation === 'removed' ? 'MICROSOFT_GROUP_MEMBER_REMOVE_SUCCESS' : 'MICROSOFT_GROUP_MEMBER_NOT_REGISTERED',
+            targetType: 'AdminNotification',
+            targetId: notification.id,
+            targetLabel: notification.name,
+            summary: '分子生物実験センターグループの削除同期を再試行しました。',
+            metadata: { result: result.operation === 'removed' ? 'removed' : 'not-member', source: 'ADMIN_NOTIFICATION_RETRY' },
+        })
+        return result
+    }
+
+    await prisma.adminNotification.update({
+        where: { id: notification.id },
+        data: { microsoftDirectoryUserId: result.directoryUserId ?? null, microsoftGroupSyncErrorCode: result.errorCode },
+    })
+    await recordAuditLog({
+        actor: input.actor,
+        action: 'MICROSOFT_GROUP_SYNC_RETRY_PENDING',
+        targetType: 'AdminNotification',
+        targetId: notification.id,
+        targetLabel: notification.name,
+        summary: '分子生物実験センターグループの削除同期を再試行しましたが、再試行待ちです。',
+        metadata: { result: 'pending', errorCode: result.errorCode, source: 'ADMIN_NOTIFICATION_RETRY' },
+    })
     return result
 }
