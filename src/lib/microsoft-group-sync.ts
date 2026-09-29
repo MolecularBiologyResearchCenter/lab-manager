@@ -131,12 +131,14 @@ async function syncMembership(config: GraphConfig, directoryUserId: string, enab
         return { ok: false, operation: 'add', errorCode: added.errorCode, directoryUserId }
     }
 
-    if (!membership.ok && membership.errorCode === 'HTTP_404') return { ok: true, operation: 'not-member', directoryUserId }
+    if (!membership.ok && (membership.errorCode === 'HTTP_404' || membership.errorCode === 'Request_ResourceNotFound')) {
+        return { ok: true, operation: 'not-member', directoryUserId }
+    }
     if (!membership.ok) return { ok: false, operation: 'remove', errorCode: membership.errorCode, directoryUserId }
     const removed = await graphRequest<Record<string, never>>(config, memberPath, { method: 'DELETE' })
     return removed.ok
         ? { ok: true, operation: 'removed', directoryUserId }
-        : removed.errorCode === 'HTTP_404'
+        : removed.errorCode === 'HTTP_404' || removed.errorCode === 'Request_ResourceNotFound'
             ? { ok: true, operation: 'not-member', directoryUserId }
             : { ok: false, operation: 'remove', errorCode: removed.errorCode, directoryUserId }
 }
