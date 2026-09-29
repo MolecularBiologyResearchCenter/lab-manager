@@ -36,7 +36,7 @@ import {
 } from '@/lib/password'
 import { claimIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey } from '@/lib/idempotency'
 import { performanceTrace } from '@/lib/performance'
-import { syncUserMicrosoftGroupMembership } from '@/lib/microsoft-group-sync'
+import { getMicrosoftGroupMembershipStatus, syncUserMicrosoftGroupMembership } from '@/lib/microsoft-group-sync'
 
 /**
  * Get the current quarter (1, 2, or 3) based on the month
@@ -48,7 +48,7 @@ const concurrentReservationError = '同時に別の予約が登録されまし�
 const reservationFailedError = '予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。'
 type ReservationActionResult = { success: true } | { success: false; error: string }
 type LoginActionResult = { success: true } | { success: false; error: string }
-type RegisterActionResult = { success: true } | { success: false; error: string }
+type RegisterActionResult = { success: true; notice?: string } | { success: false; error: string }
 
 const authAuditActor = { name: '認証システム', role: 'SYSTEM' }
 const genericLoginError = 'アカウントまたはパスワードが正しくありません。'
@@ -517,7 +517,16 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     })
 
     if (existingUser) {
-        return { success: false, error: 'このメールアドレスは既に登録されています。ログイン画面からお試しください。' }
+        return { success: false, error: 'このメールアドレスはLab Managerに利用者登録済みです。ログイン画面からお試しください。' }
+    }
+
+    let mailingListAlreadyRegistered = false
+    if (mailingList) {
+        try {
+            mailingListAlreadyRegistered = await getMicrosoftGroupMembershipStatus(email) === 'member'
+        } catch {
+            // Graph確認に失敗しても、Lab Manager側の利用者登録は継続する。
+        }
     }
 
     const passwordHash = await hashPassword(password)
@@ -539,7 +548,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
         })
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            return { success: false, error: 'このメールアドレスは既に登録されています。ログイン画面からお試しください。' }
+            return { success: false, error: 'このメールアドレスはLab Managerに利用者登録済みです。ログイン画面からお試しください。' }
         }
         throw error
     }
@@ -608,7 +617,12 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     }
 
     await setSessionCookie(user.id)
-    return { success: true }
+    return {
+        success: true,
+        ...(mailingListAlreadyRegistered
+            ? { notice: 'このメールアドレスはMicrosoft 365メーリングリストに登録済みです。Lab Managerの利用者登録は完了しました。' }
+            : {}),
+    }
 }
 
 const passwordResetRequestMessage = 'パスワード再設定を受け付けました。管理者に本人確認を依頼してください。'
@@ -729,29 +743,47 @@ export async function deleteUser(userId: string) {
         throw new Error('自分自身を削除することはできません。')
     }
 
-    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, email: true, mailingList: true } })
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, role: true, email: true } })
     if (!targetUser) throw new Error('ユーザーが見つかりません。')
 
-    if (targetUser.mailingList) {
-        try {
-            await syncUserMicrosoftGroupMembership({
-                userId,
-                name: targetUser.name,
-                email: targetUser.email,
-                enabled: false,
-                actor: currentUser,
-            })
-        } catch {
-            await recordAuditLog({
-                actor: currentUser,
-                action: 'MICROSOFT_GROUP_MEMBER_REMOVE',
-                targetType: 'User',
-                targetId: userId,
-                targetLabel: targetUser.name,
-                summary: 'ユーザー削除前のMicrosoft 365グループ同期に失敗しました。',
-                metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
-            })
-        }
+    await recordAuditLog({
+        actor: currentUser,
+        action: 'ADMIN_USER_DELETE_START',
+        targetType: 'User',
+        targetId: userId,
+        targetLabel: targetUser.name,
+        summary: '管理者によるユーザー削除を開始しました。',
+    })
+
+    try {
+        await syncUserMicrosoftGroupMembership({
+            userId,
+            name: targetUser.name,
+            email: targetUser.email,
+            enabled: false,
+            actor: currentUser,
+            preserveFailureNotification: true,
+            context: 'USER_DELETE',
+        })
+    } catch {
+        await recordAuditLog({
+            actor: currentUser,
+            action: 'MICROSOFT_GROUP_MEMBER_REMOVE_FAILURE',
+            targetType: 'User',
+            targetId: userId,
+            targetLabel: targetUser.name,
+            summary: 'ユーザー削除前のMicrosoft 365グループ同期記録に失敗しました。',
+            metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
+        })
+        await recordAuditLog({
+            actor: currentUser,
+            action: 'MICROSOFT_GROUP_SYNC_RETRY_PENDING',
+            targetType: 'User',
+            targetId: userId,
+            targetLabel: targetUser.name,
+            summary: 'Microsoft 365グループからの削除を再試行待ちにしました。',
+            metadata: { result: 'pending', errorCode: 'SYNC_RECORD_FAILED' },
+        })
     }
 
     await prisma.user.delete({

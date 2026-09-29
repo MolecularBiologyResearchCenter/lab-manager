@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Link from 'next/link'
-import { showError } from '@/lib/error-notifier'
+import { showError, showInfo } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -22,6 +22,7 @@ export default function RegisterPage() {
                 showError(result.error)
                 return
             }
+            if (result.notice) showInfo(result.notice)
             router.replace('/')
         } catch (error) {
             console.error('利用者登録に失敗しました。', error)

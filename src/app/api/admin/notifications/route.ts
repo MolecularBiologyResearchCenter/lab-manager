@@ -171,12 +171,14 @@ export async function GET() {
                 select: {
                     id: true,
                     type: true,
+                    targetUserId: true,
                     name: true,
                     department: true,
                     laboratory: true,
                     employeeId: true,
                     fiscalYear: true,
                     quarter: true,
+                    microsoftGroupSyncErrorCode: true,
                     createdAt: true,
                     reads: {
                         where: { adminId: currentUser!.id },

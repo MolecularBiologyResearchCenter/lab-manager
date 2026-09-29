@@ -13,48 +13,49 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  name        String
-  nameKana    String?  // ふりがな
-  employeeId  String?  // 職員番号/学籍番号
-  mailingList Boolean  @default(false) // メーリングリスト登録
-  email       String   @unique
-  password    String
+  id                          String    @id @default(cuid())
+  name                        String
+  nameKana                    String? // ふりがな
+  employeeId                  String? // 職員番号/学籍番号
+  mailingList                 Boolean   @default(false) // メーリングリスト登録
+  email                       String    @unique
+  password                    String
   passwordResetTokenHash      String?
   passwordResetTokenExpiresAt DateTime?
-  department  String?  // 学部など
-  laboratory  String?  // 研究室 (旧 affiliation)
-  extension   String?  // 内線
-  role        String   @default("USER") // USER, ADMIN
-  microsoftGroupSyncStatus    String   @default("NOT_REQUESTED")
+  department                  String? // 学部など
+  laboratory                  String? // 研究室 (旧 affiliation)
+  extension                   String? // 内線
+  role                        String    @default("USER") // USER, ADMIN
+  microsoftGroupSyncStatus    String    @default("NOT_REQUESTED")
   microsoftGroupSyncErrorCode String?
   microsoftGroupSyncAt        DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  microsoftDirectoryUserId    String?   @unique
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
-  reservations Reservation[]
-  usageLogs    UsageLog[]
-  invoices     Invoice[]
-  sealedInvoices Invoice[] @relation("Sealer")
-  sealImage    String? // 印鑑画像のパス
-  auditLogs    AuditLog[]
-  adminNotificationsTarget AdminNotification[] @relation("AdminNotificationTarget")
+  reservations             Reservation[]
+  usageLogs                UsageLog[]
+  invoices                 Invoice[]
+  sealedInvoices           Invoice[]               @relation("Sealer")
+  sealImage                String? // 印鑑画像のパス
+  auditLogs                AuditLog[]
+  adminNotificationsTarget AdminNotification[]     @relation("AdminNotificationTarget")
   adminNotificationReads   AdminNotificationRead[] @relation("AdminNotificationReader")
-  passwordResetRequests PasswordResetRequest[]
+  passwordResetRequests    PasswordResetRequest[]
 
   @@index([passwordResetTokenHash])
 }
 
 model PasswordResetRequest {
-  id              String   @id @default(cuid())
-  userId          String
-  codeHash        String?
-  codeExpiresAt   DateTime?
-  issuedAt        DateTime?
-  attempts        Int      @default(0)
-  usedAt          DateTime?
-  invalidatedAt   DateTime?
-  createdAt       DateTime @default(now())
+  id            String    @id @default(cuid())
+  userId        String
+  codeHash      String?
+  codeExpiresAt DateTime?
+  issuedAt      DateTime?
+  attempts      Int       @default(0)
+  usedAt        DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -85,20 +86,22 @@ model AuditLog {
 }
 
 model AdminNotification {
-  id           String   @id @default(cuid())
-  type         String
-  targetUserId String?
-  name         String
-  department   String?
-  laboratory   String?
-  employeeId   String?
-  fiscalYear   Int?
-  quarter      Int?
-  dedupeKey    String?  @unique
-  resolvedAt   DateTime?
-  createdAt    DateTime @default(now())
+  id                          String    @id @default(cuid())
+  type                        String
+  targetUserId                String?
+  name                        String
+  department                  String?
+  laboratory                  String?
+  employeeId                  String?
+  fiscalYear                  Int?
+  quarter                     Int?
+  microsoftDirectoryUserId    String?
+  microsoftGroupSyncErrorCode String?
+  dedupeKey                   String?   @unique
+  resolvedAt                  DateTime?
+  createdAt                   DateTime  @default(now())
 
-  targetUser User?                  @relation("AdminNotificationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetUser User?                   @relation("AdminNotificationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
   reads      AdminNotificationRead[]
 
   @@index([createdAt])
@@ -119,13 +122,13 @@ model AdminNotificationRead {
 }
 
 model AuthThrottle {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   kind            String
   key             String
-  attemptCount    Int      @default(0)
-  windowStartedAt DateTime @default(now())
+  attemptCount    Int       @default(0)
+  windowStartedAt DateTime  @default(now())
   lockedUntil     DateTime?
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime  @updatedAt
 
   @@unique([kind, key])
   @@index([lockedUntil])
@@ -149,7 +152,7 @@ model Equipment {
   id          String   @id @default(cuid())
   name        String
   description String?
-  icon        String?  // アイコンファイルのパス
+  icon        String? // アイコンファイルのパス
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -163,7 +166,7 @@ model Reservation {
   startTime   DateTime
   endTime     DateTime
   status      String   @default("active") // active, cancelled, rejected
-  phoneNumber String?  // Optional contact number (Added for better communication)
+  phoneNumber String? // Optional contact number (Added for better communication)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -200,55 +203,55 @@ model UsageLog {
 }
 
 model Invoice {
-  id            String   @id @default(cuid())
-  invoiceNumber String   @unique
+  id            String @id @default(cuid())
+  invoiceNumber String @unique
   userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  
+  user          User   @relation(fields: [userId], references: [id])
+
   // 期間情報
-  fiscalYear    Int      // 年度
-  quarter       Int      // 四半期 (1, 2, 3)
-  startDate     DateTime
-  endDate       DateTime
-  
+  fiscalYear Int // 年度
+  quarter    Int // 四半期 (1, 2, 3)
+  startDate  DateTime
+  endDate    DateTime
+
   // 金額情報
-  totalAmount   Float
-  
+  totalAmount Float
+
   // 請求書情報
-  issuedDate    DateTime @default(now())
-  status        String   @default("draft") // draft, issued, paid
-  
+  issuedDate DateTime @default(now())
+  status     String   @default("draft") // draft, issued, paid
+
   // 支出予算情報（任意）
   budgetDepartment String?
   budgetCategory   String?
   budgetCode       String?
-  
-  // 関連データ
-  items         InvoiceItem[]
-  
-  // 電子印
-  sealedBy      String?  // 押印したユーザーID
-  sealer        User?    @relation("Sealer", fields: [sealedBy], references: [id])
-  sealedAt      DateTime? // 押印日時
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  // 関連データ
+  items InvoiceItem[]
+
+  // 電子印
+  sealedBy String? // 押印したユーザーID
+  sealer   User?     @relation("Sealer", fields: [sealedBy], references: [id])
+  sealedAt DateTime? // 押印日時
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model InvoiceItem {
-  id          String   @id @default(cuid())
-  invoiceId   String
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  
-  date        DateTime
-  itemName    String   // 利用項目名
-  unitPrice   Float    // 単価
-  quantity    Int      // 個数
-  amount      Float    // 合計
-  
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  date      DateTime
+  itemName  String // 利用項目名
+  unitPrice Float // 単価
+  quantity  Int // 個数
+  amount    Float // 合計
+
   // 元データへの参照（任意）
   reservationId String?
   reagentLogId  String?
-  
-  createdAt   DateTime @default(now())
+
+  createdAt DateTime @default(now())
 }
