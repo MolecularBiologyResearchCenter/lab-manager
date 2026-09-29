@@ -121,13 +121,18 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             const candidateHash = sha256Pdf(candidate)
             return sealMetadata?.result === 'success' && sealMetadata.pdfSha256 === candidateHash && sealMetadata.fileSize === candidate.length
         }
-        // Annual registration fields were introduced after some invoices had already
-        // been sealed. Try the pre-issue-date layout only when its stored audit hash
-        // proves that it is the original sealed document.
-        if (!matchesSeal(buffer) && invoice.annualRegistrationFee !== null) {
-            const legacyBuffer = await trace.measure('pdf', () => generateInvoicePdf({ ...pdfInput, includeIssuedDate: false }))
-            validateGeneratedInvoicePdf(legacyBuffer)
-            if (matchesSeal(legacyBuffer)) buffer = legacyBuffer
+        // Try both known header layouts only when the stored audit hash proves
+        // which one was used for the original sealed document. This preserves
+        // compatibility without weakening the seal verification.
+        if (!matchesSeal(buffer)) {
+            for (const includeIssuedDate of [true, false]) {
+                const candidate = await trace.measure('pdf', () => generateInvoicePdf({ ...pdfInput, includeIssuedDate }))
+                validateGeneratedInvoicePdf(candidate)
+                if (matchesSeal(candidate)) {
+                    buffer = candidate
+                    break
+                }
+            }
         }
         const pdfSha256 = sha256Pdf(buffer)
         if (!matchesSeal(buffer)) {

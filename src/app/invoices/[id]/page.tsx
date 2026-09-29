@@ -70,7 +70,7 @@ function sanitizeFilenamePart(value: string) {
 }
 
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
-    const { t } = useUserLanguage()
+    const { language, t } = useUserLanguage()
     const { id } = use(params)
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -285,7 +285,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     ) : invoice.sealedAt && invoice.sealedBy ? (
                         <>
                             <strong>{t('invoiceNotice')}:</strong>{' '}
-                            {t('languageEnglish') === 'English'
+                            {language === 'en'
                                 ? t('submissionNotice')
                                 : `ダウンロード後に印刷し、必要事項をご記入の上、${getSubmissionDeadline(invoice.fiscalYear, invoice.quarter)}までに共通事務室経理課へ提出してください。`}
                         </>
