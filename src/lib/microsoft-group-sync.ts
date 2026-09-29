@@ -97,14 +97,14 @@ async function graphRequest<T>(config: GraphConfig, path: string, init?: Request
 }
 
 async function findDirectoryUser(config: GraphConfig, email: string) {
-    const filter = `mail eq '${escapeODataString(email)}' or userPrincipalName eq '${escapeODataString(email)}'`
+    const normalizedEmail = email.trim().toLowerCase()
+    const filter = `mail eq '${escapeODataString(normalizedEmail)}' or userPrincipalName eq '${escapeODataString(normalizedEmail)}'`
     const result = await graphRequest<{ value?: Array<{ id?: string; mail?: string | null; userPrincipalName?: string | null }> }>(
         config,
         `/users?$filter=${encodeURIComponent(filter)}&$select=id,mail,userPrincipalName&$top=2`,
     )
     if (!result.ok) return result
-    const normalizedEmail = email.toLowerCase()
-    const matches = result.data.value?.filter((user) => user.mail?.toLowerCase() === normalizedEmail || user.userPrincipalName?.toLowerCase() === normalizedEmail) ?? []
+    const matches = result.data.value?.filter((user) => user.mail?.trim().toLowerCase() === normalizedEmail || user.userPrincipalName?.trim().toLowerCase() === normalizedEmail) ?? []
     const id = matches.length === 1 ? matches[0]?.id : null
     return id ? { ok: true as const, id } : { ok: false as const, errorCode: 'DIRECTORY_USER_NOT_FOUND' }
 }
@@ -142,7 +142,9 @@ async function syncMembership(config: GraphConfig, directoryUserId: string, enab
 export async function syncMicrosoftGroupMembership(input: { email: string; enabled: boolean }): Promise<MicrosoftGroupSyncResult> {
     const config = getGraphConfig()
     if (!config) return { ok: false, operation: input.enabled ? 'add' : 'remove', errorCode: 'GRAPH_CONFIG_MISSING' }
-    const directoryUser = await findDirectoryUser(config, input.email)
+    const normalizedEmail = input.email.trim().toLowerCase()
+    if (!normalizedEmail) return { ok: false, operation: input.enabled ? 'add' : 'remove', errorCode: 'EMAIL_MISSING' }
+    const directoryUser = await findDirectoryUser(config, normalizedEmail)
     if (!directoryUser.ok) {
         return input.enabled
             ? { ok: false, operation: 'add', errorCode: directoryUser.errorCode }
@@ -160,7 +162,7 @@ export async function syncUserMicrosoftGroupMembership(input: {
     preserveFailureNotification?: boolean
     context?: 'USER_DELETE'
 }) {
-    const result = await syncMicrosoftGroupMembership({ email: input.email, enabled: input.enabled })
+    const result = await syncMicrosoftGroupMembership({ email: input.email.trim().toLowerCase(), enabled: input.enabled })
     const status = result.ok ? 'SYNCED' : 'FAILED'
     await prisma.user.update({
         where: { id: input.userId },
@@ -168,6 +170,7 @@ export async function syncUserMicrosoftGroupMembership(input: {
             microsoftGroupSyncStatus: status,
             microsoftGroupSyncErrorCode: result.ok ? null : result.errorCode,
             microsoftGroupSyncAt: new Date(),
+            ...(result.directoryUserId ? { microsoftDirectoryUserId: result.directoryUserId } : {}),
         },
     })
 
@@ -178,13 +181,19 @@ export async function syncUserMicrosoftGroupMembership(input: {
             ? result.ok
                 ? result.operation === 'removed' ? 'MICROSOFT_GROUP_MEMBER_REMOVE_SUCCESS' : 'MICROSOFT_GROUP_MEMBER_NOT_REGISTERED'
                 : 'MICROSOFT_GROUP_MEMBER_REMOVE_FAILURE'
-            : input.enabled ? 'MICROSOFT_GROUP_MEMBER_ADD' : 'MICROSOFT_GROUP_MEMBER_REMOVE',
+            : input.enabled
+                ? result.ok
+                    ? result.operation === 'added' ? 'MICROSOFT_GROUP_MEMBER_ADD' : 'MICROSOFT_GROUP_MEMBER_ALREADY_REGISTERED'
+                    : 'MICROSOFT_GROUP_MEMBER_ADD_FAILURE'
+                : 'MICROSOFT_GROUP_MEMBER_REMOVE',
         targetType: 'User',
         targetId: input.userId,
         targetLabel: input.name,
         summary: result.ok ? 'Microsoft 365グループのメンバー同期に成功しました。' : 'Microsoft 365グループのメンバー同期に失敗しました。',
         metadata: {
-            result: result.ok ? 'success' : 'failure',
+            result: result.ok
+                ? result.operation === 'added' ? 'added' : result.operation === 'already-member' ? 'already-registered' : 'success'
+                : 'failure',
             operation: result.ok ? result.operation : result.operation,
             ...(result.ok ? {} : { errorCode: result.errorCode }),
         },

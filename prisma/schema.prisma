@@ -29,6 +29,7 @@ model User {
   microsoftGroupSyncStatus    String    @default("NOT_REQUESTED")
   microsoftGroupSyncErrorCode String?
   microsoftGroupSyncAt        DateTime?
+  microsoftDirectoryUserId    String?   @unique
   createdAt                   DateTime  @default(now())
   updatedAt                   DateTime  @updatedAt
 
