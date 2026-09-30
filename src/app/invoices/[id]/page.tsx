@@ -80,6 +80,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     const [loading, setLoading] = useState(true)
     const [downloading, setDownloading] = useState(false)
     const [sealing, setSealing] = useState(false)
+    const [sealMode, setSealMode] = useState<'seal' | 'reseal'>('seal')
     const [sealDialogOpen, setSealDialogOpen] = useState(false)
     const [sealConfirmed, setSealConfirmed] = useState(false)
 
@@ -191,6 +192,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
 
     const handleSeal = () => {
+        setSealMode('seal')
+        setSealConfirmed(false)
+        setSealDialogOpen(true)
+    }
+
+    const handleReseal = () => {
+        setSealMode('reseal')
         setSealConfirmed(false)
         setSealDialogOpen(true)
     }
@@ -202,13 +210,15 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             const response = await fetch(`/api/invoices/${id}/seal`, {
                 method: 'POST',
                 cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reissue: sealMode === 'reseal' }),
             })
             if (!response.ok) {
                 const apiError = await readApiError(response, '押印処理に失敗しました。')
                 throw new Error(formatApiError(apiError))
             }
             setInvoice(prev => prev ? { ...prev, sealedAt: new Date(), sealedBy: 'current-user' } : null)
-            showSuccess('電子印を押しました')
+            showSuccess(sealMode === 'reseal' ? '電子印を再押印しました' : '電子印を押しました')
             setSealDialogOpen(false)
         } catch (error) {
             showError((error as Error).message)
@@ -265,12 +275,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                     })()}
                 </div>
                 {invoice.viewerRole === 'CENTER_DIRECTOR' && (!invoice.sealedAt || !invoice.sealedBy) && (
-                    <Button
-                        onClick={handleSeal}
-                        disabled={sealing}
-                        className="rounded-xl bg-red-600 font-semibold text-white hover:bg-red-700"
-                    >
+                    <Button onClick={handleSeal} disabled={sealing} className="rounded-xl bg-red-600 font-semibold text-white hover:bg-red-700">
                         {sealing ? '処理中...' : '電子印を押す'}
+                    </Button>
+                )}
+                {invoice.viewerRole === 'CENTER_DIRECTOR' && invoice.sealedAt && invoice.sealedBy && (
+                    <Button onClick={handleReseal} disabled={sealing} className="rounded-xl bg-red-600 font-semibold text-white hover:bg-red-700">
+                        {sealing ? '処理中...' : '電子印を再押印'}
                     </Button>
                 )}
             </div>
@@ -303,8 +314,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             }}>
                 <DialogContent className="max-w-md rounded-2xl border-slate-200 bg-white">
                     <DialogHeader>
-                        <DialogTitle>電子印押印の確認</DialogTitle>
-                        <DialogDescription>内容を確認してから押印してください。押印後は取り消せません。</DialogDescription>
+                        <DialogTitle>{sealMode === 'reseal' ? '電子印再押印の確認' : '電子印押印の確認'}</DialogTitle>
+                        <DialogDescription>{sealMode === 'reseal' ? '請求書の内容を確認し、現在の内容で再押印してください。以前の押印記録は監査ログに残ります。' : '内容を確認してから押印してください。押印後は取り消せません。'}</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
                         <p><span className="font-medium">利用者：</span>{invoice.user.name}</p>
@@ -318,12 +329,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                             onChange={(event) => setSealConfirmed(event.target.checked)}
                             className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
                         />
-                        <span>押印後は取り消せないことを確認しました</span>
+                        <span>{sealMode === 'reseal' ? '現在の請求書内容で再押印することを確認しました' : '押印後は取り消せないことを確認しました'}</span>
                     </label>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setSealDialogOpen(false)}>キャンセル</Button>
                         <Button onClick={confirmSeal} disabled={!sealConfirmed || sealing} className="bg-red-600 font-semibold text-white hover:bg-red-700">
-                            {sealing ? '処理中...' : '電子印を押す'}
+                            {sealing ? '処理中...' : sealMode === 'reseal' ? '再押印する' : '電子印を押す'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

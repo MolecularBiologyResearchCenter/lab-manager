@@ -6,7 +6,7 @@ import { performanceTrace } from '@/lib/performance'
 
 export const runtime = 'nodejs'
 
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const requestId = createRequestId()
     const trace = performanceTrace('api.invoice.seal', requestId)
     let actor: { id: string; name: string; role: string } | null = null
@@ -30,7 +30,14 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
             return apiErrorResponse(400, API_ERROR_CODES.INVALID_REQUEST, '請求書IDが正しくありません。', '請求書画面からもう一度お試しください。', requestId)
         }
 
-        await trace.measure('app', () => sealInvoice(id, requestId))
+        let reissue = false
+        try {
+            const body = await request.json()
+            reissue = body?.reissue === true
+        } catch {
+            // Empty request bodies are valid for the initial seal operation.
+        }
+        await trace.measure('app', () => sealInvoice(id, requestId, reissue))
         trace.finish()
         return apiSuccessResponse({ success: true }, requestId)
     } catch {

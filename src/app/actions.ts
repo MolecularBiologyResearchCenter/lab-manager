@@ -913,7 +913,7 @@ export async function updateProfile(
     revalidatePath('/mypage')
 }
 
-export async function sealInvoice(invoiceId: string, requestId?: string) {
+export async function sealInvoice(invoiceId: string, requestId?: string, reissue = false) {
     const currentUser = await requireCenterDirector()
 
     const recordSealFailure = async (reason: string, message: string): Promise<never> => {
@@ -983,7 +983,7 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
         return recordSealFailure('INVALID_INVOICE_STATUS', '発行済みの請求書以外には押印できません。')
     }
 
-    if (invoice.sealedAt || invoice.sealedBy) {
+    if (!reissue && (invoice.sealedAt || invoice.sealedBy)) {
         return recordSealFailure('INVOICE_ALREADY_SEALED', 'この請求書はすでに押印済みです。')
     }
 
@@ -1020,7 +1020,9 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
     try {
         const result = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
             const updated = await transaction.invoice.updateMany({
-                where: { id: invoiceId, sealedAt: null, sealedBy: null },
+                where: reissue
+                    ? { id: invoiceId, sealedAt: { not: null }, sealedBy: { not: null } }
+                    : { id: invoiceId, sealedAt: null, sealedBy: null },
                 data: {
                     sealedBy: currentUser.id,
                     sealedAt,
@@ -1037,7 +1039,7 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
                     action: 'INVOICE_SEAL',
                     targetType: 'Invoice',
                     targetId: invoiceId,
-                    summary: '請求書に電子印を押しました。',
+                    summary: reissue ? '請求書に電子印を再押印しました。' : '請求書に電子印を押しました。',
                     metadata: {
                         invoiceId,
                         ...(requestId ? { requestId } : {}),
@@ -1045,6 +1047,7 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
                         executedAt: new Date().toISOString(),
                         fileSize: canonicalPdf.length,
                         pdfSha256,
+                        operation: reissue ? 'RESEAL' : 'SEAL',
                         result: 'success',
                     },
                 },
