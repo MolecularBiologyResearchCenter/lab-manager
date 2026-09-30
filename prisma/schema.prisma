@@ -84,6 +84,7 @@ model UserAffiliationChange {
 
 model AuditLog {
   id          String   @id @default(cuid())
+  requestId   String   @default(uuid())
   actorId     String?
   actorName   String
   actorRole   String
@@ -92,6 +93,8 @@ model AuditLog {
   targetId    String?
   targetLabel String?
   summary     String
+  result      String   @default("success") // success, failure, pending
+  errorCode   String?
   metadata    Json?
   createdAt   DateTime @default(now())
 
@@ -101,6 +104,7 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([targetType, targetId])
   @@index([action, createdAt])
+  @@index([requestId])
 }
 
 model AdminNotification {

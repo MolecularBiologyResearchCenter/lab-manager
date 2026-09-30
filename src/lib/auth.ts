@@ -158,6 +158,19 @@ export async function requireAdmin() {
     return requireRole('ADMIN')
 }
 
+export async function requireAdminOrCenterDirector() {
+    const user = await getAuthenticatedUser()
+    if (!user) {
+        await recordAuthorizationFailure(null, 'ADMIN_OR_CENTER_DIRECTOR')
+        throw new Error('ログインが必要です。')
+    }
+    if (user.role !== 'ADMIN' && user.role !== 'CENTER_DIRECTOR') {
+        await recordAuthorizationFailure(user, 'ADMIN_OR_CENTER_DIRECTOR')
+        throw new Error('権限がありません。')
+    }
+    return user
+}
+
 export async function requireCenterDirector() {
     return requireRole('CENTER_DIRECTOR')
 }
