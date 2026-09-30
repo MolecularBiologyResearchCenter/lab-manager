@@ -561,6 +561,15 @@ export async function register(formData: FormData): Promise<RegisterActionResult
         throw error
     }
 
+    await recordAuditLog({
+        actor: authAuditActor,
+        action: 'USER_REGISTER',
+        targetType: 'User',
+        targetId: user.id,
+        summary: '新規利用者を登録しました。',
+        metadata: { affiliationType, mailingList },
+    })
+
     // 通知の作成失敗で、利用者登録そのものをロールバックしない。
     // 通知テーブルのマイグレーション未反映や一時的なDB障害があっても、
     // 登録済み利用者がログインできなくなることを防ぐ。
@@ -1034,7 +1043,7 @@ export async function sealInvoice(invoiceId: string, requestId?: string, reissue
             await transaction.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.name,
+                    actorName: currentUser.id,
                     actorRole: currentUser.role,
                     action: 'INVOICE_SEAL',
                     targetType: 'Invoice',
@@ -1050,6 +1059,7 @@ export async function sealInvoice(invoiceId: string, requestId?: string, reissue
                         operation: reissue ? 'RESEAL' : 'SEAL',
                         result: 'success',
                     },
+                    result: 'success',
                 },
             })
 
@@ -1197,12 +1207,12 @@ export async function updateUserProfileByAdmin(
             await tx.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.name,
+                    actorName: currentUser.id,
                     actorRole: currentUser.role,
                     action: 'USER_ROLE_UPDATE',
                     targetType: 'User',
                     targetId: userId,
-                    targetLabel: targetUser.name,
+                    targetLabel: null,
                     summary: 'ユーザー権限を変更しました。',
                     metadata: { previousRole: targetUser.role, newRole: nextRole },
                 },
@@ -1213,12 +1223,12 @@ export async function updateUserProfileByAdmin(
             await tx.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.name,
+                    actorName: currentUser.id,
                     actorRole: currentUser.role,
                     action: 'USER_PROFILE_UPDATE',
                     targetType: 'User',
                     targetId: userId,
-                    targetLabel: targetUser.name,
+                    targetLabel: null,
                     summary: '管理者がユーザープロフィールを変更しました。',
                     metadata: {
                         ...(employeeIdChanged ? { changedFields: ['employeeId'] } : {}),
@@ -1244,12 +1254,12 @@ export async function updateUserProfileByAdmin(
             await tx.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.name,
+                    actorName: currentUser.id,
                     actorRole: currentUser.role,
                     action: 'USER_AFFILIATION_UPDATE',
                     targetType: 'User',
                     targetId: userId,
-                    targetLabel: targetUser.name,
+                    targetLabel: null,
                     summary: '所属区分を変更しました。',
                     metadata: { previousType: targetUser.affiliationType, nextType: nextAffiliationType },
                 },
@@ -1260,12 +1270,12 @@ export async function updateUserProfileByAdmin(
             await tx.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.name,
+                    actorName: currentUser.id,
                     actorRole: currentUser.role,
                     action: 'USER_ENROLLMENT_STATUS_UPDATE',
                     targetType: 'User',
                     targetId: userId,
-                    targetLabel: targetUser.name,
+                    targetLabel: null,
                     summary: '在籍状態を変更しました。',
                     metadata: { previousStatus: targetUser.enrollmentStatus, nextStatus: nextEnrollmentStatus },
                 },

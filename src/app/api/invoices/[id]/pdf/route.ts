@@ -143,12 +143,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         await trace.measure('prismaQuery', () => prisma.auditLog.create({
             data: {
                 actorId: user.id,
-                actorName: user.name,
+                actorName: user.id,
                 actorRole: user.role,
                 action: 'invoice.pdf_download',
                 targetType: 'Invoice',
                 targetId: invoice.id,
-                targetLabel: invoice.invoiceNumber,
+                targetLabel: null,
                 summary: '押印済みPDF取得',
                 metadata: {
                     invoiceId: invoice.id,

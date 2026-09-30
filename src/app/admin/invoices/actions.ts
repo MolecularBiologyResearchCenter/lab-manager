@@ -46,7 +46,7 @@ export async function generateInvoicesForQuarter(year: number, quarter: number, 
     const pendingUsers = users.filter((user) => (usageUserIds.has(user.id) || getAnnualRegistrationFee(user.affiliationType, user.createdAt, year, quarter) > 0) && !invoiceUserIds.has(user.id))
     await Promise.all(pendingUsers.map(async (user) => {
         const invoiceId = await generateInvoiceForUser(user.id, year, quarter)
-        await recordAuditLog({ actor: currentUser, action: 'INVOICE_CREATE', targetType: 'Invoice', targetId: invoiceId, targetLabel: user.name, summary: '請求書を生成しました。', metadata: { year, quarter, userId: user.id } })
+        await recordAuditLog({ actor: currentUser, action: 'INVOICE_CREATE', targetType: 'Invoice', targetId: invoiceId, summary: '請求書を生成しました。', metadata: { year, quarter, userId: user.id, affiliationType: user.affiliationType, annualRegistrationFee: getAnnualRegistrationFee(user.affiliationType, user.createdAt, year, quarter) } })
     }))
 
     revalidatePath('/admin/invoices')
