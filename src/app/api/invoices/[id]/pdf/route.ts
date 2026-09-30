@@ -53,6 +53,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
                 fiscalYear: true,
                 quarter: true,
                 totalAmount: true,
+                annualRegistrationFee: true,
+                annualRegistrationPeriodStart: true,
+                annualRegistrationPeriodEnd: true,
+                issuedDate: true,
                 budgetDepartment: true,
                 budgetCategory: true,
                 budgetCode: true,
@@ -74,11 +78,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         if (invoice.status === 'rejected') return failure(409, API_ERROR_CODES.CONFLICT, 'この請求書は現在ダウンロードできません。', '請求書の状態を確認して、もう一度お試しください。')
         if (!invoice.sealedAt || !invoice.sealedBy || !invoice.sealer || invoice.sealer.role !== 'CENTER_DIRECTOR') return failure(409, API_ERROR_CODES.CONFLICT, '押印済み請求書のみダウンロードできます。', 'センター長の押印完了後に、もう一度お試しください。')
 
-        const buffer = await trace.measure('pdf', () => generateInvoicePdf({
+        const pdfInput = {
             invoiceNumber: invoice.invoiceNumber,
             fiscalYear: invoice.fiscalYear,
             quarter: invoice.quarter,
             totalAmount: invoice.totalAmount,
+            issuedDate: invoice.issuedDate,
+            annualRegistrationFee: invoice.annualRegistrationFee,
+            annualRegistrationPeriodStart: invoice.annualRegistrationPeriodStart,
+            annualRegistrationPeriodEnd: invoice.annualRegistrationPeriodEnd,
             budgetDepartment: invoice.budgetDepartment,
             budgetCategory: invoice.budgetCategory,
             budgetCode: invoice.budgetCode,
@@ -86,7 +94,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             items: invoice.items,
             sealedAt: invoice.sealedAt!,
             sealer: invoice.sealer!,
-        }))
+        }
+        let buffer = await trace.measure('pdf', () => generateInvoicePdf(pdfInput))
         try {
             validateGeneratedInvoicePdf(buffer)
         } catch (error) {
@@ -96,7 +105,6 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             return failure(error instanceof Error && error.message === 'PDF_TOO_LARGE' ? 413 : 500, API_ERROR_CODES.INVALID_REQUEST, reason, '時間をおいて、もう一度お試しください。')
         }
 
-        const pdfSha256 = sha256Pdf(buffer)
         const sealAudit = await prisma.auditLog.findFirst({
             where: {
                 action: 'INVOICE_SEAL',
@@ -109,7 +117,25 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         const sealMetadata = sealAudit?.metadata && typeof sealAudit.metadata === 'object' && !Array.isArray(sealAudit.metadata)
             ? sealAudit.metadata as Record<string, unknown>
             : null
-        if (sealMetadata?.result !== 'success' || sealMetadata.pdfSha256 !== pdfSha256 || sealMetadata.fileSize !== buffer.length) {
+        const matchesSeal = (candidate: Buffer) => {
+            const candidateHash = sha256Pdf(candidate)
+            return sealMetadata?.result === 'success' && sealMetadata.pdfSha256 === candidateHash && sealMetadata.fileSize === candidate.length
+        }
+        // Try both known header layouts only when the stored audit hash proves
+        // which one was used for the original sealed document. This preserves
+        // compatibility without weakening the seal verification.
+        if (!matchesSeal(buffer)) {
+            for (const includeIssuedDate of [true, false]) {
+                const candidate = await trace.measure('pdf', () => generateInvoicePdf({ ...pdfInput, includeIssuedDate }))
+                validateGeneratedInvoicePdf(candidate)
+                if (matchesSeal(candidate)) {
+                    buffer = candidate
+                    break
+                }
+            }
+        }
+        const pdfSha256 = sha256Pdf(buffer)
+        if (!matchesSeal(buffer)) {
             return failure(409, API_ERROR_CODES.CONFLICT, '押印対象と請求書の内容が一致しません。', '請求書を再読み込みして、もう一度お試しください。')
         }
 

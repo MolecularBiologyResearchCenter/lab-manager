@@ -16,6 +16,11 @@ type InvoicePdfData = {
     fiscalYear: number
     quarter: number
     totalAmount: number
+    issuedDate: Date
+    annualRegistrationFee: number | null
+    annualRegistrationPeriodStart: Date | null
+    annualRegistrationPeriodEnd: Date | null
+    includeIssuedDate?: boolean
     budgetDepartment: string | null
     budgetCategory: string | null
     budgetCode: string | null
@@ -147,7 +152,18 @@ async function embedSeal(pdf: PDFDocument, sealImage: string | null): Promise<PD
 }
 
 export async function generateInvoicePdf(invoice: InvoicePdfData) {
-    const pdf = await PDFDocument.create()
+    // Keep the serialized bytes stable between sealing and downloading. The
+    // seal audit stores a hash of the PDF, so generated metadata must not
+    // change on every render.
+    const pdf = await PDFDocument.create({ updateMetadata: false })
+    const stablePdfDate = new Date('2000-01-01T00:00:00.000Z')
+    pdf.setCreationDate(stablePdfDate)
+    pdf.setModificationDate(stablePdfDate)
+    pdf.setTitle('個人別請求書（研究用）')
+    pdf.setAuthor('分子生物実験センター')
+    pdf.setSubject('請求書')
+    pdf.setProducer('Lab Manager')
+    pdf.setCreator('Lab Manager')
     pdf.registerFontkit(fontkit)
     const fontBytes = await fs.readFile(path.join(process.cwd(), 'public', 'fonts', 'noto-sans-jp-japanese-400-normal.woff'))
     const font = fontkit.create(fontBytes)
@@ -156,6 +172,11 @@ export async function generateInvoicePdf(invoice: InvoicePdfData) {
     let y = PAGE_HEIGHT - MARGIN
 
     drawText(page, font, `${invoice.fiscalYear}年 ${quarterLabel(invoice.quarter)} 分子生物実験センター利用料`, MARGIN, y - 20, 17, { maxWidth: contentWidth, align: 'center' })
+    // The issue date was added after older invoices had already been sealed.
+    // Keep the historical layout for those invoices so their seal hash remains valid.
+    if (invoice.includeIssuedDate !== false && invoice.annualRegistrationFee !== null) {
+        drawText(page, font, `請求日：${formatDate(invoice.issuedDate)}`, MARGIN, y - 42, 10, { maxWidth: contentWidth, align: 'center' })
+    }
     drawText(page, font, '個人別請求書（研究用）', MARGIN, y - 46, 13, { maxWidth: contentWidth, align: 'center' })
     y -= 70
 
@@ -231,7 +252,7 @@ export async function generateInvoicePdf(invoice: InvoicePdfData) {
     drawCell(page, font, '受注 No', MARGIN + contentWidth / 2, y - footerHeight, contentWidth / 2, footerHeight, { size: 8.5 })
 
     const seal = await embedSeal(pdf, invoice.sealer.sealImage)
-    drawText(page, font, formatDate(new Date()), MARGIN, 72, 9)
+    drawText(page, font, formatDate(new Date(invoice.sealedAt)), MARGIN, 72, 9)
     drawText(page, font, '分子生物実験センター長', PAGE_WIDTH - MARGIN - 170, 111, 9, { maxWidth: 170, align: 'right' })
     drawText(page, font, `${invoice.sealer.name}　印`, PAGE_WIDTH - MARGIN - 170, 87, 12, { maxWidth: 170, align: 'right' })
     page.drawImage(seal, { x: PAGE_WIDTH - MARGIN - 64, y: 76, width: 58, height: 58, opacity: 0.82 })

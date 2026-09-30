@@ -37,6 +37,7 @@ import {
 import { claimIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey } from '@/lib/idempotency'
 import { performanceTrace } from '@/lib/performance'
 import { getMicrosoftGroupMembershipStatus, syncUserMicrosoftGroupMembership } from '@/lib/microsoft-group-sync'
+import { AFFILIATION_TYPES, ENROLLMENT_STATUSES } from '@/lib/user-lifecycle'
 
 /**
  * Get the current quarter (1, 2, or 3) based on the month
@@ -166,6 +167,7 @@ export async function createReservation(equipmentId: string, userId: string, sta
     const trace = performanceTrace('reservation.create')
     const currentUser = await requireUser()
     if (currentUser.id !== userId) throw new Error('他のユーザーの予約は作成できません。')
+    if (currentUser.enrollmentStatus !== 'ACTIVE') throw new Error('現在の在籍状態では新規予約を作成できません。')
 
     const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId }, select: { name: true } })
     if (!equipment) return { success: false, error: '指定された機器が見つかりません。' }
@@ -228,6 +230,7 @@ export async function createReservation(equipmentId: string, userId: string, sta
 export async function logReagentUsage(userId: string, reagentId: string, quantity: number) {
     const currentUser = await requireUser()
     if (currentUser.id !== userId) throw new Error('他のユーザーの利用記録は作成できません。')
+    if (currentUser.enrollmentStatus !== 'ACTIVE') throw new Error('現在の在籍状態では有料サービスを利用できません。')
     const reagent = await prisma.reagent.findUnique({
         where: { id: reagentId },
     })
@@ -492,6 +495,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     const lastNameKana = String(formData.get('lastNameKana') || '').trim()
     const firstNameKana = String(formData.get('firstNameKana') || '').trim()
     const employeeId = String(formData.get('employeeId') || '').trim()
+    const affiliationType = String(formData.get('affiliationType') || '').trim()
     const mailingList = formData.get('mailingList') === 'true' // Convert string to boolean
     const email = String(formData.get('email') || '').trim().toLowerCase()
     const password = String(formData.get('password') || '')
@@ -499,8 +503,11 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     const laboratory = String(formData.get('laboratory') || '').trim()
     const extension = String(formData.get('extension') || '').trim()
 
-    if (!lastName || !firstName || !lastNameKana || !firstNameKana || !employeeId || !email || !password || !department || !laboratory) {
+    if (!lastName || !firstName || !lastNameKana || !firstNameKana || !employeeId || !affiliationType || !email || !password || !department || !laboratory) {
         return { success: false, error: '必須項目を入力してください。' }
+    }
+    if (!['FACULTY_STAFF', 'GRADUATE_STUDENT', 'UNDERGRADUATE_STUDENT'].includes(affiliationType)) {
+        return { success: false, error: '所属区分を選択してください。' }
     }
 
     // Password validation: at least 8 characters, alphanumeric
@@ -537,6 +544,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
                 name,
                 nameKana,
                 employeeId,
+                affiliationType,
                 mailingList,
                 email,
                 password: passwordHash,
@@ -905,7 +913,7 @@ export async function updateProfile(
     revalidatePath('/mypage')
 }
 
-export async function sealInvoice(invoiceId: string, requestId?: string) {
+export async function sealInvoice(invoiceId: string, requestId?: string, reissue = false) {
     const currentUser = await requireCenterDirector()
 
     const recordSealFailure = async (reason: string, message: string): Promise<never> => {
@@ -948,6 +956,10 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
             fiscalYear: true,
             quarter: true,
             totalAmount: true,
+            issuedDate: true,
+            annualRegistrationFee: true,
+            annualRegistrationPeriodStart: true,
+            annualRegistrationPeriodEnd: true,
             budgetDepartment: true,
             budgetCategory: true,
             budgetCode: true,
@@ -971,7 +983,7 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
         return recordSealFailure('INVALID_INVOICE_STATUS', '発行済みの請求書以外には押印できません。')
     }
 
-    if (invoice.sealedAt || invoice.sealedBy) {
+    if (!reissue && (invoice.sealedAt || invoice.sealedBy)) {
         return recordSealFailure('INVOICE_ALREADY_SEALED', 'この請求書はすでに押印済みです。')
     }
 
@@ -983,6 +995,10 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
             fiscalYear: invoice.fiscalYear,
             quarter: invoice.quarter,
             totalAmount: invoice.totalAmount,
+            issuedDate: invoice.issuedDate,
+            annualRegistrationFee: invoice.annualRegistrationFee,
+            annualRegistrationPeriodStart: invoice.annualRegistrationPeriodStart,
+            annualRegistrationPeriodEnd: invoice.annualRegistrationPeriodEnd,
             budgetDepartment: invoice.budgetDepartment,
             budgetCategory: invoice.budgetCategory,
             budgetCode: invoice.budgetCode,
@@ -1004,7 +1020,9 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
     try {
         const result = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
             const updated = await transaction.invoice.updateMany({
-                where: { id: invoiceId, sealedAt: null, sealedBy: null },
+                where: reissue
+                    ? { id: invoiceId, sealedAt: { not: null }, sealedBy: { not: null } }
+                    : { id: invoiceId, sealedAt: null, sealedBy: null },
                 data: {
                     sealedBy: currentUser.id,
                     sealedAt,
@@ -1021,7 +1039,7 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
                     action: 'INVOICE_SEAL',
                     targetType: 'Invoice',
                     targetId: invoiceId,
-                    summary: '請求書に電子印を押しました。',
+                    summary: reissue ? '請求書に電子印を再押印しました。' : '請求書に電子印を押しました。',
                     metadata: {
                         invoiceId,
                         ...(requestId ? { requestId } : {}),
@@ -1029,6 +1047,7 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
                         executedAt: new Date().toISOString(),
                         fileSize: canonicalPdf.length,
                         pdfSha256,
+                        operation: reissue ? 'RESEAL' : 'SEAL',
                         result: 'success',
                     },
                 },
@@ -1047,6 +1066,31 @@ export async function sealInvoice(invoiceId: string, requestId?: string) {
 
     revalidatePath(`/invoices/${invoiceId}`)
     revalidatePath('/invoices')
+}
+
+export async function sealInvoices(invoiceIds: string[], requestId?: string) {
+    await requireCenterDirector()
+
+    const uniqueInvoiceIds = [...new Set(invoiceIds.filter((invoiceId): invoiceId is string => typeof invoiceId === 'string'))]
+    if (uniqueInvoiceIds.length === 0) throw new Error('押印する請求書を選択してください。')
+    if (uniqueInvoiceIds.length > 100) throw new Error('一度に押印できる請求書は100件までです。')
+
+    const results: Array<{ invoiceId: string; success: boolean; message?: string }> = []
+    for (const invoiceId of uniqueInvoiceIds) {
+        try {
+            await sealInvoice(invoiceId, requestId)
+            results.push({ invoiceId, success: true })
+        } catch (error) {
+            results.push({
+                invoiceId,
+                success: false,
+                message: error instanceof Error ? error.message : '押印に失敗しました。',
+            })
+        }
+    }
+
+    revalidatePath('/admin/invoices')
+    return { results }
 }
 
 export async function updateUserRole(userId: string, role: string) {
@@ -1088,13 +1132,15 @@ export async function updateUserProfileByAdmin(
         role?: string
         employeeId?: string | null
         mailingList?: boolean
+        affiliationType?: string
+        enrollmentStatus?: string
     },
 ) {
     const currentUser = await requireAdmin()
 
     const targetUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { name: true, email: true, role: true, employeeId: true, mailingList: true },
+        select: { name: true, email: true, role: true, employeeId: true, mailingList: true, affiliationType: true, enrollmentStatus: true },
     })
     if (!targetUser) throw new Error('ユーザーが見つかりません。')
 
@@ -1110,6 +1156,12 @@ export async function updateUserProfileByAdmin(
     if (data.mailingList !== undefined && typeof data.mailingList !== 'boolean') {
         throw new Error('メーリングリスト設定が不正です。')
     }
+    if (data.affiliationType !== undefined && !AFFILIATION_TYPES.includes(data.affiliationType as typeof AFFILIATION_TYPES[number])) {
+        throw new Error('無効な所属区分です。')
+    }
+    if (data.enrollmentStatus !== undefined && !ENROLLMENT_STATUSES.includes(data.enrollmentStatus as typeof ENROLLMENT_STATUSES[number])) {
+        throw new Error('無効な在籍状態です。')
+    }
 
     const normalizedEmployeeId = data.employeeId === undefined
         ? undefined
@@ -1122,13 +1174,21 @@ export async function updateUserProfileByAdmin(
     const roleChanged = nextRole !== targetUser.role
     const employeeIdChanged = normalizedEmployeeId !== undefined && normalizedEmployeeId !== targetUser.employeeId
     const mailingListChanged = data.mailingList !== undefined && data.mailingList !== targetUser.mailingList
+    const nextAffiliationType = data.affiliationType ?? targetUser.affiliationType
+    const nextEnrollmentStatus = data.enrollmentStatus ?? targetUser.enrollmentStatus
+    const affiliationChanged = nextAffiliationType !== targetUser.affiliationType
+    const enrollmentStatusChanged = nextEnrollmentStatus !== targetUser.enrollmentStatus
+    const shouldDisableMailingList = enrollmentStatusChanged && targetUser.enrollmentStatus === 'ACTIVE' && nextEnrollmentStatus !== 'ACTIVE' && targetUser.mailingList
 
-    if (!roleChanged && !employeeIdChanged && !mailingListChanged) return
+    if (!roleChanged && !employeeIdChanged && !mailingListChanged && !affiliationChanged && !enrollmentStatusChanged) return
 
-    const updateData: { role?: string; employeeId?: string | null; mailingList?: boolean } = {}
+    const updateData: { role?: string; employeeId?: string | null; mailingList?: boolean; affiliationType?: string; enrollmentStatus?: string } = {}
     if (roleChanged) updateData.role = nextRole
     if (employeeIdChanged) updateData.employeeId = normalizedEmployeeId
     if (mailingListChanged) updateData.mailingList = data.mailingList
+    if (affiliationChanged) updateData.affiliationType = nextAffiliationType
+    if (enrollmentStatusChanged) updateData.enrollmentStatus = nextEnrollmentStatus
+    if (shouldDisableMailingList) updateData.mailingList = false
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.user.update({ where: { id: userId }, data: updateData })
@@ -1169,6 +1229,48 @@ export async function updateUserProfileByAdmin(
                 },
             })
         }
+
+        if (affiliationChanged) {
+            await tx.userAffiliationChange.create({
+                data: {
+                    userId,
+                    previousType: targetUser.affiliationType,
+                    nextType: nextAffiliationType,
+                    effectiveFrom: new Date(),
+                    changedById: currentUser.id,
+                    changedByName: currentUser.name,
+                },
+            })
+            await tx.auditLog.create({
+                data: {
+                    actorId: currentUser.id,
+                    actorName: currentUser.name,
+                    actorRole: currentUser.role,
+                    action: 'USER_AFFILIATION_UPDATE',
+                    targetType: 'User',
+                    targetId: userId,
+                    targetLabel: targetUser.name,
+                    summary: '所属区分を変更しました。',
+                    metadata: { previousType: targetUser.affiliationType, nextType: nextAffiliationType },
+                },
+            })
+        }
+
+        if (enrollmentStatusChanged) {
+            await tx.auditLog.create({
+                data: {
+                    actorId: currentUser.id,
+                    actorName: currentUser.name,
+                    actorRole: currentUser.role,
+                    action: 'USER_ENROLLMENT_STATUS_UPDATE',
+                    targetType: 'User',
+                    targetId: userId,
+                    targetLabel: targetUser.name,
+                    summary: '在籍状態を変更しました。',
+                    metadata: { previousStatus: targetUser.enrollmentStatus, nextStatus: nextEnrollmentStatus },
+                },
+            })
+        }
     })
 
     if (mailingListChanged) {
@@ -1189,6 +1291,30 @@ export async function updateUserProfileByAdmin(
                 targetLabel: targetUser.name,
                 summary: 'Microsoft 365グループ同期の記録に失敗しました。プロフィール更新は完了しています。',
                 metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
+            })
+        }
+    }
+
+    if (shouldDisableMailingList) {
+        try {
+            await syncUserMicrosoftGroupMembership({
+                userId,
+                name: targetUser.name,
+                email: targetUser.email,
+                enabled: false,
+                actor: currentUser,
+                preserveFailureNotification: true,
+                context: 'USER_STATUS_CHANGE',
+            })
+        } catch {
+            await recordAuditLog({
+                actor: currentUser,
+                action: 'MICROSOFT_GROUP_SYNC_RETRY_PENDING',
+                targetType: 'User',
+                targetId: userId,
+                targetLabel: targetUser.name,
+                summary: '在籍状態変更後のMicrosoft 365グループ削除を再試行待ちにしました。',
+                metadata: { result: 'pending', errorCode: 'SYNC_RECORD_FAILED' },
             })
         }
     }

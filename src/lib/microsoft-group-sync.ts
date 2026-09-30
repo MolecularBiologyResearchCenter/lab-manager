@@ -186,7 +186,7 @@ export async function syncUserMicrosoftGroupMembership(input: {
     enabled: boolean
     actor?: { id?: string | null; name?: string | null; role?: string | null }
     preserveFailureNotification?: boolean
-    context?: 'USER_DELETE'
+    context?: 'USER_DELETE' | 'USER_STATUS_CHANGE'
 }) {
     const result = await syncMicrosoftGroupMembership({ email: input.email.trim().toLowerCase(), enabled: input.enabled })
     const status = result.ok ? 'SYNCED' : 'FAILED'
@@ -200,7 +200,7 @@ export async function syncUserMicrosoftGroupMembership(input: {
         },
     })
 
-    const isDelete = input.context === 'USER_DELETE' && !input.enabled
+    const isDelete = (input.context === 'USER_DELETE' || input.context === 'USER_STATUS_CHANGE') && !input.enabled
     await recordAuditLog({
         actor: input.actor,
         action: isDelete
