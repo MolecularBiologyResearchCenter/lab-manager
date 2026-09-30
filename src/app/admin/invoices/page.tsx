@@ -42,5 +42,5 @@ export default async function AdminInvoicesPage(props: { searchParams: Promise<{
     const generationTargetUserIds = [...new Set([...eligibleUsageUserIds, ...annualFeeUserIds])]
     const generationComplete = generationTargetUserIds.length > 0 && generationTargetUserIds.every((userId) => invoices.some((invoice) => invoice.userId === userId && invoice.fiscalYear === selectedPeriod.year && invoice.quarter === selectedPeriod.quarter))
     trace.finish()
-    return <InvoiceManager invoices={invoices} periods={periods} selectedPeriod={selectedPeriod} usageLogs={usageLogs} reservations={reservations} canGenerate={user.role === 'ADMIN' || user.role === 'CENTER_DIRECTOR'} generationComplete={generationComplete} hasGenerationTargets={generationTargetUserIds.length > 0} />
+    return <InvoiceManager invoices={invoices} periods={periods} selectedPeriod={selectedPeriod} usageLogs={usageLogs} reservations={reservations} canGenerate={user.role === 'ADMIN' || user.role === 'CENTER_DIRECTOR'} canBulkSeal={user.role === 'CENTER_DIRECTOR'} generationComplete={generationComplete} hasGenerationTargets={generationTargetUserIds.length > 0} />
 }

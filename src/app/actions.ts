@@ -1068,6 +1068,31 @@ export async function sealInvoice(invoiceId: string, requestId?: string, reissue
     revalidatePath('/invoices')
 }
 
+export async function sealInvoices(invoiceIds: string[], requestId?: string) {
+    await requireCenterDirector()
+
+    const uniqueInvoiceIds = [...new Set(invoiceIds.filter((invoiceId): invoiceId is string => typeof invoiceId === 'string'))]
+    if (uniqueInvoiceIds.length === 0) throw new Error('押印する請求書を選択してください。')
+    if (uniqueInvoiceIds.length > 100) throw new Error('一度に押印できる請求書は100件までです。')
+
+    const results: Array<{ invoiceId: string; success: boolean; message?: string }> = []
+    for (const invoiceId of uniqueInvoiceIds) {
+        try {
+            await sealInvoice(invoiceId, requestId)
+            results.push({ invoiceId, success: true })
+        } catch (error) {
+            results.push({
+                invoiceId,
+                success: false,
+                message: error instanceof Error ? error.message : '押印に失敗しました。',
+            })
+        }
+    }
+
+    revalidatePath('/admin/invoices')
+    return { results }
+}
+
 export async function updateUserRole(userId: string, role: string) {
     const currentUser = await requireAdmin()
 
