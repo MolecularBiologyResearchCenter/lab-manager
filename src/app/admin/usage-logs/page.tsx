@@ -1,6 +1,6 @@
 import { getCurrentUser } from '@/app/actions'
 import { prisma } from '@/lib/prisma'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { redirect } from 'next/navigation'
 import { Edit, Trash2 } from 'lucide-react'
@@ -30,12 +30,10 @@ export default async function AdminUsageLogsPage(props: { searchParams: Promise<
 
     // Determine target date (for data)
     let targetDate = now
-    let isMonthSelected = false
     if (searchParams.month) {
         const [year, month] = searchParams.month.split('-').map(Number)
         if (!isNaN(year) && !isNaN(month)) {
             targetDate = new Date(year, month - 1, 1)
-            isMonthSelected = true
         }
     } else if (searchParams.year) {
         const y = parseInt(searchParams.year)

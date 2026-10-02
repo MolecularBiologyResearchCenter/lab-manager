@@ -16,6 +16,7 @@ import {
     Users,
     Wrench,
 } from 'lucide-react'
+import Image from 'next/image'
 
 const adminNavigation = [
     { href: '/admin', label: '概要', icon: Gauge },
@@ -37,10 +38,12 @@ export default async function Header() {
             <div className="content-wrapper">
                 <div className="flex min-h-16 items-center justify-between gap-4 py-2">
                     <Link href="/" className="flex flex-shrink-0 items-center gap-3 transition-opacity hover:opacity-90">
-                        <img
+                        <Image
                             src="/images/kitasato-logo.png"
                             alt="北里大学"
                             className="h-10 w-10 flex-shrink-0 object-contain md:h-11 md:w-11"
+                            width={44}
+                            height={44}
                         />
                         <div className="min-w-0 leading-tight">
                             <div className="whitespace-nowrap text-sm font-medium md:text-base">分子生物実験センター</div>
