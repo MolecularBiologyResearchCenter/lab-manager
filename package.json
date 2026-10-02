@@ -10,6 +10,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "npm run security:check && npm run test:reservation && npm run test:invoice-period && tsx scripts/security-business-flow-self-test.ts",
     "security:check": "tsx scripts/security-self-test.ts",
     "password:migrate": "tsx scripts/hash-existing-passwords.ts",
     "test:reservation": "tsx scripts/reservation-rules-self-test.ts",
@@ -42,6 +43,7 @@
     "react-datepicker": "^8.9.0",
     "react-dom": "^19.2.8",
     "recharts": "^3.4.1",
+    "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0"
   },
