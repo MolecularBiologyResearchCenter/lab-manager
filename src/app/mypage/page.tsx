@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Building, KeyRound, Mail, Pencil, Phone, Save, UserRound, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { showError, showSuccess } from '@/lib/error-notifier'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
@@ -40,7 +40,7 @@ export default function MyPage() {
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
 
-    async function loadUser() {
+    const loadUser = useCallback(async () => {
         try {
             const userData = await getCurrentUser()
             if (!userData) {
@@ -57,11 +57,11 @@ export default function MyPage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [router])
 
     useEffect(() => {
         loadUser()
-    }, [])
+    }, [loadUser])
 
     function startEditing() {
         if (!user) return

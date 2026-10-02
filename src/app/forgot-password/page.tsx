@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardFooter } from '@/co
 import Link from 'next/link'
 import { showError, showSuccess } from '@/lib/error-notifier'
 import { useState } from 'react'
+import Image from 'next/image'
 
 export default function ForgotPasswordPage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -30,10 +31,12 @@ export default function ForgotPasswordPage() {
                 <CardHeader className="space-y-3 bg-blue-700 py-7 text-center">
                     <div className="flex justify-center">
                         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white p-1">
-                            <img
+                            <Image
                                 src="/images/kitasato-logo.png"
                                 alt="Kitasato University Logo"
                                 className="w-full h-full rounded-full"
+                                width={64}
+                                height={64}
                             />
                         </div>
                     </div>
