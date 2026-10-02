@@ -82,8 +82,7 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
             showSuccess('予約が完了しました!')
             setIsDialogOpen(false)
             router.refresh()
-        } catch (error) {
-            console.error('Error:', error)
+        } catch {
             showError('予約に失敗しました。画面を更新して、もう一度お試しください。')
         } finally {
             setSubmitting(false)
