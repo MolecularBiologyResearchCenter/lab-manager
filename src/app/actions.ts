@@ -1178,7 +1178,7 @@ export async function updateUserProfileByAdmin(
     const nextEnrollmentStatus = data.enrollmentStatus ?? targetUser.enrollmentStatus
     const affiliationChanged = nextAffiliationType !== targetUser.affiliationType
     const enrollmentStatusChanged = nextEnrollmentStatus !== targetUser.enrollmentStatus
-    const shouldDisableMailingList = enrollmentStatusChanged && targetUser.enrollmentStatus === 'ACTIVE' && nextEnrollmentStatus !== 'ACTIVE' && targetUser.mailingList
+    const shouldDisableMailingList = nextEnrollmentStatus !== 'ACTIVE' && (targetUser.mailingList || data.mailingList === true)
 
     if (!roleChanged && !employeeIdChanged && !mailingListChanged && !affiliationChanged && !enrollmentStatusChanged) return
 
@@ -1273,7 +1273,7 @@ export async function updateUserProfileByAdmin(
         }
     })
 
-    if (mailingListChanged) {
+    if (mailingListChanged && !shouldDisableMailingList) {
         try {
             await syncUserMicrosoftGroupMembership({
                 userId,
