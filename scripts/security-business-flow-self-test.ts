@@ -90,6 +90,8 @@ async function testResponseAndSourceContracts() {
     assert.match(schema, /model UserAffiliationChange/)
     assert.match(schema, /model AuditLog/)
     const actions = await readFile('src/app/actions.ts', 'utf8')
+    const packageJson = JSON.parse(await readFile('package.json', 'utf8')) as { scripts?: Record<string, string> }
+    assert.match(packageJson.scripts?.['vercel-build'] ?? '', /prisma db execute --file prisma\/ensure-idempotency-key-table\.sql/)
     assert.match(actions, /if \(mailingList\)[\s\S]*syncUserMicrosoftGroupMembership\([\s\S]*enabled: true/)
     assert.match(actions, /const mailingListChanged = data\.mailingList !== undefined && previousProfile\.mailingList !== data\.mailingList/)
     assert.match(actions, /if \(mailingListChanged\)[\s\S]*syncUserMicrosoftGroupMembership\([\s\S]*enabled: data\.mailingList === true/)
@@ -100,6 +102,9 @@ async function testResponseAndSourceContracts() {
     assert.match(actions, /requireAdmin\(\)/)
     assert.match(actions, /requireCenterDirector\(\)/)
     assert.match(actions, /claimIdempotencyKey/)
+    assert.match(actions, /lab_manager_reservation_failure/)
+    assert.match(actions, /RESERVATION_CREATE_FAILED/)
+    assert.match(actions, /requestId: trace.requestId/)
     assert.match(actions, /sealedAt: null, sealedBy: null/)
     assert.match(actions, /ADMIN_USER_DELETE_START/)
     assert.match(actions, /INVOICE_SEAL/)
