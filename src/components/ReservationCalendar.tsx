@@ -261,8 +261,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
             setIsDialogOpen(false)
             // Refresh data to reflect changes
             router.refresh()
-        } catch (error) {
-            console.error('Error:', error)
+        } catch {
             showReservationError('操作に失敗しました。画面を更新して、もう一度お試しください。')
         } finally {
             setSubmitting(false)

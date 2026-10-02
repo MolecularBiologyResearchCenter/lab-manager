@@ -58,6 +58,12 @@ function isTransactionConflict(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
 }
 
+function getReservationErrorCode(error: unknown): string {
+    if (isTransactionConflict(error)) return 'RESERVATION_TRANSACTION_CONFLICT'
+    if (error instanceof Prisma.PrismaClientKnownRequestError) return `PRISMA_${error.code}`
+    return 'RESERVATION_CREATE_FAILED'
+}
+
 export async function getDashboardData() {
     const trace = performanceTrace('dashboard.user')
     const currentUser = await requireUser()
@@ -174,10 +180,12 @@ export async function createReservation(equipmentId: string, userId: string, sta
     const validationError = validateReservationWindow(equipment.name, startTime, endTime)
     if (validationError) return { success: false, error: validationError }
 
-    const claim = await claimIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey)
-    if (claim.state === 'duplicate') return (claim.result as ReservationActionResult | null) ?? { success: false, error: '処理中です。完了するまでお待ちください。' }
-
+    let idempotencyClaimed = false
     try {
+        const claim = await claimIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey)
+        if (claim.state === 'duplicate') return (claim.result as ReservationActionResult | null) ?? { success: false, error: '処理中です。完了するまでお待ちください。' }
+        idempotencyClaimed = true
+
         const created = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
             const overlap = await transaction.reservation.findFirst({
                 where: {
@@ -212,10 +220,31 @@ export async function createReservation(equipmentId: string, userId: string, sta
             metadata: { equipmentId, userId },
         })
     } catch (error) {
-        await releaseIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey)
-        if (isTransactionConflict(error)) { trace.finish('failure'); return { success: false, error: concurrentReservationError } }
-        console.error('Failed to create reservation', error)
-        trace.finish('failure')
+        if (idempotencyClaimed) {
+            try {
+                await releaseIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey)
+            } catch {
+                // The original reservation error is the actionable failure; do not mask it.
+            }
+        }
+        const errorCode = getReservationErrorCode(error)
+        if (isTransactionConflict(error)) {
+            trace.finish('failure', { errorCode })
+            return { success: false, error: concurrentReservationError }
+        }
+        console.error(JSON.stringify({ type: 'lab_manager_reservation_failure', requestId: trace.requestId, operation: 'reservation.create', errorCode }))
+        await recordAuditLog({
+            actor: currentUser,
+            action: 'RESERVATION_CREATE',
+            targetType: 'Equipment',
+            targetId: equipmentId,
+            summary: '機器予約に失敗しました。',
+            requestId: trace.requestId,
+            result: 'failure',
+            errorCode,
+            metadata: { result: 'failure', errorCode },
+        })
+        trace.finish('failure', { errorCode })
         return { success: false, error: reservationFailedError }
     }
 
