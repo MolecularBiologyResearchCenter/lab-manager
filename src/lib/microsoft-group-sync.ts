@@ -3,22 +3,13 @@ import 'server-only'
 import { ConfidentialClientApplication } from '@azure/msal-node'
 import { prisma } from '@/lib/prisma'
 import { recordAuditLog } from '@/lib/audit'
+import { findDirectoryUser, syncMembership } from './microsoft-group-sync-core'
+import type { GraphConfig, MicrosoftGroupSyncResult } from './microsoft-group-sync-core'
 
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0'
 const GRAPH_SCOPE = ['https://graph.microsoft.com/.default']
 const MAX_RETRIES = 2
 const SYNC_FAILURE_NOTIFICATION = 'MICROSOFT_GROUP_SYNC_FAILURE'
-
-type GraphConfig = {
-    tenantId: string
-    clientId: string
-    clientSecret: string
-    groupId: string
-}
-
-export type MicrosoftGroupSyncResult =
-    | { ok: true; operation: 'added' | 'already-member' | 'removed' | 'not-member' | 'not-found'; directoryUserId?: string }
-    | { ok: false; operation: 'add' | 'remove'; errorCode: string; directoryUserId?: string }
 
 export type MicrosoftGroupMembershipStatus = 'member' | 'not-member' | 'unknown'
 
@@ -29,10 +20,6 @@ function getGraphConfig(): GraphConfig | null {
     const groupId = process.env.MICROSOFT_GROUP_ID?.trim()
     if (!tenantId || !clientId || !clientSecret || !groupId) return null
     return { tenantId, clientId, clientSecret, groupId }
-}
-
-function escapeODataString(value: string) {
-    return value.replace(/'/g, "''")
 }
 
 function isRetryableStatus(status: number) {
@@ -98,57 +85,12 @@ async function graphRequest<T>(config: GraphConfig, path: string, init?: Request
     }
 }
 
-async function findDirectoryUser(config: GraphConfig, email: string) {
-    const normalizedEmail = email.trim().toLowerCase()
-    const filter = `mail eq '${escapeODataString(normalizedEmail)}' or userPrincipalName eq '${escapeODataString(normalizedEmail)}'`
-    const result = await graphRequest<{ value?: Array<{ id?: string; mail?: string | null; userPrincipalName?: string | null }> }>(
-        config,
-        `/users?$filter=${encodeURIComponent(filter)}&$select=id,mail,userPrincipalName&$top=2`,
-    )
-    if (!result.ok) return result
-    const matches = result.data.value?.filter((user) => user.mail?.trim().toLowerCase() === normalizedEmail || user.userPrincipalName?.trim().toLowerCase() === normalizedEmail) ?? []
-    const id = matches.length === 1 ? matches[0]?.id : null
-    return id ? { ok: true as const, id } : { ok: false as const, errorCode: 'DIRECTORY_USER_NOT_FOUND' }
-}
-
-async function syncMembership(config: GraphConfig, directoryUserId: string, enabled: boolean): Promise<MicrosoftGroupSyncResult> {
-    const memberPath = `/groups/${encodeURIComponent(config.groupId)}/members/${encodeURIComponent(directoryUserId)}/$ref`
-    const membership = await graphRequest<Record<string, never>>(config, memberPath)
-    if (enabled) {
-        if (membership.ok) return { ok: true, operation: 'already-member', directoryUserId }
-        if (membership.errorCode !== 'HTTP_404' && membership.errorCode !== 'Request_ResourceNotFound') {
-            return { ok: false, operation: 'add', errorCode: membership.errorCode, directoryUserId }
-        }
-        const added = await graphRequest<Record<string, never>>(config, `/groups/${encodeURIComponent(config.groupId)}/members/$ref`, {
-            method: 'POST',
-            body: JSON.stringify({ '@odata.id': `${GRAPH_BASE_URL}/directoryObjects/${encodeURIComponent(directoryUserId)}` }),
-        })
-        if (added.ok) return { ok: true, operation: 'added', directoryUserId }
-        if (added.errorCode === 'Request_BadRequest') {
-            const membershipAfterAdd = await graphRequest<Record<string, never>>(config, memberPath)
-            if (membershipAfterAdd.ok) return { ok: true, operation: 'already-member', directoryUserId }
-        }
-        return { ok: false, operation: 'add', errorCode: added.errorCode, directoryUserId }
-    }
-
-    if (!membership.ok && (membership.errorCode === 'HTTP_404' || membership.errorCode === 'Request_ResourceNotFound')) {
-        return { ok: true, operation: 'not-member', directoryUserId }
-    }
-    if (!membership.ok) return { ok: false, operation: 'remove', errorCode: membership.errorCode, directoryUserId }
-    const removed = await graphRequest<Record<string, never>>(config, memberPath, { method: 'DELETE' })
-    return removed.ok
-        ? { ok: true, operation: 'removed', directoryUserId }
-        : removed.errorCode === 'HTTP_404' || removed.errorCode === 'Request_ResourceNotFound'
-            ? { ok: true, operation: 'not-member', directoryUserId }
-            : { ok: false, operation: 'remove', errorCode: removed.errorCode, directoryUserId }
-}
-
 export async function getMicrosoftGroupMembershipStatus(email: string): Promise<MicrosoftGroupMembershipStatus> {
     const config = getGraphConfig()
     const normalizedEmail = email.trim().toLowerCase()
     if (!config || !normalizedEmail) return 'unknown'
 
-    const directoryUser = await findDirectoryUser(config, normalizedEmail)
+    const directoryUser = await findDirectoryUser(config, normalizedEmail, graphRequest)
     if (!directoryUser.ok) return directoryUser.errorCode === 'DIRECTORY_USER_NOT_FOUND' ? 'not-member' : 'unknown'
 
     const memberPath = `/groups/${encodeURIComponent(config.groupId)}/members/${encodeURIComponent(directoryUser.id)}/$ref`
@@ -163,20 +105,20 @@ export async function syncMicrosoftGroupMembership(input: { email: string; enabl
     if (!config) return { ok: false, operation: input.enabled ? 'add' : 'remove', errorCode: 'GRAPH_CONFIG_MISSING' }
     const normalizedEmail = input.email.trim().toLowerCase()
     if (!normalizedEmail) return { ok: false, operation: input.enabled ? 'add' : 'remove', errorCode: 'EMAIL_MISSING' }
-    const directoryUser = await findDirectoryUser(config, normalizedEmail)
+    const directoryUser = await findDirectoryUser(config, normalizedEmail, graphRequest)
     if (!directoryUser.ok) {
         return input.enabled
             ? { ok: false, operation: 'add', errorCode: directoryUser.errorCode }
             : { ok: true, operation: 'not-found' }
     }
-    return syncMembership(config, directoryUser.id, input.enabled)
+    return syncMembership(config, directoryUser.id, input.enabled, graphRequest)
 }
 
 async function syncMicrosoftGroupMembershipByDirectoryUserId(directoryUserId: string, enabled: boolean): Promise<MicrosoftGroupSyncResult> {
     const config = getGraphConfig()
     if (!config) return { ok: false, operation: enabled ? 'add' : 'remove', errorCode: 'GRAPH_CONFIG_MISSING', directoryUserId }
     if (!directoryUserId.trim()) return { ok: false, operation: enabled ? 'add' : 'remove', errorCode: 'DIRECTORY_USER_ID_MISSING' }
-    return syncMembership(config, directoryUserId.trim(), enabled)
+    return syncMembership(config, directoryUserId.trim(), enabled, graphRequest)
 }
 
 export async function syncUserMicrosoftGroupMembership(input: {
