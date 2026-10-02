@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { recordAuditLog } from '@/lib/audit'
 import { findDirectoryUser, syncMembership } from './microsoft-group-sync-core'
 import type { GraphConfig, MicrosoftGroupSyncResult } from './microsoft-group-sync-core'
+import { performanceTrace } from '@/lib/performance'
 
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0'
 const GRAPH_SCOPE = ['https://graph.microsoft.com/.default']
@@ -86,17 +87,32 @@ async function graphRequest<T>(config: GraphConfig, path: string, init?: Request
 }
 
 export async function getMicrosoftGroupMembershipStatus(email: string): Promise<MicrosoftGroupMembershipStatus> {
+    const trace = performanceTrace('microsoft.graph.membership-check')
     const config = getGraphConfig()
     const normalizedEmail = email.trim().toLowerCase()
-    if (!config || !normalizedEmail) return 'unknown'
+    if (!config || !normalizedEmail) {
+        trace.finish('failure', { errorCode: !config ? 'GRAPH_CONFIG_MISSING' : 'EMAIL_MISSING' })
+        return 'unknown'
+    }
 
-    const directoryUser = await findDirectoryUser(config, normalizedEmail, graphRequest)
-    if (!directoryUser.ok) return directoryUser.errorCode === 'DIRECTORY_USER_NOT_FOUND' ? 'not-member' : 'unknown'
+    const directoryUser = await trace.measure('externalApi', () => findDirectoryUser(config, normalizedEmail, graphRequest))
+    if (!directoryUser.ok) {
+        const status = directoryUser.errorCode === 'DIRECTORY_USER_NOT_FOUND' ? 'not-member' : 'unknown'
+        trace.finish(status === 'unknown' ? 'failure' : 'success', status === 'unknown' ? { errorCode: directoryUser.errorCode } : {})
+        return status
+    }
 
     const memberPath = `/groups/${encodeURIComponent(config.groupId)}/members/${encodeURIComponent(directoryUser.id)}/$ref`
-    const membership = await graphRequest<Record<string, never>>(config, memberPath)
-    if (membership.ok) return 'member'
-    if (membership.errorCode === 'HTTP_404' || membership.errorCode === 'Request_ResourceNotFound') return 'not-member'
+    const membership = await trace.measure('externalApi', () => graphRequest<Record<string, never>>(config, memberPath))
+    if (membership.ok) {
+        trace.finish()
+        return 'member'
+    }
+    if (membership.errorCode === 'HTTP_404' || membership.errorCode === 'Request_ResourceNotFound') {
+        trace.finish()
+        return 'not-member'
+    }
+    trace.finish('failure', { errorCode: membership.errorCode })
     return 'unknown'
 }
 
@@ -130,7 +146,8 @@ export async function syncUserMicrosoftGroupMembership(input: {
     preserveFailureNotification?: boolean
     context?: 'USER_DELETE' | 'USER_STATUS_CHANGE'
 }) {
-    const result = await syncMicrosoftGroupMembership({ email: input.email.trim().toLowerCase(), enabled: input.enabled })
+    const trace = performanceTrace('microsoft.graph.sync')
+    const result = await trace.measure('externalApi', () => syncMicrosoftGroupMembership({ email: input.email.trim().toLowerCase(), enabled: input.enabled }))
     const status = result.ok ? 'SYNCED' : 'FAILED'
     await prisma.user.update({
         where: { id: input.userId },
@@ -204,6 +221,7 @@ export async function syncUserMicrosoftGroupMembership(input: {
             },
         })
     }
+    trace.finish(result.ok ? 'success' : 'failure', result.ok ? {} : { errorCode: result.errorCode })
     return result
 }
 

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdminOrCenterDirector } from '@/lib/auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatTokyoDateTime } from '@/lib/date-format'
+import { performanceTrace } from '@/lib/performance'
 
 const roleLabels: Record<string, string> = {
     ADMIN: '管理者',
@@ -18,7 +19,8 @@ export default async function AuditLogsPage({
 }: {
     searchParams?: Promise<{ action?: string; result?: string; actorId?: string }>
 }) {
-    await requireAdminOrCenterDirector()
+    const trace = performanceTrace('page.admin.audit-logs')
+    await trace.measure('auth', requireAdminOrCenterDirector)
     const params = await searchParams
     const actionQuery = params?.action?.trim().slice(0, 100) || undefined
     const result = params?.result === 'success' || params?.result === 'failure' || params?.result === 'pending' ? params.result : undefined
@@ -41,7 +43,7 @@ export default async function AuditLogsPage({
     let databaseMessage: string | null = null
 
     try {
-        logs = await prisma.auditLog.findMany({
+        logs = await trace.measure('prismaQuery', () => prisma.auditLog.findMany({
             where: {
                 ...(actionQuery ? { action: { contains: actionQuery } } : {}),
                 ...(result ? { result } : {}),
@@ -63,9 +65,11 @@ export default async function AuditLogsPage({
             },
             orderBy: { createdAt: 'desc' },
             take: 200,
-        })
+        }))
+        trace.finish()
     } catch (error) {
         console.error('監査ログの読み込みに失敗しました。', error)
+        trace.finish('failure', { errorCode: 'AUDIT_LOG_READ_FAILED' })
         databaseMessage = '監査ログ用のデータベース設定がまだ反映されていません。管理者に npx prisma db push の実行を依頼してください。'
     }
 

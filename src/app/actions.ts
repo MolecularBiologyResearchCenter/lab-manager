@@ -154,8 +154,16 @@ export async function getDashboardData() {
 }
 
 export async function getEquipmentList() {
-    await requireUser()
-    return await prisma.equipment.findMany()
+    const trace = performanceTrace('equipment.list')
+    try {
+        await trace.measure('auth', requireUser)
+        const equipment = await trace.measure('prismaQuery', () => prisma.equipment.findMany())
+        trace.finish()
+        return equipment
+    } catch (error) {
+        trace.finish('failure', { errorCode: 'EQUIPMENT_LIST_FAILED' })
+        throw error
+    }
 }
 
 export async function getReagentList() {
@@ -171,22 +179,22 @@ export async function getReagentList() {
 
 export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string, idempotencyKey?: string): Promise<ReservationActionResult> {
     const trace = performanceTrace('reservation.create')
-    const currentUser = await requireUser()
+    const currentUser = await trace.measure('auth', requireUser)
     if (currentUser.id !== userId) throw new Error('他のユーザーの予約は作成できません。')
     if (currentUser.enrollmentStatus !== 'ACTIVE') throw new Error('現在の在籍状態では新規予約を作成できません。')
 
-    const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId }, select: { name: true } })
+    const equipment = await trace.measure('prismaQuery', () => prisma.equipment.findUnique({ where: { id: equipmentId }, select: { name: true } }))
     if (!equipment) return { success: false, error: '指定された機器が見つかりません。' }
     const validationError = validateReservationWindow(equipment.name, startTime, endTime)
     if (validationError) return { success: false, error: validationError }
 
     let idempotencyClaimed = false
     try {
-        const claim = await claimIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey)
+        const claim = await trace.measure('prismaQuery', () => claimIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey))
         if (claim.state === 'duplicate') return (claim.result as ReservationActionResult | null) ?? { success: false, error: '処理中です。完了するまでお待ちください。' }
         idempotencyClaimed = true
 
-        const created = await prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
+        const created = await trace.measure('prismaQuery', () => prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
             const overlap = await transaction.reservation.findFirst({
                 where: {
                     equipmentId,
@@ -203,7 +211,7 @@ export async function createReservation(equipmentId: string, userId: string, sta
                 data: { equipmentId, userId, startTime, endTime, ...(phoneNumber ? { phoneNumber } : {}) },
             })
             return reservation.id
-        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }))
         if (!created) {
             const result = { success: false as const, error: 'この時間帯は既に予約が入っています。' }
             await completeIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey!, result)
@@ -239,10 +247,7 @@ export async function createReservation(equipmentId: string, userId: string, sta
             targetType: 'Equipment',
             targetId: equipmentId,
             summary: '機器予約に失敗しました。',
-            requestId: trace.requestId,
-            result: 'failure',
-            errorCode,
-            metadata: { result: 'failure', errorCode },
+            metadata: { result: 'failure', errorCode, requestId: trace.requestId },
         })
         trace.finish('failure', { errorCode })
         return { success: false, error: reservationFailedError }
@@ -519,6 +524,7 @@ export async function logout() {
 }
 
 export async function register(formData: FormData): Promise<RegisterActionResult> {
+    const trace = performanceTrace('user.register')
     const lastName = String(formData.get('lastName') || '').trim()
     const firstName = String(formData.get('firstName') || '').trim()
     const lastNameKana = String(formData.get('lastNameKana') || '').trim()
@@ -547,10 +553,10 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     const name = `${lastName} ${firstName}`
     const nameKana = `${lastNameKana} ${firstNameKana}`
 
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await trace.measure('prismaQuery', () => prisma.user.findUnique({
         where: { email },
         select: { id: true },
-    })
+    }))
 
     if (existingUser) {
         return { success: false, error: 'このメールアドレスはLab Managerに利用者登録済みです。ログイン画面からお試しください。' }
@@ -559,7 +565,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     let mailingListAlreadyRegistered = false
     if (mailingList) {
         try {
-            mailingListAlreadyRegistered = await getMicrosoftGroupMembershipStatus(email) === 'member'
+            mailingListAlreadyRegistered = await trace.measure('externalApi', () => getMicrosoftGroupMembershipStatus(email)) === 'member'
         } catch {
             // Graph確認に失敗しても、Lab Manager側の利用者登録は継続する。
         }
@@ -568,7 +574,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     const passwordHash = await hashPassword(password)
     let user: { id: string }
     try {
-        user = await prisma.user.create({
+        user = await trace.measure('prismaQuery', () => prisma.user.create({
             data: {
                 name,
                 nameKana,
@@ -582,7 +588,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
                 extension,
             },
             select: { id: true },
-        })
+        }))
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
             return { success: false, error: 'このメールアドレスはLab Managerに利用者登録済みです。ログイン画面からお試しください。' }
@@ -663,6 +669,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     }
 
     await setSessionCookie(user.id)
+    trace.finish()
     return {
         success: true,
         ...(mailingListAlreadyRegistered
