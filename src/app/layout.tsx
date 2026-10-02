@@ -6,6 +6,12 @@ import Footer from "@/components/Footer"
 import { UserLanguageProvider } from "@/components/UserLanguageProvider"
 import { getCurrentUser } from "@/app/actions"
 
+// Prisma and the server-side actions should stay on the Node.js runtime close
+// to the database. Vercel's Tokyo region is the intended primary region for
+// the university's production workload; this does not move or modify data.
+export const runtime = "nodejs"
+export const preferredRegion = "hnd1"
+
 export const metadata: Metadata = {
   title: "北里大学 医学部 分子生物実験センター",
   description: "Lab Management System for Kitasato University School of Medicine",
