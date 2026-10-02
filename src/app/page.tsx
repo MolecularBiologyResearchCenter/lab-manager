@@ -289,6 +289,8 @@ export default function HomePage() {
                     </div>
                     {user.sealImage && (
                         <div className="app-surface mt-3 flex items-center gap-4 p-4">
+                            {/* Seal images may be stored as data URLs or in external storage. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={user.sealImage} alt="現在の印鑑画像" className="h-14 w-14 object-contain" />
                             <span className="text-sm text-slate-600">{t('currentSealImage')}</span>
                         </div>

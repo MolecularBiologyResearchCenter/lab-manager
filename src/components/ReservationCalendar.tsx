@@ -12,7 +12,6 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from '@/components/ui/dialog'
 import {
     Select,
@@ -21,10 +20,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createReservation, updateReservation, deleteReservation } from '@/app/actions'
-import CustomDateTimePicker from '@/components/CustomDateTimePicker'
 import { useRouter } from 'next/navigation'
 import { formatTokyoDateTimeLocal, fromTokyoWallClock, parseTokyoDateTimeLocal, toTokyoWallClock } from '@/lib/date-format'
 import { useUserLanguage } from '@/components/UserLanguageProvider'
@@ -85,12 +82,11 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
     const [view, setView] = useState<View>('week')
     const [date, setDate] = useState(() => toTokyoWallClock(new Date()))
     const [isDialogOpen, setIsDialogOpen] = useState(false)
-    const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null)
     const [editingReservation, setEditingReservation] = useState<Reservation | null>(null)
 
     // Form state
     const [selectedEquipment, setSelectedEquipment] = useState<string>('')
-    const [showActiveOnly, setShowActiveOnly] = useState(false)
+    const [showActiveOnly] = useState(false)
     const [visibleEquipmentIds, setVisibleEquipmentIds] = useState<string[]>([])
     const [phoneNumber, setPhoneNumber] = useState<string>('')
     const [submitting, setSubmitting] = useState(false)
@@ -113,7 +109,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
         if (equipmentList.length > 0 && visibleEquipmentIds.length === 0) {
             setVisibleEquipmentIds(equipmentList.map(e => e.id))
         }
-    }, [equipmentList])
+    }, [equipmentList, visibleEquipmentIds.length])
 
     const toggleEquipment = (id: string) => {
         setVisibleEquipmentIds(prev =>
@@ -204,7 +200,6 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
     const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
         setEditingReservation(null)
-        setSelectedSlot(slotInfo)
         setStartTime(fromTokyoWallClock(slotInfo.start))
         setEndTime(fromTokyoWallClock(slotInfo.end))
         setSelectedEquipment('')

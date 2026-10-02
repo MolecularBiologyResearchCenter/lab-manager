@@ -448,6 +448,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                         <div style={{ position: 'relative', minWidth: '170px', minHeight: '64px' }}>
                             <p style={{ position: 'relative', zIndex: 2, margin: 0, fontSize: '16px' }}>{invoice.sealer?.name || '藤岡　正人'}　印</p>
                             {invoice.sealedAt && <div style={{ position: 'absolute', right: 0, top: '-20px', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {/* Seal images may be data URLs and need the native fallback handler. */}
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={invoice.sealer?.sealImage || DEFAULT_SEAL_IMAGE} alt="電子印" style={{ width: '64px', height: '64px', objectFit: 'contain', opacity: 0.8 }} onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = DEFAULT_SEAL_IMAGE }} />
                                 <span style={{ position: 'absolute', color: '#ef4444', fontSize: '8px', fontWeight: 700, whiteSpace: 'nowrap', fontFamily: 'Arial, sans-serif' }}>{formatSealDate(invoice.sealedAt)}</span>
                             </div>}
@@ -637,6 +639,8 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                                                 justifyContent: 'center',
                                             }}
                                         >
+                                            {/* Seal images may be data URLs and need the native fallback handler. */}
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img
                                                 src={invoice.sealer?.sealImage || DEFAULT_SEAL_IMAGE}
                                                 alt="電子印"

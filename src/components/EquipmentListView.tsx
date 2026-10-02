@@ -17,7 +17,6 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import CustomDateTimePicker from '@/components/CustomDateTimePicker'
 import { createReservation } from '@/app/actions'
 import { showError, showSuccess } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
@@ -29,13 +28,6 @@ interface Equipment {
     name: string
     description?: string | null
     icon?: string | null
-}
-
-interface Reservation {
-    id: string
-    equipmentId: string
-    startTime: Date
-    endTime: Date
 }
 
 interface User {
@@ -126,6 +118,8 @@ export default function EquipmentListView({ equipmentList, currentUser, reservat
                             <div>
                                 {/* Left: Icon */}
                                 <div className="mb-3 grid h-16 place-items-center rounded-xl bg-slate-50 md:h-20">
+                                    {/* Equipment icons may be configured with external storage URLs. */}
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                         src={imagePath}
                                         alt={equipment.name}
