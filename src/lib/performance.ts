@@ -22,12 +22,12 @@ export class PerformanceTrace {
         try {
             return await task()
         } finally {
-            this.stages[stage] = roundMs(performance.now() - startedAt)
+            this.stages[stage] = roundMs((this.stages[stage] ?? 0) + performance.now() - startedAt)
         }
     }
 
     mark(stage: PerformanceStage, startedAt: number) {
-        this.stages[stage] = roundMs(performance.now() - startedAt)
+        this.stages[stage] = roundMs((this.stages[stage] ?? 0) + performance.now() - startedAt)
     }
 
     finish(result: 'success' | 'failure' = 'success', extra: Record<string, string | number | boolean | null> = {}) {

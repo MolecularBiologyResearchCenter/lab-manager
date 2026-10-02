@@ -2,12 +2,14 @@ import { getCurrentUser } from '../actions'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import UserInvoicesView from '@/components/UserInvoicesView'
+import { performanceTrace } from '@/lib/performance'
 
 export default async function InvoicesPage() {
-    const user = await getCurrentUser()
+    const trace = performanceTrace('page.invoices')
+    const user = await trace.measure('auth', getCurrentUser)
     if (!user) redirect('/login')
 
-    const invoices = await prisma.invoice.findMany({
+    const invoices = await trace.measure('prismaQuery', () => prisma.invoice.findMany({
         where: { userId: user.id },
         select: {
             id: true,
@@ -20,7 +22,8 @@ export default async function InvoicesPage() {
             sealedBy: true,
         },
         orderBy: [{ fiscalYear: 'desc' }, { quarter: 'desc' }],
-    })
+    }))
+    trace.finish()
 
     return <UserInvoicesView invoices={invoices} />
 }
