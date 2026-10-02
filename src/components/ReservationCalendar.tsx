@@ -220,6 +220,7 @@ export default function ReservationCalendar({ reservations, equipmentList, curre
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (submitting) return
 
         if (!selectedEquipment || !startTime || !endTime) {
             showReservationError('全ての項目を入力してください。')
