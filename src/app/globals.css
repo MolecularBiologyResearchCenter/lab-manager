@@ -298,19 +298,15 @@
   .admin-header-nav {
     display: flex;
     min-width: 0;
-    flex: 1 1 auto;
     align-items: center;
-    gap: 0.125rem;
-    overflow: visible;
-    scrollbar-width: none;
-  }
-
-  .admin-header-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .admin-header-nav {
+    justify-content: center;
+    gap: 0.25rem;
     flex-wrap: wrap;
+    padding: 0.25rem 0 0.5rem;
+  }
+
+  .admin-header-top {
+    flex-wrap: nowrap;
   }
 
   .admin-header-nav a {
@@ -333,16 +329,14 @@
     color: white;
   }
 
-  @media (max-width: 1023px) {
-    .admin-header > .content-wrapper > div {
+  @media (max-width: 767px) {
+    .admin-header-top {
       flex-wrap: wrap;
       row-gap: 0.25rem;
     }
 
-    .admin-header .admin-header-nav {
-      order: 3;
-      flex-basis: 100%;
-      flex-shrink: 0;
+    .admin-header-nav {
+      justify-content: flex-start;
     }
   }
 
