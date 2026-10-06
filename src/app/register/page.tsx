@@ -13,15 +13,19 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { isKitasatoEmail, KITASATO_EMAIL_ERROR, KITASATO_EMAIL_HINT, normalizeEmail } from '@/lib/university-email'
 
+type RegistrationType = 'UNIVERSITY' | 'GUEST'
+
 export default function RegisterPage() {
     const router = useRouter()
     const [mailingList, setMailingList] = useState(true)
+    const [registrationType, setRegistrationType] = useState<RegistrationType>('UNIVERSITY')
 
     async function handleSubmit(formData: FormData) {
         try {
             const email = normalizeEmail(formData.get('email'))
             formData.set('email', email)
-            if (!isKitasatoEmail(email)) {
+            const type = formData.get('registrationType')
+            if (type === 'UNIVERSITY' && !isKitasatoEmail(email)) {
                 showError(KITASATO_EMAIL_ERROR)
                 return
             }
@@ -31,7 +35,7 @@ export default function RegisterPage() {
                 return
             }
             if (result.notice) showInfo(result.notice)
-            router.replace('/')
+            router.replace(result.pendingApproval ? '/login' : '/')
         } catch (error) {
             console.error('利用者登録に失敗しました。', error)
             showError('登録処理中にエラーが発生しました。時間をおいて、もう一度お試しください。')
@@ -83,8 +87,25 @@ export default function RegisterPage() {
                             </div>
                         </div>
                         <div className="space-y-2">
+                            <Label htmlFor="registrationType">登録区分</Label>
+                            <Select name="registrationType" value={registrationType} onValueChange={(value) => setRegistrationType(value as RegistrationType)} required>
+                                <SelectTrigger id="registrationType" className="h-11 rounded-xl border-slate-300 text-base">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="UNIVERSITY">北里大学所属</SelectItem>
+                                    <SelectItem value="GUEST">学外ゲスト</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-sm leading-6 text-slate-600">
+                                {registrationType === 'UNIVERSITY'
+                                    ? "KID'sアカウントのメールアドレス（@kitasato-u.ac.jp）で登録してください。"
+                                    : '学外ゲストは管理者の承認後に利用できます。'}
+                            </p>
+                        </div>
+                        <div className="space-y-2">
                             <Label htmlFor="employeeId">職員番号/学籍番号</Label>
-                            <Input id="employeeId" name="employeeId" required placeholder="12345678" className="h-11 rounded-xl border-slate-300 text-base" />
+                            <Input id="employeeId" name="employeeId" required={registrationType === 'UNIVERSITY'} placeholder={registrationType === 'UNIVERSITY' ? '12345678' : 'ゲストは不要'} className="h-11 rounded-xl border-slate-300 text-base" />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="affiliationType">所属区分</Label>
@@ -101,12 +122,33 @@ export default function RegisterPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">メールアドレス</Label>
-                            <Input id="email" name="email" type="email" required placeholder="test@kitasato-u.ac.jp" className="h-11 rounded-xl border-slate-300 text-base" />
+                            <Input id="email" name="email" type="email" required placeholder={registrationType === 'UNIVERSITY' ? 'user@kitasato-u.ac.jp' : 'guest@example.com'} className="h-11 rounded-xl border-slate-300 text-base" />
                             <p className="text-sm leading-6 text-slate-600">
-                                {KITASATO_EMAIL_HINT}<br />
-                                メールアドレスのドメインが kitasato-u.ac.jp で終わるもの以外では登録できません。
+                                {registrationType === 'UNIVERSITY'
+                                    ? <>{KITASATO_EMAIL_HINT}<br />メールアドレスのドメインが kitasato-u.ac.jp で終わるもの以外では登録できません。</>
+                                    : <>学外ゲストは管理者の承認後に利用できます。<br />所属機関、利用目的、受入担当者、利用期限を入力してください。</>}
                             </p>
                         </div>
+                        {registrationType === 'GUEST' && (
+                            <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="guestInstitution">所属機関</Label>
+                                    <Input id="guestInstitution" name="guestInstitution" required placeholder="〇〇大学・〇〇研究所" className="h-11 rounded-xl border-slate-300 bg-white text-base" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="guestPurpose">利用目的</Label>
+                                    <Input id="guestPurpose" name="guestPurpose" required placeholder="共同研究・見学など" className="h-11 rounded-xl border-slate-300 bg-white text-base" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="guestHostName">受入担当者</Label>
+                                    <Input id="guestHostName" name="guestHostName" required placeholder="北里 太郎" className="h-11 rounded-xl border-slate-300 bg-white text-base" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="guestValidUntil">利用期限</Label>
+                                    <Input id="guestValidUntil" name="guestValidUntil" type="date" required className="h-11 rounded-xl border-slate-300 bg-white text-base" />
+                                </div>
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="password">
                                 パスワード <span className="text-sm font-normal text-gray-500 ml-1">（英数小文字8文字以上）</span>

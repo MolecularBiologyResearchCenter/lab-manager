@@ -15,6 +15,9 @@ export const currentUserSelect = {
     extension: true,
     employeeId: true,
     affiliationType: true,
+    registrationType: true,
+    guestApproved: true,
+    guestValidUntil: true,
     enrollmentStatus: true,
     mailingList: true,
     role: true,
@@ -26,6 +29,12 @@ export const adminUserSelect = {
     email: true,
     employeeId: true,
     affiliationType: true,
+    registrationType: true,
+    guestInstitution: true,
+    guestPurpose: true,
+    guestHostName: true,
+    guestValidUntil: true,
+    guestApproved: true,
     enrollmentStatus: true,
     mailingList: true,
     role: true,
@@ -50,6 +59,10 @@ export const credentialUserSelect = {
     id: true,
     password: true,
     updatedAt: true,
+    enrollmentStatus: true,
+    registrationType: true,
+    guestApproved: true,
+    guestValidUntil: true,
 } as const
 
 function getAuthSecret(): string {
@@ -97,11 +110,13 @@ export async function getSessionUserId(): Promise<string | null> {
     if (!value) return null
     const userId = verifySignedSessionValue(value)
     if (!userId) return null
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { updatedAt: true, enrollmentStatus: true } })
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { updatedAt: true, enrollmentStatus: true, registrationType: true, guestApproved: true, guestValidUntil: true } })
     const sessionEpoch = getSessionVersion(value)
     // 旧形式のCookieは既存利用者をログアウトさせずに互換維持する。
     // 新形式のCookieはパスワード変更でupdatedAtが変わるため無効化される。
-    return user && user.enrollmentStatus === 'ACTIVE' && (sessionEpoch === 0 || user.updatedAt.getTime() === sessionEpoch) ? userId : null
+    const guestUsable = user?.registrationType !== 'GUEST'
+        || (user.guestApproved && (!user.guestValidUntil || user.guestValidUntil.getTime() >= Date.now()))
+    return user && user.enrollmentStatus === 'ACTIVE' && guestUsable && (sessionEpoch === 0 || user.updatedAt.getTime() === sessionEpoch) ? userId : null
 }
 
 export async function setSessionCookie(userId: string, rememberMe = false, sessionEpoch = 0) {
