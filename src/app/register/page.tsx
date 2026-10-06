@@ -11,6 +11,7 @@ import { showError, showInfo } from '@/lib/error-notifier'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import Image from 'next/image'
+import { isKitasatoEmail, KITASATO_EMAIL_ERROR, KITASATO_EMAIL_HINT, normalizeEmail } from '@/lib/university-email'
 
 export default function RegisterPage() {
     const router = useRouter()
@@ -18,6 +19,12 @@ export default function RegisterPage() {
 
     async function handleSubmit(formData: FormData) {
         try {
+            const email = normalizeEmail(formData.get('email'))
+            formData.set('email', email)
+            if (!isKitasatoEmail(email)) {
+                showError(KITASATO_EMAIL_ERROR)
+                return
+            }
             const result = await register(formData)
             if (!result.success) {
                 showError(result.error)
@@ -94,7 +101,11 @@ export default function RegisterPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">メールアドレス</Label>
-                            <Input id="email" name="email" type="email" required placeholder="user@example.com" className="h-11 rounded-xl border-slate-300 text-base" />
+                            <Input id="email" name="email" type="email" required placeholder="test@kitasato-u.ac.jp" className="h-11 rounded-xl border-slate-300 text-base" />
+                            <p className="text-sm leading-6 text-slate-600">
+                                {KITASATO_EMAIL_HINT}<br />
+                                メールアドレスのドメインが kitasato-u.ac.jp で終わるもの以外では登録できません。
+                            </p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">
