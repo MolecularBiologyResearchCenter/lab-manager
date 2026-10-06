@@ -36,7 +36,8 @@ import {
 } from '@/lib/password'
 import { claimIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey } from '@/lib/idempotency'
 import { performanceTrace } from '@/lib/performance'
-import { getMicrosoftGroupMembershipStatus, syncUserMicrosoftGroupMembership } from '@/lib/microsoft-group-sync'
+import { getMicrosoftGroupMembershipStatus, syncUserMicrosoftGroupMembership, verifyMicrosoftDirectoryUser } from '@/lib/microsoft-group-sync'
+import { isKitasatoEmail, KITASATO_EMAIL_ERROR, normalizeEmail } from '@/lib/university-email'
 import { AFFILIATION_TYPES, ENROLLMENT_STATUSES } from '@/lib/user-lifecycle'
 
 /**
@@ -532,7 +533,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     const employeeId = String(formData.get('employeeId') || '').trim()
     const affiliationType = String(formData.get('affiliationType') || '').trim()
     const mailingList = formData.get('mailingList') === 'true' // Convert string to boolean
-    const email = String(formData.get('email') || '').trim().toLowerCase()
+    const email = normalizeEmail(formData.get('email'))
     const password = String(formData.get('password') || '')
     const department = String(formData.get('department') || '').trim()
     const laboratory = String(formData.get('laboratory') || '').trim()
@@ -540,6 +541,9 @@ export async function register(formData: FormData): Promise<RegisterActionResult
 
     if (!lastName || !firstName || !lastNameKana || !firstNameKana || !employeeId || !affiliationType || !email || !password || !department || !laboratory) {
         return { success: false, error: '必須項目を入力してください。' }
+    }
+    if (!isKitasatoEmail(email)) {
+        return { success: false, error: KITASATO_EMAIL_ERROR }
     }
     if (!['FACULTY_STAFF', 'GRADUATE_STUDENT', 'UNDERGRADUATE_STUDENT'].includes(affiliationType)) {
         return { success: false, error: '所属区分を選択してください。' }
@@ -560,6 +564,23 @@ export async function register(formData: FormData): Promise<RegisterActionResult
 
     if (existingUser) {
         return { success: false, error: 'このメールアドレスはLab Managerに利用者登録済みです。ログイン画面からお試しください。' }
+    }
+
+    const directoryUser = await trace.measure('externalApi', () => verifyMicrosoftDirectoryUser(email))
+    if (!directoryUser.ok) {
+        await recordAuditLog({
+            actor: authAuditActor,
+            action: 'USER_REGISTER_DIRECTORY_VERIFICATION_FAILURE',
+            targetType: 'Authentication',
+            summary: '新規利用者登録時のMicrosoft Entraユーザー確認に失敗しました。',
+            metadata: { result: 'failure', errorCode: directoryUser.errorCode },
+        })
+        return {
+            success: false,
+            error: directoryUser.errorCode === 'DIRECTORY_USER_NOT_FOUND'
+                ? '北里大学のKID\'sアカウントを確認できませんでした。学内メールアドレスを確認してください。'
+                : '大学アカウントの確認に失敗しました。時間をおいて、もう一度お試しください。',
+        }
     }
 
     let mailingListAlreadyRegistered = false
