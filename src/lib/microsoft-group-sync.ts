@@ -11,15 +11,20 @@ const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0'
 const GRAPH_SCOPE = ['https://graph.microsoft.com/.default']
 const MAX_RETRIES = 2
 const SYNC_FAILURE_NOTIFICATION = 'MICROSOFT_GROUP_SYNC_FAILURE'
+export const LAB_MANAGER_MICROSOFT_GROUP_ID = 'acb1d03b-11ff-4974-9541-56830c15b911'
 
 export type MicrosoftGroupMembershipStatus = 'member' | 'not-member' | 'unknown'
+
+export type MicrosoftDirectoryUserCheck =
+    | { ok: true; directoryUserId: string }
+    | { ok: false; errorCode: string }
 
 function getGraphConfig(): GraphConfig | null {
     const tenantId = process.env.MICROSOFT_TENANT_ID?.trim()
     const clientId = process.env.MICROSOFT_CLIENT_ID?.trim()
     const clientSecret = process.env.MICROSOFT_CLIENT_SECRET?.trim()
     const groupId = process.env.MICROSOFT_GROUP_ID?.trim()
-    if (!tenantId || !clientId || !clientSecret || !groupId) return null
+    if (!tenantId || !clientId || !clientSecret || groupId !== LAB_MANAGER_MICROSOFT_GROUP_ID) return null
     return { tenantId, clientId, clientSecret, groupId }
 }
 
@@ -33,6 +38,17 @@ function getGraphErrorCode(body: unknown, fallback: string) {
     return typeof error?.code === 'string' && /^[A-Za-z0-9_.-]{1,80}$/.test(error.code)
         ? error.code
         : fallback
+}
+
+export async function verifyMicrosoftDirectoryUser(email: string): Promise<MicrosoftDirectoryUserCheck> {
+    const config = getGraphConfig()
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!config) return { ok: false, errorCode: 'GRAPH_CONFIG_MISSING' }
+    if (!normalizedEmail) return { ok: false, errorCode: 'EMAIL_MISSING' }
+    const directoryUser = await findDirectoryUser(config, normalizedEmail, graphRequest)
+    return directoryUser.ok
+        ? { ok: true, directoryUserId: directoryUser.id }
+        : { ok: false, errorCode: directoryUser.errorCode }
 }
 
 async function getAccessToken(config: GraphConfig) {

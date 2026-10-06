@@ -70,7 +70,7 @@ export default function LoginPage() {
                                 name="email"
                                 type="email"
                                 required
-                                placeholder="user@example.com"
+                                placeholder="user@kitasato-u.ac.jp"
                                 className="h-11 rounded-xl border-slate-300 text-base"
                             />
                         </div>
