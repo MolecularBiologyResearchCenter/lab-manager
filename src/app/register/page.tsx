@@ -120,15 +120,6 @@ export default function RegisterPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="email">メールアドレス</Label>
-                            <Input id="email" name="email" type="email" required placeholder={registrationType === 'UNIVERSITY' ? 'user@kitasato-u.ac.jp' : 'guest@example.com'} className="h-11 rounded-xl border-slate-300 text-base" />
-                            <p className="text-sm leading-6 text-slate-600">
-                                {registrationType === 'UNIVERSITY'
-                                    ? <>{KITASATO_EMAIL_HINT}<br />メールアドレスのドメインが kitasato-u.ac.jp で終わるもの以外では登録できません。</>
-                                    : <>学外ゲストは管理者の承認後に利用できます。<br />所属機関、利用目的、受入担当者、利用期限を入力してください。</>}
-                            </p>
-                        </div>
                         {registrationType === 'GUEST' && (
                             <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
                                 <div className="space-y-2">
@@ -149,6 +140,15 @@ export default function RegisterPage() {
                                 </div>
                             </div>
                         )}
+                        <div className="space-y-2">
+                            <Label htmlFor="email">メールアドレス</Label>
+                            <Input id="email" name="email" type="email" required placeholder={registrationType === 'UNIVERSITY' ? 'user@kitasato-u.ac.jp' : 'guest@example.com'} className="h-11 rounded-xl border-slate-300 text-base" />
+                            <p className="text-sm leading-6 text-slate-600">
+                                {registrationType === 'UNIVERSITY'
+                                    ? <>{KITASATO_EMAIL_HINT}<br />メールアドレスのドメインが kitasato-u.ac.jp で終わるもの以外では登録できません。</>
+                                    : <>学外ゲストは管理者の承認後に利用できます。<br />所属機関、利用目的、受入担当者、利用期限を入力してください。</>}
+                            </p>
+                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">
                                 パスワード <span className="text-sm font-normal text-gray-500 ml-1">（英数小文字8文字以上）</span>
