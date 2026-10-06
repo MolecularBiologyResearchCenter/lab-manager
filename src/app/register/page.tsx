@@ -149,26 +149,6 @@ export default function RegisterPage() {
                                     : <>学外ゲストは管理者の承認後に利用できます。<br />所属機関、利用目的、受入担当者、利用期限を入力してください。</>}
                             </p>
                         </div>
-                        {registrationType === 'GUEST' && (
-                            <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="guestInstitution">所属機関</Label>
-                                    <Input id="guestInstitution" name="guestInstitution" required placeholder="〇〇大学・〇〇研究所" className="h-11 rounded-xl border-slate-300 bg-white text-base" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="guestPurpose">利用目的</Label>
-                                    <Input id="guestPurpose" name="guestPurpose" required placeholder="共同研究・見学など" className="h-11 rounded-xl border-slate-300 bg-white text-base" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="guestHostName">受入担当者</Label>
-                                    <Input id="guestHostName" name="guestHostName" required placeholder="北里 太郎" className="h-11 rounded-xl border-slate-300 bg-white text-base" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="guestValidUntil">利用期限</Label>
-                                    <Input id="guestValidUntil" name="guestValidUntil" type="date" required className="h-11 rounded-xl border-slate-300 bg-white text-base" />
-                                </div>
-                            </div>
-                        )}
                         <div className="space-y-2">
                             <Label htmlFor="password">
                                 パスワード <span className="text-sm font-normal text-gray-500 ml-1">（英数小文字8文字以上）</span>
