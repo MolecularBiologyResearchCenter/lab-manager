@@ -97,11 +97,11 @@ export default function RegisterPage() {
                                     <SelectItem value="GUEST">学外ゲスト</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <p className="text-sm leading-6 text-slate-600">
-                                {registrationType === 'UNIVERSITY'
-                                    ? "KID'sアカウントのメールアドレス（@kitasato-u.ac.jp）で登録してください。"
-                                    : '学外ゲストは管理者の承認後に利用できます。'}
-                            </p>
+                            {registrationType === 'UNIVERSITY' && (
+                                <p className="text-sm leading-6 text-slate-600">
+                                    {KITASATO_EMAIL_HINT}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="employeeId">職員番号/学籍番号</Label>
@@ -119,6 +119,12 @@ export default function RegisterPage() {
                                     <SelectItem value="UNDERGRADUATE_STUDENT">学部学生</SelectItem>
                                 </SelectContent>
                             </Select>
+                            {registrationType === 'GUEST' && (
+                                <p className="text-sm leading-6 text-slate-600">
+                                    学外ゲストは管理者の承認後に利用できます。<br />
+                                    所属機関、利用目的、受入担当者、利用期限を入力してください。
+                                </p>
+                            )}
                         </div>
                         {registrationType === 'GUEST' && (
                             <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -143,11 +149,12 @@ export default function RegisterPage() {
                         <div className="space-y-2">
                             <Label htmlFor="email">メールアドレス</Label>
                             <Input id="email" name="email" type="email" required placeholder={registrationType === 'UNIVERSITY' ? 'user@kitasato-u.ac.jp' : 'guest@example.com'} className="h-11 rounded-xl border-slate-300 text-base" />
-                            <p className="text-sm leading-6 text-slate-600">
-                                {registrationType === 'UNIVERSITY'
-                                    ? <>{KITASATO_EMAIL_HINT}<br />メールアドレスのドメインが kitasato-u.ac.jp で終わるもの以外では登録できません。</>
-                                    : <>学外ゲストは管理者の承認後に利用できます。<br />所属機関、利用目的、受入担当者、利用期限を入力してください。</>}
-                            </p>
+                            {registrationType === 'UNIVERSITY' && (
+                                <p className="text-sm leading-6 text-slate-600">
+                                    {KITASATO_EMAIL_HINT}<br />
+                                    メールアドレスのドメインが kitasato-u.ac.jp で終わるもの以外では登録できません。
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">
