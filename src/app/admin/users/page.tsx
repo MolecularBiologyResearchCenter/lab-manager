@@ -36,6 +36,12 @@ interface User {
     email: string
     employeeId: string | null
     mailingList: boolean
+    registrationType: string
+    guestInstitution: string | null
+    guestPurpose: string | null
+    guestHostName: string | null
+    guestValidUntil: Date | string | null
+    guestApproved: boolean
     affiliationType: string
     enrollmentStatus: string
     role: string
@@ -70,6 +76,7 @@ export default function UsersPage() {
     const [mailingList, setMailingList] = useState(false)
     const [selectedAffiliationType, setSelectedAffiliationType] = useState('FACULTY_STAFF')
     const [selectedEnrollmentStatus, setSelectedEnrollmentStatus] = useState('ACTIVE')
+    const [guestApproved, setGuestApproved] = useState(false)
     const [search, setSearch] = useState('')
     const [affiliationFilter, setAffiliationFilter] = useState('ALL')
     const [statusFilter, setStatusFilter] = useState('ALL')
@@ -123,6 +130,7 @@ export default function UsersPage() {
         setMailingList(user.mailingList)
         setSelectedAffiliationType(user.affiliationType)
         setSelectedEnrollmentStatus(user.enrollmentStatus)
+        setGuestApproved(user.guestApproved)
         setEditDialogOpen(true)
     }
 
@@ -149,7 +157,7 @@ export default function UsersPage() {
         if (!userToEdit) return
 
         try {
-            await updateUserProfileByAdmin(userToEdit.id, { role: selectedRole, employeeId, mailingList, affiliationType: selectedAffiliationType, enrollmentStatus: selectedEnrollmentStatus })
+            await updateUserProfileByAdmin(userToEdit.id, { role: selectedRole, employeeId, mailingList, affiliationType: selectedAffiliationType, enrollmentStatus: selectedEnrollmentStatus, guestApproved })
             showSuccess('利用者情報を更新しました')
             router.refresh()
             fetchUsers()
@@ -163,6 +171,7 @@ export default function UsersPage() {
         setMailingList(false)
         setSelectedAffiliationType('FACULTY_STAFF')
         setSelectedEnrollmentStatus('ACTIVE')
+        setGuestApproved(false)
     }
 
     const cancelDelete = () => {
@@ -315,6 +324,7 @@ export default function UsersPage() {
                                     <TableHead>No.</TableHead>
                                     <TableHead>名前</TableHead>
                                     <TableHead>メールアドレス</TableHead>
+                                    <TableHead>登録区分</TableHead>
                                     <TableHead>職員番号</TableHead>
                                     <TableHead>メーリングリスト</TableHead>
                                     <TableHead>権限</TableHead>
@@ -333,6 +343,7 @@ export default function UsersPage() {
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell className="font-medium">{user.name}</TableCell>
                                         <TableCell>{user.email}</TableCell>
+                                        <TableCell>{user.registrationType === 'GUEST' ? '学外ゲスト' : '北里大学所属'}</TableCell>
                                         <TableCell>{user.employeeId || '未登録'}</TableCell>
                                         <TableCell>{user.mailingList ? '参加する' : '参加しない'}</TableCell>
                                         <TableCell>
@@ -480,6 +491,23 @@ export default function UsersPage() {
                                 参加する
                             </label>
                         </div>
+                        {userToEdit?.registrationType === 'GUEST' && (
+                            <>
+                                <div className="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                                    <div>
+                                        <Label htmlFor="admin-guest-approved">学外ゲスト承認</Label>
+                                        <p className="mt-1 text-xs text-slate-600">承認されるまでログイン・予約・有料サービスは利用できません。</p>
+                                    </div>
+                                    <input id="admin-guest-approved" type="checkbox" checked={guestApproved} onChange={(event) => setGuestApproved(event.target.checked)} className="h-4 w-4 accent-blue-700" />
+                                </div>
+                                <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+                                    <p>所属機関：{userToEdit.guestInstitution || '-'}</p>
+                                    <p>利用目的：{userToEdit.guestPurpose || '-'}</p>
+                                    <p>受入担当者：{userToEdit.guestHostName || '-'}</p>
+                                    <p>利用期限：{userToEdit.guestValidUntil ? new Date(userToEdit.guestValidUntil).toLocaleDateString('ja-JP') : '-'}</p>
+                                </div>
+                            </>
+                        )}
                         <div className="space-y-2">
                             <Label htmlFor="role">権限</Label>
                             <Select value={selectedRole} onValueChange={setSelectedRole}>
@@ -506,7 +534,8 @@ export default function UsersPage() {
                             disabled={!userToEdit || (
                                 selectedRole === userToEdit.role &&
                                 employeeId === (userToEdit.employeeId || '') &&
-                                mailingList === userToEdit.mailingList
+                                mailingList === userToEdit.mailingList &&
+                                guestApproved === userToEdit.guestApproved
                             )}
                             className="bg-blue-600 text-white hover:bg-blue-700"
                         >

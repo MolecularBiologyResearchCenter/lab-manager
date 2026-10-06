@@ -18,6 +18,12 @@ model User {
   nameKana                    String? // ふりがな
   employeeId                  String? // 職員番号/学籍番号
   affiliationType             String    @default("FACULTY_STAFF") // FACULTY_STAFF, GRADUATE_STUDENT, UNDERGRADUATE_STUDENT
+  registrationType            String    @default("UNIVERSITY") // UNIVERSITY, GUEST
+  guestInstitution            String?
+  guestPurpose                String?
+  guestHostName               String?
+  guestValidUntil             DateTime?
+  guestApproved               Boolean   @default(true)
   enrollmentStatus            String    @default("ACTIVE") // ACTIVE, SUSPENDED, GRADUATED, RETIRED
   mailingList                 Boolean   @default(false) // メーリングリスト登録
   email                       String    @unique

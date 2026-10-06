@@ -50,7 +50,7 @@ const concurrentReservationError = '同時に別の予約が登録されまし�
 const reservationFailedError = '予約処理中にエラーが発生しました。画面を更新して、もう一度お試しください。'
 type ReservationActionResult = { success: true } | { success: false; error: string }
 type LoginActionResult = { success: true } | { success: false; error: string }
-type RegisterActionResult = { success: true; notice?: string } | { success: false; error: string }
+type RegisterActionResult = { success: true; notice?: string; pendingApproval?: boolean } | { success: false; error: string }
 
 const authAuditActor = { name: '認証システム', role: 'SYSTEM' }
 const genericLoginError = 'アカウントまたはパスワードが正しくありません。'
@@ -499,6 +499,20 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
             return { success: false, error: genericLoginError }
         }
 
+        const guestUsable = user.registrationType !== 'GUEST'
+            || (user.guestApproved && (!user.guestValidUntil || user.guestValidUntil.getTime() >= Date.now()))
+        if (user.enrollmentStatus !== 'ACTIVE' || !guestUsable) {
+            await recordAuditLog({
+                actor: authAuditActor,
+                action: 'LOGIN_RESTRICTED',
+                targetType: 'Authentication',
+                summary: '在籍状態、承認状態、または利用期限によりログインを拒否しました。',
+                metadata: { result: 'failure' },
+            })
+            trace.finish('failure')
+            return { success: false, error: genericLoginError }
+        }
+
         await setSessionCookie(user.id, rememberMe, user.updatedAt.getTime())
         const wasLimited = await resetLoginFailures(throttleKeys)
         if (wasLimited) {
@@ -531,19 +545,37 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     const lastNameKana = String(formData.get('lastNameKana') || '').trim()
     const firstNameKana = String(formData.get('firstNameKana') || '').trim()
     const employeeId = String(formData.get('employeeId') || '').trim()
+    const registrationType = String(formData.get('registrationType') || '').trim()
     const affiliationType = String(formData.get('affiliationType') || '').trim()
-    const mailingList = formData.get('mailingList') === 'true' // Convert string to boolean
+    const mailingList = registrationType === 'UNIVERSITY' && formData.get('mailingList') === 'true'
     const email = normalizeEmail(formData.get('email'))
     const password = String(formData.get('password') || '')
     const department = String(formData.get('department') || '').trim()
     const laboratory = String(formData.get('laboratory') || '').trim()
     const extension = String(formData.get('extension') || '').trim()
+    const guestInstitution = String(formData.get('guestInstitution') || '').trim()
+    const guestPurpose = String(formData.get('guestPurpose') || '').trim()
+    const guestHostName = String(formData.get('guestHostName') || '').trim()
+    const guestValidUntilInput = String(formData.get('guestValidUntil') || '').trim()
 
-    if (!lastName || !firstName || !lastNameKana || !firstNameKana || !employeeId || !affiliationType || !email || !password || !department || !laboratory) {
+    if (!['UNIVERSITY', 'GUEST'].includes(registrationType)) {
+        return { success: false, error: '登録区分を選択してください。' }
+    }
+    if (!lastName || !firstName || !lastNameKana || !firstNameKana || (registrationType === 'UNIVERSITY' && !employeeId) || !affiliationType || !email || !password || !department || !laboratory) {
         return { success: false, error: '必須項目を入力してください。' }
     }
-    if (!isKitasatoEmail(email)) {
+    if (registrationType === 'UNIVERSITY' && !isKitasatoEmail(email)) {
         return { success: false, error: KITASATO_EMAIL_ERROR }
+    }
+    if (registrationType === 'GUEST' && isKitasatoEmail(email)) {
+        return { success: false, error: '北里大学所属を選択して、KID\'sアカウントのメールアドレスを入力してください。' }
+    }
+    if (registrationType === 'GUEST' && (!guestInstitution || !guestPurpose || !guestHostName || !guestValidUntilInput)) {
+        return { success: false, error: '学外ゲストの所属機関、利用目的、受入担当者、利用期限を入力してください。' }
+    }
+    const guestValidUntil = registrationType === 'GUEST' ? new Date(`${guestValidUntilInput}T23:59:59.999+09:00`) : null
+    if (registrationType === 'GUEST' && (!guestValidUntil || Number.isNaN(guestValidUntil.getTime()) || guestValidUntil.getTime() < Date.now())) {
+        return { success: false, error: '利用期限は今日以降の日付を入力してください。' }
     }
     if (!['FACULTY_STAFF', 'GRADUATE_STUDENT', 'UNDERGRADUATE_STUDENT'].includes(affiliationType)) {
         return { success: false, error: '所属区分を選択してください。' }
@@ -566,8 +598,10 @@ export async function register(formData: FormData): Promise<RegisterActionResult
         return { success: false, error: 'このメールアドレスはLab Managerに利用者登録済みです。ログイン画面からお試しください。' }
     }
 
-    const directoryUser = await trace.measure('externalApi', () => verifyMicrosoftDirectoryUser(email))
-    if (!directoryUser.ok) {
+    const directoryUser = registrationType === 'UNIVERSITY'
+        ? await trace.measure('externalApi', () => verifyMicrosoftDirectoryUser(email))
+        : null
+    if (registrationType === 'UNIVERSITY' && directoryUser && !directoryUser.ok) {
         await recordAuditLog({
             actor: authAuditActor,
             action: 'USER_REGISTER_DIRECTORY_VERIFICATION_FAILURE',
@@ -601,6 +635,12 @@ export async function register(formData: FormData): Promise<RegisterActionResult
                 nameKana,
                 employeeId,
                 affiliationType,
+                registrationType,
+                guestInstitution: registrationType === 'GUEST' ? guestInstitution : null,
+                guestPurpose: registrationType === 'GUEST' ? guestPurpose : null,
+                guestHostName: registrationType === 'GUEST' ? guestHostName : null,
+                guestValidUntil,
+                guestApproved: registrationType === 'UNIVERSITY',
                 mailingList,
                 email,
                 password: passwordHash,
@@ -619,11 +659,11 @@ export async function register(formData: FormData): Promise<RegisterActionResult
 
     await recordAuditLog({
         actor: authAuditActor,
-        action: 'USER_REGISTER',
+        action: registrationType === 'GUEST' ? 'GUEST_REGISTER' : 'USER_REGISTER',
         targetType: 'User',
         targetId: user.id,
         summary: '新規利用者を登録しました。',
-        metadata: { affiliationType, mailingList },
+        metadata: { registrationType, affiliationType, mailingList, ...(registrationType === 'GUEST' ? { guestApproved: false } : {}) },
     })
 
     // 通知の作成失敗で、利用者登録そのものをロールバックしない。
@@ -635,7 +675,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
             notification = await prisma.adminNotification.upsert({
                 where: { dedupeKey: `NEW_USER_REGISTRATION:${user.id}` },
                 create: {
-                    type: 'NEW_USER_REGISTRATION',
+                    type: registrationType === 'GUEST' ? 'GUEST_REGISTRATION' : 'NEW_USER_REGISTRATION',
                     targetUserId: user.id,
                     name,
                     department,
@@ -654,7 +694,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
                 select: { id: true },
             })
             notification = existing ?? await prisma.adminNotification.create({
-                data: { type: 'NEW_USER_REGISTRATION', targetUserId: user.id, name, department, laboratory, employeeId },
+                data: { type: registrationType === 'GUEST' ? 'GUEST_REGISTRATION' : 'NEW_USER_REGISTRATION', targetUserId: user.id, name, department, laboratory, employeeId },
                 select: { id: true },
             })
         }
@@ -674,7 +714,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
         console.error('新規利用者登録通知の作成に失敗しました。登録処理は完了しています。')
     }
 
-    if (mailingList) {
+    if (registrationType === 'UNIVERSITY' && mailingList) {
         try {
             await syncUserMicrosoftGroupMembership({ userId: user.id, name, email, enabled: true })
         } catch {
@@ -687,6 +727,11 @@ export async function register(formData: FormData): Promise<RegisterActionResult
                 metadata: { result: 'failure', errorCode: 'SYNC_RECORD_FAILED' },
             })
         }
+    }
+
+    if (registrationType === 'GUEST') {
+        trace.finish()
+        return { success: true, pendingApproval: true, notice: '登録を受け付けました。管理者の承認後にログインできます。' }
     }
 
     await setSessionCookie(user.id)
@@ -1201,15 +1246,20 @@ export async function updateUserProfileByAdmin(
         mailingList?: boolean
         affiliationType?: string
         enrollmentStatus?: string
+        guestApproved?: boolean
     },
 ) {
     const currentUser = await requireAdmin()
 
     const targetUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { name: true, email: true, role: true, employeeId: true, mailingList: true, affiliationType: true, enrollmentStatus: true },
+        select: { name: true, email: true, role: true, employeeId: true, mailingList: true, affiliationType: true, enrollmentStatus: true, registrationType: true, guestApproved: true },
     })
     if (!targetUser) throw new Error('ユーザーが見つかりません。')
+
+    if (targetUser.registrationType === 'GUEST' && data.mailingList === true) {
+        throw new Error('学外ゲストはMicrosoft 365グループへ追加できません。')
+    }
 
     if (data.role !== undefined && !['USER', 'ADMIN', 'CENTER_DIRECTOR'].includes(data.role)) {
         throw new Error('無効な権限です。')
@@ -1229,6 +1279,9 @@ export async function updateUserProfileByAdmin(
     if (data.enrollmentStatus !== undefined && !ENROLLMENT_STATUSES.includes(data.enrollmentStatus as typeof ENROLLMENT_STATUSES[number])) {
         throw new Error('無効な在籍状態です。')
     }
+    if (data.guestApproved !== undefined && typeof data.guestApproved !== 'boolean') {
+        throw new Error('ゲスト承認設定が不正です。')
+    }
 
     const normalizedEmployeeId = data.employeeId === undefined
         ? undefined
@@ -1245,16 +1298,18 @@ export async function updateUserProfileByAdmin(
     const nextEnrollmentStatus = data.enrollmentStatus ?? targetUser.enrollmentStatus
     const affiliationChanged = nextAffiliationType !== targetUser.affiliationType
     const enrollmentStatusChanged = nextEnrollmentStatus !== targetUser.enrollmentStatus
+    const guestApprovalChanged = data.guestApproved !== undefined && data.guestApproved !== targetUser.guestApproved
     const shouldDisableMailingList = nextEnrollmentStatus !== 'ACTIVE' && (targetUser.mailingList || data.mailingList === true)
 
-    if (!roleChanged && !employeeIdChanged && !mailingListChanged && !affiliationChanged && !enrollmentStatusChanged) return
+    if (!roleChanged && !employeeIdChanged && !mailingListChanged && !affiliationChanged && !enrollmentStatusChanged && !guestApprovalChanged) return
 
-    const updateData: { role?: string; employeeId?: string | null; mailingList?: boolean; affiliationType?: string; enrollmentStatus?: string } = {}
+    const updateData: { role?: string; employeeId?: string | null; mailingList?: boolean; affiliationType?: string; enrollmentStatus?: string; guestApproved?: boolean } = {}
     if (roleChanged) updateData.role = nextRole
     if (employeeIdChanged) updateData.employeeId = normalizedEmployeeId
     if (mailingListChanged) updateData.mailingList = data.mailingList
     if (affiliationChanged) updateData.affiliationType = nextAffiliationType
     if (enrollmentStatusChanged) updateData.enrollmentStatus = nextEnrollmentStatus
+    if (guestApprovalChanged) updateData.guestApproved = data.guestApproved
     if (shouldDisableMailingList) updateData.mailingList = false
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -1335,6 +1390,22 @@ export async function updateUserProfileByAdmin(
                     targetLabel: null,
                     summary: '在籍状態を変更しました。',
                     metadata: { previousStatus: targetUser.enrollmentStatus, nextStatus: nextEnrollmentStatus },
+                },
+            })
+        }
+
+        if (guestApprovalChanged) {
+            await tx.auditLog.create({
+                data: {
+                    actorId: currentUser.id,
+                    actorName: currentUser.id,
+                    actorRole: currentUser.role,
+                    action: 'GUEST_APPROVAL_UPDATE',
+                    targetType: 'User',
+                    targetId: userId,
+                    targetLabel: null,
+                    summary: data.guestApproved ? '学外ゲストを承認しました。' : '学外ゲストの承認を取り消しました。',
+                    metadata: { previousApproved: targetUser.guestApproved, nextApproved: data.guestApproved },
                 },
             })
         }
