@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { assertUserRole } from '@/lib/authorization'
 import { recordAuthorizationFailure } from '@/lib/audit'
+import { setAuditActor } from './audit-context'
 
 export const SESSION_COOKIE_NAME = 'session'
 
@@ -57,6 +58,8 @@ export const adminUserSelect = {
 
 export const credentialUserSelect = {
     id: true,
+    name: true,
+    role: true,
     password: true,
     updatedAt: true,
     enrollmentStatus: true,
@@ -146,10 +149,12 @@ export async function getAuthenticatedUser() {
     const userId = await getSessionUserId()
     if (!userId) return null
 
-    return prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
         where: { id: userId },
         select: currentUserSelect,
     })
+    setAuditActor(user)
+    return user
 }
 
 export async function requireUser() {

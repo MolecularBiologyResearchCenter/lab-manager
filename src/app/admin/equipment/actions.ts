@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import fs from 'fs/promises'
 import path from 'path'
 import { requireAdmin } from '@/lib/auth'
-import { recordAuditLog } from '@/lib/audit'
+import { recordAuditLog, runAuditedOperation } from '@/lib/audit'
 import { randomUUID } from 'crypto'
 
 export async function getEquipment() {
@@ -40,6 +40,7 @@ export async function getAvailableIcons() {
 }
 
 export async function createEquipment(formData: FormData) {
+    return runAuditedOperation('EQUIPMENT_CREATE', 'Equipment', null, async () => {
     const currentUser = await requireAdmin()
     try {
         const name = formData.get('name') as string
@@ -66,9 +67,12 @@ export async function createEquipment(formData: FormData) {
         console.error('Failed to create equipment:', error)
         return { success: false, error: error instanceof Error ? error.message : 'Failed to create equipment' }
     }
+
+    })
 }
 
 export async function updateEquipment(id: string, formData: FormData) {
+    return runAuditedOperation('EQUIPMENT_UPDATE', 'Equipment', id, async () => {
     const currentUser = await requireAdmin()
     try {
         const name = formData.get('name') as string
@@ -96,9 +100,12 @@ export async function updateEquipment(id: string, formData: FormData) {
         console.error('Failed to update equipment:', error)
         return { success: false, error: 'Failed to update equipment' }
     }
+
+    })
 }
 
 export async function deleteEquipment(id: string) {
+    return runAuditedOperation('EQUIPMENT_DELETE', 'Equipment', id, async () => {
     const currentUser = await requireAdmin()
     try {
         // Check if equipment is used in any reservations
@@ -125,9 +132,12 @@ export async function deleteEquipment(id: string) {
         console.error('Failed to delete equipment:', error)
         return { success: false, error: 'Failed to delete equipment' }
     }
+
+    })
 }
 
 export async function uploadIcon(formData: FormData) {
+    return runAuditedOperation('EQUIPMENT_ICON_UPLOAD', 'EquipmentIcon', null, async () => {
     const currentUser = await requireAdmin()
     try {
         const file = formData.get('file') as File
@@ -154,4 +164,6 @@ export async function uploadIcon(formData: FormData) {
         console.error('Failed to upload icon:', error)
         return { success: false, error: 'Failed to upload icon' }
     }
+
+    })
 }

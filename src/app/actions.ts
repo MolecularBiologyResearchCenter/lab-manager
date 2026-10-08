@@ -4,7 +4,8 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { recordAuditLog } from '@/lib/audit'
+import { recordAuditLog, runAuditedOperation } from '@/lib/audit'
+import { auditRequestId, setAuditActor } from '@/lib/audit-context'
 import { generateInvoicePdf } from '@/lib/invoice-pdf'
 import { sha256Pdf, validateGeneratedInvoicePdf } from '@/lib/invoice-pdf-security'
 import { formatTokyoDateTime } from '@/lib/date-format'
@@ -179,6 +180,7 @@ export async function getReagentList() {
 }
 
 export async function createReservation(equipmentId: string, userId: string, startTime: Date, endTime: Date, phoneNumber?: string, idempotencyKey?: string): Promise<ReservationActionResult> {
+    return runAuditedOperation('RESERVATION_CREATE', 'Equipment', equipmentId, async () => {
     const trace = performanceTrace('reservation.create')
     const currentUser = await trace.measure('auth', requireUser)
     if (currentUser.id !== userId) throw new Error('他のユーザーの予約は作成できません。')
@@ -260,9 +262,12 @@ export async function createReservation(equipmentId: string, userId: string, sta
     await completeIdempotencyKey(currentUser.id, 'reservation.create', idempotencyKey!, result)
     trace.finish()
     return result
+
+    })
 }
 
 export async function logReagentUsage(userId: string, reagentId: string, quantity: number) {
+    return runAuditedOperation('SERVICE_CREATE', 'Reagent', reagentId, async () => {
     const currentUser = await requireUser()
     if (currentUser.id !== userId) throw new Error('他のユーザーの利用記録は作成できません。')
     if (currentUser.enrollmentStatus !== 'ACTIVE') throw new Error('現在の在籍状態では有料サービスを利用できません。')
@@ -293,7 +298,7 @@ export async function logReagentUsage(userId: string, reagentId: string, quantit
 
     await recordAuditLog({
         actor: currentUser,
-        action: 'USAGE_LOG_CREATE',
+        action: 'SERVICE_CREATE',
         targetType: 'UsageLog',
         targetId: usageLog.id,
         targetLabel: reagent.name,
@@ -303,6 +308,8 @@ export async function logReagentUsage(userId: string, reagentId: string, quantit
 
     revalidatePath('/reagents')
     revalidatePath('/')
+
+    })
 }
 
 export async function getUsers() {
@@ -331,6 +338,7 @@ export async function updateReservation(
     phoneNumber?: string,
     idempotencyKey?: string,
 ): Promise<ReservationActionResult> {
+    return runAuditedOperation('RESERVATION_UPDATE', 'Reservation', id, async () => {
     const trace = performanceTrace('reservation.update')
     const currentUser = await requireUser()
     const existingReservation = await prisma.reservation.findUnique({
@@ -401,9 +409,12 @@ export async function updateReservation(
     await completeIdempotencyKey(currentUser.id, 'reservation.update', idempotencyKey!, result)
     trace.finish()
     return result
+
+    })
 }
 
 export async function deleteReservation(id: string, idempotencyKey?: string) {
+    return runAuditedOperation('RESERVATION_CANCEL', 'Reservation', id, async () => {
     const currentUser = await requireUser()
     const claim = await claimIdempotencyKey(currentUser.id, 'reservation.delete', idempotencyKey)
     if (claim.state === 'duplicate') return
@@ -420,7 +431,7 @@ export async function deleteReservation(id: string, idempotencyKey?: string) {
 
     await recordAuditLog({
         actor: currentUser,
-        action: 'RESERVATION_DELETE',
+        action: 'RESERVATION_CANCEL',
         targetType: 'Reservation',
         targetId: id,
         targetLabel: reservation.equipment.name,
@@ -432,6 +443,8 @@ export async function deleteReservation(id: string, idempotencyKey?: string) {
     revalidatePath('/')
     revalidatePath('/admin')
     await completeIdempotencyKey(currentUser.id, 'reservation.delete', idempotencyKey!, { success: true })
+
+    })
 }
 
 export async function getCurrentUser() {
@@ -448,6 +461,7 @@ export async function getCurrentUserSealImage() {
 }
 
 export async function login(formData: FormData): Promise<LoginActionResult | never> {
+    return runAuditedOperation('LOGIN_FAILURE', 'Authentication', null, async () => {
     const trace = performanceTrace('auth.login')
     const email = String(formData.get('email') || '').trim()
     const password = String(formData.get('password') || '').trim()
@@ -478,6 +492,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
             where: { email },
             select: credentialUserSelect,
         })
+        setAuditActor(user)
 
         if (!user || !(await verifyPassword(password, user.password))) {
             const locked = await registerLoginFailure(throttleKeys)
@@ -485,6 +500,10 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
                 actor: authAuditActor,
                 action: 'LOGIN_FAILURE',
                 targetType: 'Authentication',
+                targetId: user?.id,
+                result: 'failure',
+                errorCode: 'INVALID_CREDENTIALS',
+                metadata: { identityVerified: false },
                 summary: 'ログインに失敗しました。',
             })
             if (locked) {
@@ -514,6 +533,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
         }
 
         await setSessionCookie(user.id, rememberMe, user.updatedAt.getTime())
+        await recordAuditLog({ actor: user, action: 'LOGIN_SUCCESS', targetType: 'User', targetId: user.id, summary: 'ログインしました。' })
         const wasLimited = await resetLoginFailures(throttleKeys)
         if (wasLimited) {
             await recordAuditLog({
@@ -531,14 +551,22 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
 
     trace.finish()
     return { success: true }
+
+    })
 }
 
 export async function logout() {
+    return runAuditedOperation('LOGOUT', 'Authentication', null, async () => {
+    const actor = await getAuthenticatedUser()
     await clearSessionCookie()
+    await recordAuditLog({ actor, action: 'LOGOUT', targetType: 'User', targetId: actor?.id, summary: 'ログアウトしました。' })
     redirect('/login')
+
+    })
 }
 
 export async function register(formData: FormData): Promise<RegisterActionResult> {
+    return runAuditedOperation('USER_CREATE', 'User', null, async () => {
     const trace = performanceTrace('user.register')
     const lastName = String(formData.get('lastName') || '').trim()
     const firstName = String(formData.get('firstName') || '').trim()
@@ -658,7 +686,7 @@ export async function register(formData: FormData): Promise<RegisterActionResult
     }
 
     await recordAuditLog({
-        actor: authAuditActor,
+        actor: { id: user.id, name, role: 'USER' },
         action: registrationType === 'GUEST' ? 'GUEST_REGISTER' : 'USER_REGISTER',
         targetType: 'User',
         targetId: user.id,
@@ -742,6 +770,8 @@ export async function register(formData: FormData): Promise<RegisterActionResult
             ? { notice: 'このメールアドレスはMicrosoft 365メーリングリストに登録済みです。Lab Managerの利用者登録は完了しました。' }
             : {}),
     }
+
+    })
 }
 
 const passwordResetRequestMessage = 'パスワード再設定を受け付けました。管理者に本人確認を依頼してください。'
@@ -749,6 +779,7 @@ const invalidPasswordResetCodeMessage = 'リセットコードが無効、また
 const PASSWORD_RESET_CODE_MAX_ATTEMPTS = 5
 
 export async function requestPasswordReset(formData: FormData) {
+    return runAuditedOperation('PASSWORD_RESET_REQUEST', 'Authentication', null, async () => {
     const employeeId = String(formData.get('employeeId') || '').trim()
     if (!employeeId) return { message: passwordResetRequestMessage }
 
@@ -768,6 +799,8 @@ export async function requestPasswordReset(formData: FormData) {
     }
 
     return { message: passwordResetRequestMessage }
+
+    })
 }
 
 // 既存画面からの呼び出し名を維持する互換ラッパー。メールは送信しない。
@@ -799,6 +832,7 @@ export async function getPasswordResetRequests() {
 }
 
 export async function issuePasswordResetCode(requestId: string) {
+    return runAuditedOperation('RESET_CODE_ISSUED', 'PasswordResetRequest', requestId, async () => {
     const admin = await requireAdmin()
     const resetCode = createAdminPasswordResetCode()
     const request = await prisma.passwordResetRequest.findFirst({
@@ -813,9 +847,12 @@ export async function issuePasswordResetCode(requestId: string) {
     ])
     await recordAuditLog({ actor: admin, action: 'RESET_CODE_ISSUED', targetType: 'User', targetId: request.userId, summary: 'パスワード再設定コードを発行しました。' })
     return { code: resetCode.code, expiresAt: resetCode.expiresAt.toISOString() }
+
+    })
 }
 
 export async function resetPasswordWithCode(code: string, newPassword: string) {
+    return runAuditedOperation('PASSWORD_RESET', 'Authentication', null, async () => {
     if (!code.trim() || !validatePassword(newPassword)) {
         await recordAuditLog({ actor: authAuditActor, action: 'RESET_FAILED', targetType: 'Authentication', summary: 'パスワード再設定に失敗しました。' })
         throw new Error(invalidPasswordResetCodeMessage)
@@ -842,19 +879,22 @@ export async function resetPasswordWithCode(code: string, newPassword: string) {
                 throw new Error(invalidPasswordResetCodeMessage)
             }
             await tx.passwordResetRequest.update({ where: { id: request.id }, data: { usedAt: now } })
-            const user = await tx.user.update({ where: { id: request.userId }, data: { password: passwordHash, passwordResetTokenHash: null, passwordResetTokenExpiresAt: null }, select: { id: true } })
+            const user = await tx.user.update({ where: { id: request.userId }, data: { password: passwordHash, passwordResetTokenHash: null, passwordResetTokenExpiresAt: null }, select: { id: true, name: true, role: true } })
             return user
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 
-        await recordAuditLog({ actor: authAuditActor, action: 'RESET_COMPLETED', targetType: 'User', targetId: result.id, summary: 'パスワードを変更しました。' })
+        await recordAuditLog({ actor: result, action: 'PASSWORD_RESET', targetType: 'User', targetId: result.id, summary: 'パスワードを再設定しました。' })
     } catch (error) {
         const expired = error instanceof Error && error.message === 'RESET_EXPIRED'
         await recordAuditLog({ actor: authAuditActor, action: expired ? 'RESET_EXPIRED' : 'RESET_FAILED', targetType: 'Authentication', summary: expired ? '期限切れのリセットコードを使用しました。' : 'パスワード再設定に失敗しました。' })
         throw new Error(invalidPasswordResetCodeMessage)
     }
+
+    })
 }
 
 export async function deleteUser(userId: string) {
+    return runAuditedOperation('USER_DELETE', 'User', userId, async () => {
     const currentUser = await requireAdmin()
 
     // Prevent self-deletion
@@ -920,6 +960,8 @@ export async function deleteUser(userId: string) {
     })
 
     revalidatePath('/admin/users')
+
+    })
 }
 
 export async function updateProfile(
@@ -933,6 +975,7 @@ export async function updateProfile(
         newPassword?: string
     }
 ) {
+    return runAuditedOperation(data.newPassword ? 'PASSWORD_CHANGE' : 'PROFILE_UPDATE', 'User', userId, async () => {
     const currentUser = await requireUser()
 
     if (currentUser.id !== userId) {
@@ -987,6 +1030,7 @@ export async function updateProfile(
     })
 
     const mailingListChanged = data.mailingList !== undefined && previousProfile.mailingList !== data.mailingList
+    if (data.newPassword) await recordAuditLog({ actor: currentUser, action: 'PASSWORD_CHANGE', targetType: 'User', targetId: userId, summary: 'パスワードを変更しました。' })
     await recordAuditLog({
         actor: currentUser,
         action: 'PROFILE_UPDATE',
@@ -1000,6 +1044,7 @@ export async function updateProfile(
     })
 
     if (mailingListChanged) {
+        await recordAuditLog({ actor: currentUser, action: data.mailingList ? 'MAILING_LIST_OPT_IN' : 'MAILING_LIST_OPT_OUT', targetType: 'User', targetId: userId, summary: 'メーリングリストの参加希望を変更しました。' })
         try {
             await syncUserMicrosoftGroupMembership({
                 userId,
@@ -1022,9 +1067,12 @@ export async function updateProfile(
     }
 
     revalidatePath('/mypage')
+
+    })
 }
 
 export async function sealInvoice(invoiceId: string, requestId?: string, reissue = false) {
+    return runAuditedOperation('INVOICE_SEAL', 'Invoice', invoiceId, async () => {
     const currentUser = await requireCenterDirector()
 
     const recordSealFailure = async (reason: string, message: string): Promise<never> => {
@@ -1145,7 +1193,8 @@ export async function sealInvoice(invoiceId: string, requestId?: string, reissue
             await transaction.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.id,
+                    actorName: currentUser.name,
+                    requestId: requestId ?? auditRequestId(),
                     actorRole: currentUser.role,
                     action: 'INVOICE_SEAL',
                     targetType: 'Invoice',
@@ -1178,6 +1227,8 @@ export async function sealInvoice(invoiceId: string, requestId?: string, reissue
 
     revalidatePath(`/invoices/${invoiceId}`)
     revalidatePath('/invoices')
+
+    })
 }
 
 export async function sealInvoices(invoiceIds: string[], requestId?: string) {
@@ -1206,6 +1257,7 @@ export async function sealInvoices(invoiceIds: string[], requestId?: string) {
 }
 
 export async function updateUserRole(userId: string, role: string) {
+    return runAuditedOperation('USER_ROLE_UPDATE', 'User', userId, async () => {
     const currentUser = await requireAdmin()
 
     if (!['USER', 'ADMIN', 'CENTER_DIRECTOR'].includes(role)) {
@@ -1236,6 +1288,8 @@ export async function updateUserRole(userId: string, role: string) {
     })
 
     revalidatePath('/admin/users')
+
+    })
 }
 
 export async function updateUserProfileByAdmin(
@@ -1249,6 +1303,7 @@ export async function updateUserProfileByAdmin(
         guestApproved?: boolean
     },
 ) {
+    return runAuditedOperation('USER_UPDATE', 'User', userId, async () => {
     const currentUser = await requireAdmin()
 
     const targetUser = await prisma.user.findUnique({
@@ -1315,11 +1370,20 @@ export async function updateUserProfileByAdmin(
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.user.update({ where: { id: userId }, data: updateData })
 
+        if (mailingListChanged || shouldDisableMailingList) {
+            await tx.auditLog.create({ data: {
+                actorId: currentUser.id, actorName: currentUser.name, actorRole: currentUser.role,
+                requestId: auditRequestId(), action: updateData.mailingList ? 'MAILING_LIST_OPT_IN' : 'MAILING_LIST_OPT_OUT',
+                targetType: 'User', targetId: userId, result: 'success', summary: 'メーリングリストの参加希望を変更しました。',
+            } })
+        }
+
         if (roleChanged) {
             await tx.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.id,
+                    actorName: currentUser.name,
+                    requestId: auditRequestId(),
                     actorRole: currentUser.role,
                     action: 'USER_ROLE_UPDATE',
                     targetType: 'User',
@@ -1335,7 +1399,8 @@ export async function updateUserProfileByAdmin(
             await tx.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.id,
+                    actorName: currentUser.name,
+                    requestId: auditRequestId(),
                     actorRole: currentUser.role,
                     action: 'USER_PROFILE_UPDATE',
                     targetType: 'User',
@@ -1366,7 +1431,8 @@ export async function updateUserProfileByAdmin(
             await tx.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.id,
+                    actorName: currentUser.name,
+                    requestId: auditRequestId(),
                     actorRole: currentUser.role,
                     action: 'USER_AFFILIATION_UPDATE',
                     targetType: 'User',
@@ -1382,7 +1448,8 @@ export async function updateUserProfileByAdmin(
             await tx.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.id,
+                    actorName: currentUser.name,
+                    requestId: auditRequestId(),
                     actorRole: currentUser.role,
                     action: 'USER_ENROLLMENT_STATUS_UPDATE',
                     targetType: 'User',
@@ -1398,7 +1465,8 @@ export async function updateUserProfileByAdmin(
             await tx.auditLog.create({
                 data: {
                     actorId: currentUser.id,
-                    actorName: currentUser.id,
+                    actorName: currentUser.name,
+                    requestId: auditRequestId(),
                     actorRole: currentUser.role,
                     action: 'GUEST_APPROVAL_UPDATE',
                     targetType: 'User',
@@ -1459,9 +1527,12 @@ export async function updateUserProfileByAdmin(
 
     revalidatePath('/admin/users')
     revalidatePath('/mypage')
+
+    })
 }
 
 export async function adminSetUserPassword(userId: string, newPassword: string) {
+    return runAuditedOperation('PASSWORD_CHANGE', 'User', userId, async () => {
     const currentUser = await requireAdmin()
     if (!validatePassword(newPassword)) {
         throw new Error('パスワードは英小文字と数字を含む8文字以上で入力してください。')
@@ -1483,9 +1554,12 @@ export async function adminSetUserPassword(userId: string, newPassword: string) 
         summary: '管理者がユーザーのパスワードを再設定しました。',
     })
 
+
+    })
 }
 
 export async function uploadSeal(formData: FormData) {
+    return runAuditedOperation('SEAL_IMAGE_UPDATE', 'User', null, async () => {
     const currentUser = await requireCenterDirector()
 
     const file = formData.get('file')
@@ -1512,7 +1586,7 @@ export async function uploadSeal(formData: FormData) {
 
     await recordAuditLog({
         actor: currentUser,
-        action: 'SEAL_UPLOAD',
+        action: 'SEAL_IMAGE_UPDATE',
         targetType: 'User',
         targetId: currentUser.id,
         targetLabel: currentUser.name,
@@ -1521,4 +1595,6 @@ export async function uploadSeal(formData: FormData) {
     })
 
     revalidatePath('/')
+
+    })
 }

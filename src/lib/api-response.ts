@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto'
+import { auditRequestId } from './audit-context'
 import { NextResponse } from 'next/server'
 
 export const API_ERROR_CODES = {
@@ -17,7 +17,7 @@ export type ApiErrorCode = typeof API_ERROR_CODES[keyof typeof API_ERROR_CODES]
 const requestStarts = new Map<string, number>()
 
 export function createRequestId() {
-    const requestId = randomUUID()
+    const requestId = auditRequestId()
     requestStarts.set(requestId, performance.now())
     return requestId
 }

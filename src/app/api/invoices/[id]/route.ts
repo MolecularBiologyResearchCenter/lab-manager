@@ -3,12 +3,14 @@ import { getCurrentUser } from '@/app/actions'
 import { prisma } from '@/lib/prisma'
 import { API_ERROR_CODES, apiErrorResponse, apiSuccessResponse, createRequestId } from '@/lib/api-response'
 import { performanceTrace } from '@/lib/performance'
-import { recordAuthorizationFailure } from '@/lib/audit'
+import { recordAuthorizationFailure, recordAuditLog, runAuditedOperation } from '@/lib/audit'
 
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id: targetId } = await params
+    return runAuditedOperation('INVOICE_VIEW', 'Invoice', targetId, async () => {
     const requestId = createRequestId()
     const trace = performanceTrace('api.invoice.detail', requestId)
     try {
@@ -79,6 +81,7 @@ export async function GET(
         }
 
         trace.finish()
+        await recordAuditLog({ actor: user, action: 'INVOICE_VIEW', targetType: 'Invoice', targetId: id, requestId, summary: '請求書を閲覧しました。' })
         const safeSealer = invoice.sealer
             ? {
                 name: invoice.sealer.name,
@@ -91,9 +94,10 @@ export async function GET(
             sealer: safeSealer,
             viewerRole: user.role,
         }, requestId)
-    } catch (error) {
+    } catch {
         trace.finish('failure')
-        console.error(`[${requestId}] 請求書の取得に失敗しました。`, error)
+        console.error(`[${requestId}] 請求書の取得に失敗しました。`)
         return apiErrorResponse(500, API_ERROR_CODES.INTERNAL_ERROR, '請求書を取得できませんでした。', '時間をおいて、もう一度お試しください。', requestId)
     }
+    })
 }

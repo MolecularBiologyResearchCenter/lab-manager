@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto'
+import { auditRequestId } from './audit-context'
 
 export type PerformanceStage = 'auth' | 'dbConnection' | 'prismaQuery' | 'externalApi' | 'pdf' | 'app' | 'response'
 
@@ -14,7 +14,7 @@ export class PerformanceTrace {
     private readonly stages: StageDurations = {}
 
     constructor(readonly operation: string, requestId?: string) {
-        this.requestId = requestId ?? randomUUID()
+        this.requestId = requestId ?? auditRequestId()
     }
 
     async measure<T>(stage: PerformanceStage, task: () => Promise<T>) {

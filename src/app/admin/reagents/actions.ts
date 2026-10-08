@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/auth'
-import { recordAuditLog } from '@/lib/audit'
+import { recordAuditLog, runAuditedOperation } from '@/lib/audit'
 
 export async function getReagents() {
     await requireAdmin()
@@ -21,6 +21,7 @@ export async function getReagents() {
 }
 
 export async function createReagent(formData: FormData) {
+    return runAuditedOperation('REAGENT_CREATE', 'Reagent', null, async () => {
     const currentUser = await requireAdmin()
     try {
         const name = formData.get('name') as string
@@ -44,9 +45,12 @@ export async function createReagent(formData: FormData) {
         console.error('Failed to create reagent:', error)
         return { success: false, error: 'Failed to create reagent' }
     }
+
+    })
 }
 
 export async function updateReagent(id: string, formData: FormData) {
+    return runAuditedOperation('REAGENT_UPDATE', 'Reagent', id, async () => {
     const currentUser = await requireAdmin()
     try {
         const name = formData.get('name') as string
@@ -71,9 +75,12 @@ export async function updateReagent(id: string, formData: FormData) {
         console.error('Failed to update reagent:', error)
         return { success: false, error: 'Failed to update reagent' }
     }
+
+    })
 }
 
 export async function deleteReagent(id: string) {
+    return runAuditedOperation('REAGENT_DELETE', 'Reagent', id, async () => {
     const currentUser = await requireAdmin()
     try {
         // Check if reagent is used in any usage logs
@@ -99,4 +106,6 @@ export async function deleteReagent(id: string) {
         console.error('Failed to delete reagent:', error)
         return { success: false, error: 'Failed to delete reagent' }
     }
+
+    })
 }

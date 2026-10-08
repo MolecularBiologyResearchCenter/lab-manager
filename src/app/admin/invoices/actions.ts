@@ -4,11 +4,12 @@ import { prisma } from '@/lib/prisma'
 import { generateInvoiceForUser, getAnnualRegistrationFee, getCurrentQuarter, getQuarterDates, getTokyoDateParts } from '@/lib/invoice'
 import { revalidatePath } from 'next/cache'
 import { requireUser } from '@/lib/auth'
-import { recordAuditLog } from '@/lib/audit'
+import { recordAuditLog, runAuditedOperation } from '@/lib/audit'
 import { claimIdempotencyKey, completeIdempotencyKey, releaseIdempotencyKey } from '@/lib/idempotency'
 import { performanceTrace } from '@/lib/performance'
 
 export async function generateInvoicesForQuarter(year: number, quarter: number, _formData?: FormData): Promise<void> {
+    return runAuditedOperation('INVOICE_CREATE', 'Invoice', null, async () => {
     const trace = performanceTrace('invoice.generate')
     const currentUser = await requireUser()
     if (currentUser.role !== 'ADMIN' && currentUser.role !== 'CENTER_DIRECTOR') {
@@ -58,6 +59,8 @@ export async function generateInvoicesForQuarter(year: number, quarter: number, 
         trace.finish('failure')
         throw error
     }
+
+    })
 }
 
 export async function generateCurrentQuarterInvoices() {

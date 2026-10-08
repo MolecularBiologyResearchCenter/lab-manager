@@ -3,6 +3,7 @@ import { requireAdminOrCenterDirector } from '@/lib/auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatTokyoDateTime } from '@/lib/date-format'
 import { performanceTrace } from '@/lib/performance'
+import { recordAuditLog } from '@/lib/audit'
 
 const roleLabels: Record<string, string> = {
     ADMIN: '管理者',
@@ -20,7 +21,7 @@ export default async function AuditLogsPage({
     searchParams?: Promise<{ action?: string; result?: string; actorId?: string }>
 }) {
     const trace = performanceTrace('page.admin.audit-logs')
-    await trace.measure('auth', requireAdminOrCenterDirector)
+    const actor = await trace.measure('auth', requireAdminOrCenterDirector)
     const params = await searchParams
     const actionQuery = params?.action?.trim().slice(0, 100) || undefined
     const result = params?.result === 'success' || params?.result === 'failure' || params?.result === 'pending' ? params.result : undefined
@@ -30,6 +31,7 @@ export default async function AuditLogsPage({
         id: string
         createdAt: Date
         actorName: string
+        actorId: string | null
         actorRole: string
         action: string
         targetType: string
@@ -47,12 +49,13 @@ export default async function AuditLogsPage({
             where: {
                 ...(actionQuery ? { action: { contains: actionQuery } } : {}),
                 ...(result ? { result } : {}),
-                ...(actorId ? { actorName: actorId } : {}),
+                ...(actorId ? { actorId } : {}),
             },
             select: {
                 id: true,
                 createdAt: true,
                 actorName: true,
+                actorId: true,
                 actorRole: true,
                 action: true,
                 targetType: true,
@@ -66,9 +69,10 @@ export default async function AuditLogsPage({
             orderBy: { createdAt: 'desc' },
             take: 200,
         }))
+        await recordAuditLog({ actor, action: 'AUDIT_LOG_VIEW', targetType: 'AuditLog', summary: '監査ログを閲覧しました。', requestId: trace.requestId })
         trace.finish()
-    } catch (error) {
-        console.error('監査ログの読み込みに失敗しました。', error)
+    } catch {
+        await recordAuditLog({ actor, action: 'AUDIT_LOG_VIEW', targetType: 'AuditLog', summary: '監査ログを取得できませんでした。', requestId: trace.requestId, result: 'failure', errorCode: 'AUDIT_LOG_READ_FAILED' })
         trace.finish('failure', { errorCode: 'AUDIT_LOG_READ_FAILED' })
         databaseMessage = '監査ログ用のデータベース設定がまだ反映されていません。管理者に npx prisma db push の実行を依頼してください。'
     }
@@ -79,7 +83,7 @@ export default async function AuditLogsPage({
                 <Card className="card-elevated">
                     <CardHeader>
                         <CardTitle>監査ログ</CardTitle>
-                        <p className="text-sm text-slate-500">ユーザーID、日時、操作、結果を最新200件まで表示します。個人情報・秘密情報は表示しません。</p>
+                        <p className="text-sm text-slate-500">実行者の氏名・ユーザーID、実行時の権限、日時（日本時間）、操作、結果を最新200件まで表示します。</p>
                         <form method="get" className="flex items-center gap-2 pt-2">
                             <label htmlFor="audit-action" className="text-sm font-medium text-slate-700">操作</label>
                             <input id="audit-action" name="action" defaultValue={actionQuery ?? ''} placeholder="操作名" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
@@ -113,7 +117,7 @@ export default async function AuditLogsPage({
                                     {logs.map((log) => (
                                         <tr key={log.id} className="border-b last:border-0">
                                             <td className="whitespace-nowrap px-3 py-3">{formatTokyoDateTime(log.createdAt)}</td>
-                                            <td className="px-3 py-3 font-mono text-xs">{log.actorName}</td>
+                                            <td className="px-3 py-3 text-xs">{log.actorName}<div className="font-mono text-slate-500">{log.actorId ?? '未認証・削除済み'}</div></td>
                                             <td className="px-3 py-3">{roleLabels[log.actorRole] ?? log.actorRole}</td>
                                             <td className="px-3 py-3">{actionLabels[log.action] ?? log.action}</td>
                                             <td className="px-3 py-3 font-mono text-xs">{log.targetType}{log.targetId ? `:${log.targetId}` : ''}</td>
