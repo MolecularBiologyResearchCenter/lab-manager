@@ -231,7 +231,7 @@ export default async function AdminPage(props: { searchParams: Promise<{ month?:
                     </Link>
                 </div>
 
-                <div className="space-y-6">
+                <div className="mx-auto w-full max-w-[800px] space-y-6">
                     <AdminNotificationsCard />
 
                     <AdminPasswordResetRequests initialRequests={passwordResetRequests} />
