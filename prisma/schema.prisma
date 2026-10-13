@@ -288,3 +288,13 @@ model InvoiceItem {
 
   createdAt DateTime @default(now())
 }
+
+// Numeric performance samples only; never store request payloads or identities.
+model PerformanceSample {
+  id String @id
+  category String
+  recordedAt DateTime @db.Timestamptz(3)
+  durationMs Float
+
+  @@index([recordedAt, category])
+}

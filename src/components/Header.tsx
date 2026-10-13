@@ -12,6 +12,7 @@ import {
     FileText,
     FlaskConical,
     Gauge,
+    LayoutDashboard,
     LogOut,
     Users,
     Wrench,
@@ -19,7 +20,7 @@ import {
 import Image from 'next/image'
 
 const adminNavigation = [
-    { href: '/admin', label: '概要', icon: Gauge },
+    { href: '/admin', label: '概要', icon: LayoutDashboard },
     { href: '/reservations?view=calendar', label: 'カレンダー', icon: CalendarDays },
     { href: '/admin/invoices', label: '請求書', icon: FileText },
     { href: '/admin/usage-logs', label: '利用料金', icon: DollarSign },
@@ -27,6 +28,7 @@ const adminNavigation = [
     { href: '/admin/equipment', label: '機器', icon: Wrench },
     { href: '/admin/users', label: '利用者', icon: Users },
     { href: '/admin/audit-logs', label: '監査ログ', icon: ClipboardList },
+    { href: '/admin/performance', label: '性能計測', icon: Gauge },
 ]
 
 export default async function Header() {

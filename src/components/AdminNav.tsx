@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
     FileText,
     FlaskConical,
-    Gauge,
+    LayoutDashboard,
     DollarSign,
     Users,
     Wrench,
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 
 const adminNavigation = [
-    { href: '/admin', label: '概要', icon: Gauge },
+    { href: '/admin', label: '概要', icon: LayoutDashboard },
     { href: '/admin/invoices', label: '請求書', icon: FileText },
     { href: '/admin/usage-logs', label: '利用料金', icon: DollarSign },
     { href: '/admin/reagents', label: '有料サービス', icon: FlaskConical },

@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "vercel-build": "prisma db execute --file prisma/ensure-idempotency-key-table.sql && prisma generate && next build",
+    "vercel-build": "prisma db execute --file prisma/ensure-idempotency-key-table.sql && prisma db execute --file prisma/ensure-performance-samples.sql && prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "npm run security:check && npm run test:reservation && npm run test:reservation-regression && npm run test:performance && npm run test:invoice-period && npm run test:university-email && tsx scripts/security-business-flow-self-test.ts && npm run test:audit",
@@ -17,7 +17,7 @@
     "password:migrate": "tsx scripts/hash-existing-passwords.ts",
     "test:reservation": "tsx scripts/reservation-rules-self-test.ts",
     "test:reservation-regression": "tsx scripts/reservation-regression-self-test.ts",
-    "test:performance": "tsx scripts/performance-self-test.ts",
+    "test:performance": "tsx scripts/performance-self-test.ts && tsx scripts/performance-aggregation-self-test.ts",
     "test:invoice-period": "tsx scripts/invoice-period-self-test.ts",
     "test:university-email": "tsx scripts/university-email-self-test.ts",
     "performance:summary": "tsx scripts/performance-summary.ts",
