@@ -68,91 +68,92 @@ function getReservationErrorCode(error: unknown): string {
 
 export async function getDashboardData() {
     const trace = performanceTrace('dashboard.user')
-    const currentUser = await requireUser()
-    const now = new Date()
-    const currentQuarter = getCurrentQuarter(now)
-    const { start: startOfQuarter, end: endOfQuarter } = getQuarterDates(now.getFullYear(), currentQuarter)
+    return trace.run(async () => {
+        const currentUser = await trace.measure('auth', requireUser)
+        const now = new Date()
+        const currentQuarter = getCurrentQuarter(now)
+        const { start: startOfQuarter, end: endOfQuarter } = getQuarterDates(now.getFullYear(), currentQuarter)
 
-    // Get total cost for current quarter
-    const usageQuery = prisma.usageLog.findMany({
-        where: {
-            userId: currentUser.id,
-            date: {
-                gte: startOfQuarter,
-                lt: endOfQuarter,
+        // Get total cost for current quarter
+        const usageQuery = prisma.usageLog.findMany({
+            where: {
+                userId: currentUser.id,
+                date: {
+                    gte: startOfQuarter,
+                    lt: endOfQuarter,
+                },
             },
-        },
-        select: {
-            id: true,
-            totalCost: true,
-            date: true,
-            reagent: { select: { name: true } },
-        },
-        orderBy: {
-            date: 'desc',
-        },
-    })
-
-    // Get upcoming reservations (starting from today 00:00)
-    const startOfDay = new Date(now)
-    startOfDay.setHours(0, 0, 0, 0)
-
-    const reservationsQuery = prisma.reservation.findMany({
-        where: {
-            userId: currentUser.id,
-            status: reservationStatusFilter,
-            startTime: {
-                gte: startOfDay,
+            select: {
+                id: true,
+                totalCost: true,
+                date: true,
+                reagent: { select: { name: true } },
             },
-        },
-        select: {
-            id: true,
-            startTime: true,
-            endTime: true,
-            equipment: { select: { name: true } },
-        },
-        orderBy: {
-            startTime: 'asc',
-        },
-        take: 100,
+            orderBy: {
+                date: 'desc',
+            },
+        })
+
+        // Get upcoming reservations (starting from today 00:00)
+        const startOfDay = new Date(now)
+        startOfDay.setHours(0, 0, 0, 0)
+
+        const reservationsQuery = prisma.reservation.findMany({
+            where: {
+                userId: currentUser.id,
+                status: reservationStatusFilter,
+                startTime: {
+                    gte: startOfDay,
+                },
+            },
+            select: {
+                id: true,
+                startTime: true,
+                endTime: true,
+                equipment: { select: { name: true } },
+            },
+            orderBy: {
+                startTime: 'asc',
+            },
+            take: 100,
+        })
+
+        // Get equipment status (count of active reservations right now)
+        const activeCountQuery = prisma.reservation.count({
+            where: {
+                startTime: { lte: now },
+                endTime: { gt: now },
+                status: reservationStatusFilter,
+            },
+        })
+        const [usageLogs, upcomingReservations, activeReservationsCount] = await trace.measure('prismaQuery', () => Promise.all([usageQuery, reservationsQuery, activeCountQuery]))
+        const totalCost = usageLogs.reduce((sum: number, log: any) => sum + log.totalCost, 0)
+
+        // Generate quarter label
+        let quarterLabel = ''
+        switch (currentQuarter) {
+            case 1:
+                quarterLabel = '1-4月'
+                break
+            case 2:
+                quarterLabel = '5-8月'
+                break
+            case 3:
+                quarterLabel = '9-12月'
+                break
+        }
+
+        const result = {
+            totalCost,
+            upcomingReservations,
+            activeReservationsCount,
+            currentQuarter,
+            fiscalYear: getTokyoDateParts(now).year,
+            quarterLabel,
+            usageLogs,
+        }
+        return result
     })
-
-    // Get equipment status (count of active reservations right now)
-    const activeCountQuery = prisma.reservation.count({
-        where: {
-            startTime: { lte: now },
-            endTime: { gt: now },
-            status: reservationStatusFilter,
-        },
-    })
-    const [usageLogs, upcomingReservations, activeReservationsCount] = await trace.measure('prismaQuery', () => Promise.all([usageQuery, reservationsQuery, activeCountQuery]))
-    const totalCost = usageLogs.reduce((sum: number, log: any) => sum + log.totalCost, 0)
-
-    // Generate quarter label
-    let quarterLabel = ''
-    switch (currentQuarter) {
-        case 1:
-            quarterLabel = '1-4月'
-            break
-        case 2:
-            quarterLabel = '5-8月'
-            break
-        case 3:
-            quarterLabel = '9-12月'
-            break
-    }
-
-    const result = {
-        totalCost,
-        upcomingReservations,
-        activeReservationsCount,
-        currentQuarter,
-        fiscalYear: getTokyoDateParts(now).year,
-        quarterLabel,
-        usageLogs,
-    }
-    trace.finish()
-    return result
 }
 
 export async function getEquipmentList() {
@@ -468,7 +469,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
     const rememberMe = formData.get('rememberMe') === 'on'
 
     if (!email || !password) {
-        trace.finish('failure')
+        trace.finish('failure', { status: 400 })
         throw new Error('メールアドレスとパスワードを入力してください。')
     }
 
@@ -484,14 +485,14 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
             })
         }
         if (throttleStatus.blocked) {
-            trace.finish('failure')
+            trace.finish('failure', { status: 429 })
             return { success: false, error: genericLoginError }
         }
 
-        const user = await prisma.user.findUnique({
+        const user = await trace.measure('prismaQuery', () => prisma.user.findUnique({
             where: { email },
             select: credentialUserSelect,
-        })
+        }))
         setAuditActor(user)
 
         if (!user || !(await verifyPassword(password, user.password))) {
@@ -514,7 +515,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
                     summary: 'ログイン試行制限により一時ロックしました。',
                 })
             }
-            trace.finish('failure')
+            trace.finish('failure', { status: 401 })
             return { success: false, error: genericLoginError }
         }
 
@@ -528,7 +529,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
                 summary: '在籍状態、承認状態、または利用期限によりログインを拒否しました。',
                 metadata: { result: 'failure' },
             })
-            trace.finish('failure')
+            trace.finish('failure', { status: 401 })
             return { success: false, error: genericLoginError }
         }
 
@@ -545,7 +546,7 @@ export async function login(formData: FormData): Promise<LoginActionResult | nev
         }
     } catch {
         console.error('ログイン処理に失敗しました。')
-        trace.finish('failure')
+        trace.finish('failure', { status: 500 })
         return { success: false, error: 'ログイン処理中にエラーが発生しました。時間をおいて、もう一度お試しください。' }
     }
 

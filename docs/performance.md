@@ -35,3 +35,27 @@ npm run performance:summary -- ./vercel-function-logs.jsonl
 - 期限付きidempotencyレコードを追加し、同一操作の再送を無視。
 
 本番のp50/p95/最大値は、デプロイ後にVercel Function Logsを一定期間取得して上記スクリプトで集計します。リポジトリ内だけでは本番実行ログを推測できないため、未計測値を作成していません。
+
+## 第一段階の計測仕様
+
+既存の `console.info` JSON出力を再利用し、監査ログ・DBスキーマ・画面表示は変更しません。
+
+| 対象 | operation | method / path（固定の処理入口） |
+| --- | --- | --- |
+| ログインServer Action | `auth.login` | POST /login |
+| 利用者ダッシュボードデータ取得 | `dashboard.user` | POST / |
+| 予約一覧・カレンダー共通のサーバーページ | `page.reservations` | GET /reservations |
+| 機器一覧Server Action | `equipment.list` | POST /reservations |
+| 管理者ダッシュボードのサーバーページ | `page.admin.dashboard` | GET /admin |
+| 管理者ダッシュボードの通知取得API | `api.admin.notifications` | GET /api/admin/notifications |
+
+各記録は `requestId`, `method`, `path`, `status`, `durationMs`, `result` を含みます。
+Server Actionとサーバーページの `statusKind=server-processing` は処理結果のステータスであり、Next.jsが後で返すHTTPステータスを保証しません。成功200、ログイン入力不足400、認証失敗・利用制限401、試行制限429、例外500、ページの認証リダイレクト307です。通知APIは `statusKind=http-response` で実際のレスポンスステータスを記録します。
+
+`method` / `path` は固定の入口ラベルで、動的URLやクエリ文字列を読みません。機器一覧をページ内から直接呼ぶ場合もServer Actionの入口ラベルを使います。`requestId` は既存の監査コンテキストのIDを再利用し、コンテキスト外ではUUIDを生成します（通知APIは既存レスポンスID）。ログ自体は監査ログと別出力です。ページと内部Actionは別記録なので、時間を合算しないでください。
+
+`durationMs` はサーバー関数の処理時間です。ブラウザー描画、通信時間、後続のReactレンダリングは含みません。`stages.prismaQuery` は囲んだDB処理の待ち時間（並列処理は経過時間）であり、DBエンジン時間の合計ではありません。ログインは利用者検索を計測し、スロットル・監査書き込み等は総時間に含みます。既存の `lab_manager_prisma_query` はクエリ単体の実行時間のみで、requestIdとの関連付けはありません。
+
+性能ログにはリクエスト本文、ヘッダー、Cookie、入力値、戻り値、例外本文、SQL・パラメータを渡しません。追加メタデータも許可リスト方式で、任意の文字列（errorCodeを含む）は出力しません。パスワード、メール、トークン、Client Secret、印鑑画像の混入を防ぎます。ログ出力の失敗は処理結果に影響させません。
+
+次段階では同一期間・同一環境のログから成功処理をoperationごとに集計し、件数が十分ある処理のp95を比較して1件選びます。既存集計ツールの並び順は最大値なので、p95列で比較してください。選んだ処理のDB待ち時間を確認し、DBが主因ならクエリ計画・取得件数を調査して改善前後のp95を同条件で比較します。この段階ではクエリやインデックスを変更していません。

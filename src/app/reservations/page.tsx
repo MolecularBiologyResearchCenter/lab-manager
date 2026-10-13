@@ -9,71 +9,73 @@ import { performanceTrace } from '@/lib/performance'
 
 export default async function ReservationsPage(props: { searchParams: Promise<{ view?: string }> }) {
     const trace = performanceTrace('page.reservations')
-    const searchParams = await props.searchParams
-    const currentUser = await trace.measure('auth', getCurrentUser)
-    if (!currentUser) {
-        redirect('/login')
-    }
+    return trace.run(async () => {
+        const searchParams = await props.searchParams
+        const currentUser = await trace.measure('auth', getCurrentUser)
+        if (!currentUser) {
+            trace.finish('success', { status: 307 })
+            redirect('/login')
+        }
 
-    const reservationsQuery = prisma.reservation.findMany({
-        where: { status: { notIn: ['cancelled', 'rejected'] } },
-        include: {
-            equipment: true,
-            user: {
-                select: { id: true, name: true, laboratory: true, extension: true },
+        const reservationsQuery = prisma.reservation.findMany({
+            where: { status: { notIn: ['cancelled', 'rejected'] } },
+            include: {
+                equipment: true,
+                user: {
+                    select: { id: true, name: true, laboratory: true, extension: true },
+                },
             },
-        },
-    })
-    const equipmentQuery = getEquipmentList()
-    const [reservations, equipmentList] = await trace.measure('prismaQuery', () => Promise.all([reservationsQuery, equipmentQuery]))
+        })
+        const equipmentQuery = getEquipmentList()
+        const [reservations, equipmentList] = await trace.measure('prismaQuery', () => Promise.all([reservationsQuery, equipmentQuery]))
 
-    const events = reservations.map(res => ({
-        id: res.id,
-        title: `${res.equipment.name} (${res.user.name})`,
-        start: res.startTime,
-        end: res.endTime,
-        resourceId: res.equipmentId,
-        userId: res.userId,
-        userName: res.user.name, // Pass user name for display
-        userLaboratory: res.user.laboratory || undefined,
-        phoneNumber: res.phoneNumber || undefined,
-        userExtension: res.user.extension || undefined,
-    }))
+        const events = reservations.map(res => ({
+            id: res.id,
+            title: `${res.equipment.name} (${res.user.name})`,
+            start: res.startTime,
+            end: res.endTime,
+            resourceId: res.equipmentId,
+            userId: res.userId,
+            userName: res.user.name, // Pass user name for display
+            userLaboratory: res.user.laboratory || undefined,
+            phoneNumber: res.phoneNumber || undefined,
+            userExtension: res.user.extension || undefined,
+        }))
 
-    // Get view preference from URL params, default to 'calendar'
-    const view = searchParams.view || 'calendar'
+        // Get view preference from URL params, default to 'calendar'
+        const view = searchParams.view || 'calendar'
 
-    trace.finish()
-    return (
-        <div className="content-wrapper app-page">
-            <div className="app-page-header">
-                <div>
-                    <h1 className="app-page-title"><UserLanguageText k="equipmentReservation" /></h1>
-                    <p className="app-page-description"><UserLanguageText k="todaySchedule" /></p>
+        return (
+            <div className="content-wrapper app-page">
+                <div className="app-page-header">
+                    <div>
+                        <h1 className="app-page-title"><UserLanguageText k="equipmentReservation" /></h1>
+                        <p className="app-page-description"><UserLanguageText k="todaySchedule" /></p>
+                    </div>
                 </div>
+
+                <ReservationViewToggle currentView={view} />
+
+                {view === 'list' ? (
+                    <EquipmentListView
+                        equipmentList={equipmentList}
+                        currentUser={{
+                            ...currentUser,
+                            extension: currentUser.extension || undefined
+                        }}
+                        reservations={reservations}
+                    />
+                ) : (
+                    <ReservationCalendar
+                        reservations={events}
+                        equipmentList={equipmentList}
+                        currentUser={{
+                            ...currentUser,
+                            extension: currentUser.extension || undefined
+                        }}
+                    />
+                )}
             </div>
-
-            <ReservationViewToggle currentView={view} />
-
-            {view === 'list' ? (
-                <EquipmentListView
-                    equipmentList={equipmentList}
-                    currentUser={{
-                        ...currentUser,
-                        extension: currentUser.extension || undefined
-                    }}
-                    reservations={reservations}
-                />
-            ) : (
-                <ReservationCalendar
-                    reservations={events}
-                    equipmentList={equipmentList}
-                    currentUser={{
-                        ...currentUser,
-                        extension: currentUser.extension || undefined
-                    }}
-                />
-            )}
-        </div>
-    )
+        )
+    })
 }
