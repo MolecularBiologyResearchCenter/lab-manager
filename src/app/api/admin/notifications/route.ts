@@ -151,10 +151,12 @@ export async function GET() {
                 ? null
                 : 403
         if (status === 401) {
+            trace.finish('failure', { status: 401 })
             return apiErrorResponse(401, API_ERROR_CODES.AUTH_REQUIRED, 'ログインが必要です。', 'ログインしてから、もう一度お試しください。', requestId)
         }
         if (status === 403) {
             await recordAuthorizationFailure(currentUser, 'ADMIN_OR_CENTER_DIRECTOR')
+            trace.finish('failure', { status: 403 })
             return apiErrorResponse(403, API_ERROR_CODES.FORBIDDEN, 'この操作を行う権限がありません。', '管理者またはセンター長権限でログインしてください。', requestId)
         }
 
