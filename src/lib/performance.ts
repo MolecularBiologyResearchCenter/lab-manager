@@ -1,3 +1,5 @@
+import { parsePerformanceEntry } from './performance-aggregation'
+import { schedulePerformanceSample } from './performance-persistence'
 import { auditRequestId } from './audit-context'
 
 export type PerformanceStage = 'auth' | 'dbConnection' | 'prismaQuery' | 'externalApi' | 'pdf' | 'app' | 'response'
@@ -83,6 +85,8 @@ export class PerformanceTrace {
         } catch {
             // Logging must not change application behavior.
         }
+        const sample = parsePerformanceEntry({ type: 'lab_manager_performance', operation: this.operation, durationMs, timestamp: Date.now() })
+        if (sample) schedulePerformanceSample(sample)
         return this.finished
     }
 }

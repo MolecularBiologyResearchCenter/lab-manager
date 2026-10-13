@@ -27,6 +27,7 @@ const adminNavigation = [
     { href: '/admin/equipment', label: '機器', icon: Wrench },
     { href: '/admin/users', label: '利用者', icon: Users },
     { href: '/admin/audit-logs', label: '監査ログ', icon: ClipboardList },
+    { href: '/admin/performance', label: '性能計測', icon: Gauge },
 ]
 
 export default async function Header() {
