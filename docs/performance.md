@@ -71,3 +71,32 @@ Vercelへのログ出力と同じ `durationMs` を、その出力時点で `afte
 初回は `prisma/ensure-performance-samples.sql` による追加テーブル作成が必要です。既存のVercelビルドスクリプトに冪等なDDL実行を追加しています。`npm run build` はDDLを実行しません。DBに接続して本番反映する際は、適用先とビルド成功を確認してください。
 
 件数は処理呼び出し数で、利用者数やページ閲覧数ではありません。予約・管理者分類には関連する内部Action/APIも含みます。成功・失敗の両方を集計します。p50/p95は `percentile_disc`（nearest rank）を使用し、空の分類は0件・統計値「—」にします。PostgreSQL側で集計するので、生ログや全サンプルをブラウザーへ送信しません。期間変更・再読み込み時に更新し、共有キャッシュは使いません。
+
+## 2026-10-14 通知APIの限定改善
+
+Vercel Logsをブラウザーで `lab_manager_performance` に絞り、15:15:17〜15:18:24 JSTに表示された成功ログを比較した。通知APIの最長記録の環境はproduction、region=hnd1、deployment=8LUdxkEAseksikTQvfD79TDeRSe4、commit=73b3eec。当該commitの通知APIと変更前のローカルファイルは一致する。他のローカル未コミット変更は保持している。
+
+| operation | 件数 | p50 ms | p95 ms | 最大 ms |
+| --- | ---: | ---: | ---: | ---: |
+| auth.login | 2 | 1909.66 | 3453.25 | 3453.25 |
+| dashboard.user | 1 | 1666.43 | 1666.43 | 1666.43 |
+| page.reservations | 3 | 2163.42 | 2375.25 | 2375.25 |
+| page.admin.dashboard | 2 | 3450.23 | 3506.42 | 3506.42 |
+| api.admin.notifications | 20 | 3405.40 | 4374.73 | 4490.12 |
+
+少数サンプルの観測結果であり、通常負荷での統計的な順位を保証しない。内部Actionとページの時間は合算しない。今回の観測でp95・最大時間とも最長の `api.admin.notifications` のみを対象にした。
+
+最長4490.12msの内訳は認証1345.43ms、DB待ち2781.66ms。DB待ちのすべてを単一原因には帰属できないが、コード上で通知一覧取得後に独立した未読件数取得を直列実行しており、この待ち時間は重ねられる。通知補完が完了した後、この2読み取りだけをPromise.allで実行する。取得条件、50件上限、旧スキーマへのフォールバック、認証判定、監査ログの内容と書き込みタイミングは維持する。予約・請求書処理・スキーマ・UI・ログ項目は変更しない。
+
+回帰テスト: `scripts/notification-performance-self-test.ts`。成功、旧スキーマフォールバック、401、403、DB失敗、応答へのメール非露出、並列実行、監査書き込み順を隔離した依存で確認する。実DBへアクセスしない。
+
+同じ実API関数とPerformanceTraceを使い、一覧と件数のDB待ちをそれぞれ30msに固定して10回測定した結果:
+
+| 隔離した模擬DB計測 | 改善前 ms | 改善後 ms |
+| --- | ---: | ---: |
+| durationMs p50 | 62.28 | 31.34 |
+| durationMs p95 | 63.21 | 31.59 |
+
+これは並列化による待ち時間削減の検証であり、本番4490.12msが31msになるという意味ではない。本番の改善後durationMsは未計測・未デプロイ。再現する場合は `git show 73b3eec:src/app/api/admin/notifications/route.ts > /tmp/lab-manager-notifications-baseline.ts` の後、`node --import tsx scripts/notification-performance-self-test.ts /tmp/lab-manager-notifications-baseline.ts` を実行する。
+
+残る要因は認証のDB往復、通知補完の直列処理と利用者ごとの書き込み、監査書き込み、DB接続プール・ネットワーク待ち。dbRegionはunknownで、外部サービス待ちやDB実行計画が主因という証拠はない。本番の改善確認には同じデプロイ条件・操作・負荷でログを再取得する必要がある。

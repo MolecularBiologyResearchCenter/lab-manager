@@ -17,7 +17,7 @@
     "password:migrate": "tsx scripts/hash-existing-passwords.ts",
     "test:reservation": "tsx scripts/reservation-rules-self-test.ts",
     "test:reservation-regression": "tsx scripts/reservation-regression-self-test.ts",
-    "test:performance": "tsx scripts/performance-self-test.ts && tsx scripts/performance-aggregation-self-test.ts",
+    "test:performance": "tsx scripts/performance-self-test.ts && tsx scripts/performance-aggregation-self-test.ts && tsx scripts/notification-performance-self-test.ts",
     "test:invoice-period": "tsx scripts/invoice-period-self-test.ts",
     "test:university-email": "tsx scripts/university-email-self-test.ts",
     "performance:summary": "tsx scripts/performance-summary.ts",

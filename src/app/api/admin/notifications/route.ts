@@ -165,79 +165,82 @@ export async function GET() {
             await syncRecentRegistrationNotifications(currentUser!)
         })
 
-        const notifications = await trace.measure('prismaQuery', async () => {
-            try {
-                return await prisma.adminNotification.findMany({
-                    where: {
-                        OR: [
-                            { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
-                            { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
-                            { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
-                        ],
-                    },
-                    select: {
-                        id: true,
-                        type: true,
-                        targetUserId: true,
-                        name: true,
-                        department: true,
-                        laboratory: true,
-                        employeeId: true,
-                        fiscalYear: true,
-                        quarter: true,
-                        microsoftGroupSyncErrorCode: true,
-                        microsoftGroupSyncEmail: true,
-                        createdAt: true,
-                        reads: {
-                            where: { adminId: currentUser!.id },
-                            select: { readAt: true },
+        // Both reads must follow notification synchronization, but are independent.
+        const [notifications, unreadCount] = await trace.measure('prismaQuery', () => Promise.all([
+            (async () => {
+                try {
+                    return await prisma.adminNotification.findMany({
+                        where: {
+                            OR: [
+                                { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
+                                { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
+                                { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
+                            ],
                         },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                    take: 50,
-                })
-            } catch (error) {
-                if (!isMissingRetryColumn(error)) throw error
-                return prisma.adminNotification.findMany({
-                    where: {
-                        OR: [
-                            { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
-                            { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
-                            { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
-                        ],
-                    },
-                    select: {
-                        id: true,
-                        type: true,
-                        targetUserId: true,
-                        name: true,
-                        department: true,
-                        laboratory: true,
-                        employeeId: true,
-                        fiscalYear: true,
-                        quarter: true,
-                        microsoftGroupSyncErrorCode: true,
-                        createdAt: true,
-                        reads: {
-                            where: { adminId: currentUser!.id },
-                            select: { readAt: true },
+                        select: {
+                            id: true,
+                            type: true,
+                            targetUserId: true,
+                            name: true,
+                            department: true,
+                            laboratory: true,
+                            employeeId: true,
+                            fiscalYear: true,
+                            quarter: true,
+                            microsoftGroupSyncErrorCode: true,
+                            microsoftGroupSyncEmail: true,
+                            createdAt: true,
+                            reads: {
+                                where: { adminId: currentUser!.id },
+                                select: { readAt: true },
+                            },
                         },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                    take: 50,
-                })
-            }
-        })
-        const unreadCount = await trace.measure('prismaQuery', () => prisma.adminNotification.count({
-            where: {
-                OR: [
-                    { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
-                    { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
-                    { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
-                ],
-                reads: { none: { adminId: currentUser!.id } },
-            },
-        }))
+                        orderBy: { createdAt: 'desc' },
+                        take: 50,
+                    })
+                } catch (error) {
+                    if (!isMissingRetryColumn(error)) throw error
+                    return prisma.adminNotification.findMany({
+                        where: {
+                            OR: [
+                                { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
+                                { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
+                                { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
+                            ],
+                        },
+                        select: {
+                            id: true,
+                            type: true,
+                            targetUserId: true,
+                            name: true,
+                            department: true,
+                            laboratory: true,
+                            employeeId: true,
+                            fiscalYear: true,
+                            quarter: true,
+                            microsoftGroupSyncErrorCode: true,
+                            createdAt: true,
+                            reads: {
+                                where: { adminId: currentUser!.id },
+                                select: { readAt: true },
+                            },
+                        },
+                        orderBy: { createdAt: 'desc' },
+                        take: 50,
+                    })
+                }
+            })(),
+            prisma.adminNotification.count({
+                where: {
+                    OR: [
+                        { type: { notIn: [INVOICE_ISSUE_REMINDER_TYPE, MICROSOFT_GROUP_SYNC_FAILURE_TYPE] } },
+                        { type: INVOICE_ISSUE_REMINDER_TYPE, resolvedAt: null },
+                        { type: MICROSOFT_GROUP_SYNC_FAILURE_TYPE, resolvedAt: null },
+                    ],
+                    reads: { none: { adminId: currentUser!.id } },
+                },
+            }),
+        ]))
 
         await recordAuditLog({
             actor: currentUser,
